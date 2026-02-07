@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#21808D">
+    <title>TheyGrow — Офлайн</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #FCFCF9 0%, #f0f0ed 100%);
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 400px;
+            background: white;
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #21808D;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #21808D;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #21808D;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #1a6570;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📡</div>
+        <h1>Нет сети</h1>
+        <p>Приложение доступно офлайн. Ваши данные сохранены локально и будут синхронизированы при восстановлении соединения.</p>
+        <a href="/" class="btn">Вернуться в приложение</a>
+        <div class="status">
+            <span id="status-text">Проверка соединения...</span>
+        </div>
+    </div>
+
+    <script>
+        // Периодическая проверка соединения
+        function checkOnlineStatus() {
+            const statusText = document.getElementById('status-text');
+            if (navigator.onLine) {
+                statusText.textContent = 'Соединение восстановлено!';
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            } else {
+                statusText.textContent = 'Офлайн режим';
+            }
+        }
+
+        // Проверять каждые 3 секунды
+        setInterval(checkOnlineStatus, 3000);
+        checkOnlineStatus();
+
+        // Слушать события изменения статуса сети
+        window.addEventListener('online', () => {
+            document.getElementById('status-text').textContent = 'Соединение восстановлено!';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        });
+
+        window.addEventListener('offline', () => {
+            document.getElementById('status-text').textContent = 'Офлайн режим';
+        });
+    </script>
+</body>
+</html>

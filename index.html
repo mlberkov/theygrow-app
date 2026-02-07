@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#21808D">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W"></script>
@@ -1377,9 +1379,144 @@
             padding: 6px 12px;
           }
         }
+
+        /* ─────────────────────────────────────────────────────────────────────────── */
+        /* PWA INSTALL PROMPT BANNERS                                                  */
+        /* ─────────────────────────────────────────────────────────────────────────── */
+
+        #installBanner,
+        #iosBanner {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-white);
+            border-top: 2px solid var(--primary-purple);
+            padding: 16px 20px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 9999;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        #installBanner.visible,
+        #iosBanner.visible {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        #installBanner span {
+            flex: 1;
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        #installBtn,
+        #iosDismiss {
+            background: var(--primary-purple);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+        #installBtn:hover,
+        #iosDismiss:hover {
+            background: var(--primary-purple-light);
+        }
+
+        #installDismiss {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 28px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 8px;
+            margin-left: 8px;
+            transition: color 0.2s;
+        }
+
+        #installDismiss:hover {
+            color: var(--text-primary);
+        }
+
+        #iosBanner {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 16px;
+            padding: 20px;
+        }
+
+        #iosBanner p {
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+            text-align: left;
+        }
+
+        #iosBanner strong {
+            color: var(--primary-purple);
+            font-weight: 600;
+        }
+
+        #iosDismiss {
+            align-self: center;
+            min-width: 120px;
+        }
+
+        @media (max-width: 480px) {
+            #installBanner,
+            #iosBanner {
+                padding: 14px 16px;
+            }
+
+            #installBanner span,
+            #iosBanner p {
+                font-size: 13px;
+            }
+
+            #installBtn,
+            #iosDismiss {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- PWA Install Prompt Banners -->
+    <div id="installBanner">
+        <span>Установите приложение для удобной работы</span>
+        <button id="installBtn">Установить</button>
+        <button id="installDismiss" aria-label="Закрыть">&times;</button>
+    </div>
+
+    <div id="iosBanner">
+        <p>Чтобы установить приложение, нажмите <strong>Поделиться</strong> (Share) и выберите <strong>«На экран Домой»</strong> (Add to Home Screen).</p>
+        <button id="iosDismiss">Понятно</button>
+    </div>
+
     <!-- Новый заголовок с профилем -->
     <header>
         <div class="header-top">
@@ -2677,6 +2814,149 @@
 
         // Запуск при загрузке страницы
         document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+    <!-- PWA Install Prompt -->
+    <script>
+        (function() {
+            let deferredPrompt = null;
+            const installBanner = document.getElementById('installBanner');
+            const installBtn = document.getElementById('installBtn');
+            const installDismiss = document.getElementById('installDismiss');
+            const iosBanner = document.getElementById('iosBanner');
+            const iosDismiss = document.getElementById('iosDismiss');
+
+            // Проверка: приложение уже установлено?
+            function isAppInstalled() {
+                // Standalone mode (PWA запущено как приложение)
+                if (window.matchMedia('(display-mode: standalone)').matches) {
+                    return true;
+                }
+                // iOS standalone
+                if (window.navigator.standalone === true) {
+                    return true;
+                }
+                return false;
+            }
+
+            // Если приложение уже установлено, не показываем промпты
+            if (isAppInstalled()) {
+                return;
+            }
+
+            // ═══════════════════════════════════════════════════════════
+            // Android / Desktop: beforeinstallprompt
+            // ═══════════════════════════════════════════════════════════
+            window.addEventListener('beforeinstallprompt', (e) => {
+                // Предотвращаем автоматический промпт браузера
+                e.preventDefault();
+                // Сохраняем событие для последующего использования
+                deferredPrompt = e;
+
+                // Показываем наш баннер
+                installBanner.classList.add('visible');
+
+                // GA tracking
+                if (typeof trackEvent === 'function') {
+                    trackEvent('pwa_install_prompt_shown', { platform: 'android_desktop' });
+                }
+            });
+
+            // Обработчик кнопки "Установить"
+            if (installBtn) {
+                installBtn.addEventListener('click', async () => {
+                    if (!deferredPrompt) return;
+
+                    // Показываем нативный промпт
+                    deferredPrompt.prompt();
+
+                    // Ждём выбора пользователя
+                    const choiceResult = await deferredPrompt.userChoice;
+
+                    // GA tracking
+                    if (typeof trackEvent === 'function') {
+                        trackEvent('pwa_install_accepted', {
+                            outcome: choiceResult.outcome,
+                            platform: 'android_desktop'
+                        });
+                    }
+
+                    // Скрываем баннер независимо от выбора
+                    installBanner.classList.remove('visible');
+
+                    // Очищаем сохранённый промпт
+                    deferredPrompt = null;
+                });
+            }
+
+            // Обработчик кнопки закрытия (×)
+            if (installDismiss) {
+                installDismiss.addEventListener('click', () => {
+                    installBanner.classList.remove('visible');
+                });
+            }
+
+            // ═══════════════════════════════════════════════════════════
+            // iOS: показываем подсказку один раз
+            // ═══════════════════════════════════════════════════════════
+            function isIOS() {
+                return /iP(hone|od|ad)/.test(navigator.userAgent);
+            }
+
+            function shouldShowIOSHint() {
+                // Не iOS
+                if (!isIOS()) return false;
+
+                // Уже в standalone mode
+                if (window.navigator.standalone === true) return false;
+
+                // Пользователь уже закрыл подсказку ранее
+                if (localStorage.getItem('iosInstallDismissed') === 'true') return false;
+
+                return true;
+            }
+
+            if (shouldShowIOSHint()) {
+                // Показываем баннер с небольшой задержкой для лучшего UX
+                setTimeout(() => {
+                    iosBanner.classList.add('visible');
+
+                    // GA tracking
+                    if (typeof trackEvent === 'function') {
+                        trackEvent('pwa_ios_hint_shown', { platform: 'ios' });
+                    }
+                }, 1500);
+            }
+
+            // Обработчик кнопки "Понятно" для iOS
+            if (iosDismiss) {
+                iosDismiss.addEventListener('click', () => {
+                    iosBanner.classList.remove('visible');
+                    // Сохраняем флаг, чтобы больше не показывать
+                    localStorage.setItem('iosInstallDismissed', 'true');
+
+                    // GA tracking
+                    if (typeof trackEvent === 'function') {
+                        trackEvent('pwa_ios_hint_dismissed', { platform: 'ios' });
+                    }
+                });
+            }
+        })();
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker registered:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>
