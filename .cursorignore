@@ -1,0 +1,61 @@
+# TheyGrow - .cursorignore
+# Файлы и директории, которые Cursor должен игнорировать
+
+# Игнорировать всю директорию data/, кроме мастер-плана
+/data/*
+!/data/mvp_masterplan.md
+
+# Node modules
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+.nyc_output/
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

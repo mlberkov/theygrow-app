@@ -1,1 +1,2 @@
-/data/
+/data/*
+!/data/mvp_masterplan.md
