@@ -20,10 +20,10 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 
 ### M1-P3-INV-002 — Contract integrity
 
-- **Statement.** Within the contract + spine documents, superseded stack names do not reappear as active targets, and live-infra identifiers stay confined to `docs/RUNBOOK.md`.
-- **Enforced by.** `scripts/check-contract-integrity.sh`, wired into `.pre-commit-config.yaml` (local hook) and `.github/workflows/ci.yml`.
+- **Statement.** Within the contract + spine documents, three conditions hold: (a) superseded stack names do not reappear as active targets; (b) the legacy pre-rename repository directory name does not appear; (c) live-infra identifiers stay confined to `docs/RUNBOOK.md`.
+- **Enforced by.** `scripts/check-contract-integrity.sh`, wired into `.pre-commit-config.yaml` (local hook) and `.github/workflows/ci.yml`. The script holds the authoritative match patterns for all three checks; they are intentionally not restated inline here, since this file is itself within the scanned corpus.
 - **Landed in.** M1-P3.
-- **Scope.** Governs the contract + spine corpus: `AGENTS.md`, `CLAUDE.md`, `docs/INVARIANTS.md`, `docs/RUNTIME-INVARIANTS.md`, `docs/execution-map.md`, `docs/RUNBOOK.md`, `docs/product/BuildPlan.md`, `docs/product/TechSpec.md`, `.cursor/rules/masterplan.mdc`. Live-deploy paths are out of scope — they carry live-infra identifiers as operational reality. Historical artifacts (`docs/decision-log.md`, `data/mvp_masterplan.md`) are exempt — they record the superseded plan by design. This promotes the previously-manual P1/P2 negative-checks into an enforced gate.
+- **Scope.** Governs the contract + spine corpus: `AGENTS.md`, `CLAUDE.md`, `docs/INVARIANTS.md`, `docs/RUNTIME-INVARIANTS.md`, `docs/execution-map.md`, `docs/RUNBOOK.md`, `docs/product/BuildPlan.md`, `docs/product/TechSpec.md`, `.cursor/rules/masterplan.mdc`. Live-deploy paths are out of scope — they carry live-infra identifiers as operational reality. Historical artifacts (`docs/decision-log.md`, `data/mvp_masterplan.md`) are exempt — they record the superseded plan by design. This promotes the previously-manual P1/P2 negative-checks into an enforced gate. P4 tightened check (b) to a strict ban by removing its interim pairing exception once the residual naming sweep was complete.
 
 ## Entry format (for future entries)
 

@@ -6,9 +6,10 @@
 # `pre-commit run --all-files` and as a direct step). Must stay GREEN on the
 # tracked tree; a non-zero exit means the contract drifted.
 #
-# Two checks over the contract + spine corpus:
+# Three checks over the contract + spine corpus:
 #   1. No superseded stack name reappears as an active target.
-#   2. Live-infra names stay confined to docs/RUNBOOK.md (the sole carrier).
+#   2. The legacy pre-rename repository directory name does not appear.
+#   3. Live-infra names stay confined to docs/RUNBOOK.md (the sole carrier).
 #
 # Out of scope by design (never scanned):
 #   - Live-deploy paths (cloudbuild.yaml, Dockerfile, nginx.conf, index.html,
@@ -46,17 +47,20 @@ for f in "${CONTRACT_FILES[@]}"; do
   fi
 done
 
-# Old directory name `they_grow/` is permitted ONLY in a rename directive that
-# also names the canonical `theygrow-app`; the residual sweep itself is P4 scope.
+# --- Check 2: legacy pre-rename directory name banned from contract + spine --
+# Strict bare-ban (P4): the residual sweep removed the last live-spine
+# occurrence, so the interim 'theygrow-app' pairing exception is gone. The
+# legacy snake-case repo directory name must not appear at all. This script is
+# not in CONTRACT_FILES, so the pattern below is never self-scanned.
 for f in "${CONTRACT_FILES[@]}"; do
   [ -f "$f" ] || continue
-  if grep -nE 'they_grow/' "$f" | grep -vE 'theygrow-app'; then
-    echo "  ^ INV-002: bare old dir name 'they_grow/' in $f (allowed only paired with 'theygrow-app')" >&2
+  if grep -nE 'they_grow/' "$f"; then
+    echo "  ^ INV-002: legacy pre-rename directory name in $f (banned in contract + spine)" >&2
     fail=1
   fi
 done
 
-# --- Check 2: live-infra names confined to docs/RUNBOOK.md -------------------
+# --- Check 3: live-infra names confined to docs/RUNBOOK.md -------------------
 INFRA_RE='child-tracker(-service|-repo)'
 for f in "${CONTRACT_FILES[@]}"; do
   [ -f "$f" ] || continue

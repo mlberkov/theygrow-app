@@ -5,3 +5,19 @@
 .ruff_cache/
 .mypy_cache/
 .pytest_cache/
+
+# Standard ignores (P4 pass)
+.venv/
+__pycache__/
+node_modules/
+dist/
+build/
+coverage/
+htmlcov/
+.cache/
+.tox/
+*.egg-info/
+.DS_Store
+*.log
+.env*
+!.env.example

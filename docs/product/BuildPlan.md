@@ -9,7 +9,7 @@ Docs / refactor / config only. No product behavior, no backend code, no schema. 
 - **P1** — Contract redirect. Rewrite `AGENTS.md`, add `CLAUDE.md`, neutralize `.cursor/rules/masterplan.mdc`, reframe `data/mvp_masterplan.md` with a supersession header, open `docs/decision-log.md` with `M1-DL-001`. **Done** @ f04d2ee.
 - **P2** — Docs spine. Author `INVARIANTS.md`, `RUNTIME-INVARIANTS.md`, `execution-map.md`, `RUNBOOK.md`, `product/BuildPlan.md`, `product/TechSpec.md`; extend the cursor stub with the execution-map pointer. **Current packet.**
 - **P3** — Quality harness. `pyproject.toml`, Ruff, mypy, `.editorconfig`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`, secret-scan; first enforced `INVARIANTS.md` entry lands here.
-- **P4** — Naming / `.gitignore` / `README.md` cleanup; residual `they_grow/` → `theygrow-app` doc sweep.
+- **P4** — Naming / `.gitignore` / `README.md` cleanup; residual repository-directory naming sweep so the live spine reads consistently as `theygrow-app`.
 
 M1 close: a single PR opens after P4 lands.
 
