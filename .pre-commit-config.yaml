@@ -1,0 +1,47 @@
+# Pre-commit hooks for theygrow-app — local mirror of the CI quality gate.
+# CI (.github/workflows/ci.yml) is the gate of record; this runs the same checks
+# locally. With zero Python in the tree today, the Ruff/mypy hooks no-op cleanly.
+#
+# Auto-fixing hygiene hooks (trailing-whitespace, end-of-file-fixer) EXCLUDE the
+# live-deploy paths (AGENTS.md §7 guardrail) and data/ (the frozen masterplan) so
+# the harness never churns or touches those files. Read-only validators
+# (check-yaml, check-json) run repo-wide.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.2
+    hooks:
+      - id: ruff           # lint (replaces flake8); isort via the I rule set
+        args: [--fix]
+      - id: ruff-format    # format (replaces Black)
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        # types: [python] means this no-ops until /api lands in M2.
+        args: [--config-file=pyproject.toml]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '^(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|data/)'
+      - id: end-of-file-fixer
+        exclude: '^(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|data/)'
+      - id: check-yaml     # read-only validator, repo-wide
+      - id: check-json     # read-only validator, repo-wide
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks       # M1-P3-INV-001 — no secrets committed
+
+  - repo: local
+    hooks:
+      - id: contract-integrity
+        name: contract-integrity (M1-P3-INV-002)
+        entry: scripts/check-contract-integrity.sh
+        language: script
+        pass_filenames: false
+        always_run: true

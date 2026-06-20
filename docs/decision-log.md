@@ -26,3 +26,23 @@ This file records architectural and scope-shaping decisions for `theygrow-app`. 
   - Supersession header prepended to `data/mvp_masterplan.md` (this packet, M1-P1).
   - This decision log created (this packet, M1-P1).
   - Downstream in M1: docs spine authored in M1-P2 (`INVARIANTS.md`, `RUNTIME-INVARIANTS.md`, `execution-map.md`, `RUNBOOK.md`, `product/BuildPlan.md`, `product/TechSpec.md`); quality harness in M1-P3; naming / gitignore / README cleanup in M1-P4. The live-infra divergence (GCP resource names `child-tracker-service` / `child-tracker-repo` predate the project rename) is documented in `docs/RUNBOOK.md` in M1-P2, not in `AGENTS.md`.
+
+---
+
+## M1-DL-002 — Quality harness: tooling + dual posture + first enforced invariants
+
+- **Date.** 2026-06-20
+- **Decision.** Adopt **Ruff** (format + lint) and **mypy** as the Python quality harness, run by **both** pre-commit (local) and a GitHub Actions CI workflow (gate of record). Ruff replaces the Black + isort + flake8 trio (format via `ruff format`, import-sorting via the `I` rule set, linting via `ruff check`). Configs land at repo root (`pyproject.toml`, `.editorconfig`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`), pre-sized for the `/api` subtree that lands in M2. The same packet lands the **first two enforced invariants**: `M1-P3-INV-001` (no secrets committed — gitleaks) and `M1-P3-INV-002` (contract integrity — a grep gate promoting the previously-manual P1/P2 negative-checks).
+- **Rationale.** Ruff collapses three tools into one fast binary with a single config surface, reducing harness maintenance and CI time. The dual pre-commit + CI posture gives contributors a fast local signal while keeping CI as the authoritative gate that cannot be bypassed. Wiring the first invariants now — rather than waiting for product code — promotes the contract guarantees that were enforced by hand in P1/P2 into machine-checked gates, so contract drift and committed secrets fail loudly from this point on. The harness is built to pass cleanly with zero Python present (Ruff no-ops; mypy is guarded), so it provides value immediately and gains teeth when `/api` arrives.
+- **Alternatives considered.**
+  1. **Black + isort + flake8 (the conventional trio).** Rejected — three tools, three configs, slower; Ruff subsumes all three with parity for this project's needs.
+  2. **Single posture (pre-commit only, or CI only).** Rejected — pre-commit alone is bypassable (`--no-verify`); CI alone gives no local signal. Both together is the standard belt-and-suspenders.
+  3. **Defer all enforced invariants until product code lands (M2).** Rejected — the secret-scan and contract-integrity guarantees are enforceable now and protect the contract during the harness-building phase itself.
+  4. **A third-party CI action for the contract gate.** Rejected — a small in-repo shell script (`scripts/check-contract-integrity.sh`) is dependency-free, runs identically in pre-commit and CI, and keeps the enforced rule reviewable in the repo.
+- **Supersedes.** None.
+- **Effects.**
+  - Added `pyproject.toml` (Ruff + mypy config), `.editorconfig`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`, and `scripts/check-contract-integrity.sh`.
+  - `docs/INVARIANTS.md` gains its first two entries (`M1-P3-INV-001`, `M1-P3-INV-002`).
+  - Auto-fixing hygiene hooks are scoped to exclude the live-deploy paths (`AGENTS.md` §7) and `data/`, so the harness never churns those files.
+  - The new CI workflow is quality-only and independent of the Cloud Build deploy pipeline (`cloudbuild.yaml`); the live Cloud Run deploy is unaffected.
+  - Minimal tool-cache entries added to `.gitignore`; the full ignore pass remains M1-P4.

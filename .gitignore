@@ -1,2 +1,7 @@
 /data/*
 !/data/mvp_masterplan.md
+
+# Tooling caches (minimal P3 entries; full .gitignore pass is P4)
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/

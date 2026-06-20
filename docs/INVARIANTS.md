@@ -11,9 +11,19 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 
 ## Invariants
 
-_None yet._
+### M1-P3-INV-001 — No secrets committed
 
-The first entry lands in **M1-P3** when the quality harness (Ruff / mypy / pre-commit / GitHub Actions CI / secret-scan) is added — that packet introduces the first code-level enforcement and so the first eligible invariant. No earlier packet has standing to add an entry.
+- **Statement.** No secret or credential material is committed to the repository.
+- **Enforced by.** `.pre-commit-config.yaml` (gitleaks hook) and `.github/workflows/ci.yml` (runs the gitleaks hook via `pre-commit run --all-files`, with full history fetched).
+- **Landed in.** M1-P3.
+- **Scope.** Covers tracked content and commit history reachable in CI. Public, non-secret identifiers (e.g. the GA4 Measurement ID, the GCP project id / region) are not secrets; if the scanner flags one, it is allowlisted in `.gitleaks.toml` as an exact non-secret. Genuine secrets are never allowlisted.
+
+### M1-P3-INV-002 — Contract integrity
+
+- **Statement.** Within the contract + spine documents, superseded stack names do not reappear as active targets, and live-infra identifiers stay confined to `docs/RUNBOOK.md`.
+- **Enforced by.** `scripts/check-contract-integrity.sh`, wired into `.pre-commit-config.yaml` (local hook) and `.github/workflows/ci.yml`.
+- **Landed in.** M1-P3.
+- **Scope.** Governs the contract + spine corpus: `AGENTS.md`, `CLAUDE.md`, `docs/INVARIANTS.md`, `docs/RUNTIME-INVARIANTS.md`, `docs/execution-map.md`, `docs/RUNBOOK.md`, `docs/product/BuildPlan.md`, `docs/product/TechSpec.md`, `.cursor/rules/masterplan.mdc`. Live-deploy paths are out of scope — they carry live-infra identifiers as operational reality. Historical artifacts (`docs/decision-log.md`, `data/mvp_masterplan.md`) are exempt — they record the superseded plan by design. This promotes the previously-manual P1/P2 negative-checks into an enforced gate.
 
 ## Entry format (for future entries)
 

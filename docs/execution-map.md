@@ -14,8 +14,8 @@ This file is the living "where are we / what's next" state map. It is the index,
 
 - **M1 in progress.**
   - **P1** — Contract redirect. **Done** @ f04d2ee (`AGENTS.md` rewritten, `CLAUDE.md` added, `.cursor/rules/masterplan.mdc` neutralized, `data/mvp_masterplan.md` reframed, `docs/decision-log.md` opened with `M1-DL-001`).
-  - **P2** — Docs spine. **Current** (this packet — authors `INVARIANTS.md`, `RUNTIME-INVARIANTS.md`, `execution-map.md`, `RUNBOOK.md`, `product/BuildPlan.md`, `product/TechSpec.md`; extends the cursor stub with the execution-map pointer).
-  - **P3** — Quality harness. **Pending** (pyproject / Ruff / mypy / `.editorconfig` / pre-commit / GitHub Actions CI / secret-scan + first enforced `INVARIANTS.md` entry).
+  - **P2** — Docs spine. **Done** @ 2886d0f (`INVARIANTS.md`, `RUNTIME-INVARIANTS.md`, `execution-map.md`, `RUNBOOK.md`, `product/BuildPlan.md`, `product/TechSpec.md`; cursor stub extended with the execution-map pointer).
+  - **P3** — Quality harness. **Current** (this packet — `pyproject.toml` / Ruff / mypy / `.editorconfig` / `.pre-commit-config.yaml` / GitHub Actions CI / gitleaks secret-scan / `scripts/check-contract-integrity.sh`; first enforced `INVARIANTS.md` entries `M1-P3-INV-001` + `M1-P3-INV-002`; decision `M1-DL-002`).
   - **P4** — Naming / `.gitignore` / `README.md` cleanup. **Pending**.
 - **M2-M5** — Not started.
 
