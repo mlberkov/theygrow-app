@@ -55,7 +55,7 @@ This is the map, not the spec. Roadmap v2 is the spec.
 
 - M1 is **docs / refactor / config only**. No product behavior. No backend code. No schema.
 - **Do not touch live deploy paths** in any M1 packet: `cloudbuild.yaml`, `Dockerfile`, `nginx.conf`, `index.html`, `sw.js`, `manifest.json`, `offline.html`, `icons/`. The live Cloud Run deploy must remain unaffected by every M1 packet.
-- One branch per milestone (M1 = `feat/m1-harness`). Packets are commit-checkpoints on that branch. **A PR opens once per milestone, at close** — not per packet.
+- One branch per milestone; the branch prefix matches the milestone's nature (M1 is enablement / config / docs with no product behavior, so the current milestone branch is `chore/m1-harness`). Packets are commit-checkpoints on that branch. **A PR opens once per milestone, at close** — not per packet.
 - M1 packets: P1 contract redirect; P2 docs spine; P3 quality harness; P4 naming / gitignore / README cleanup.
 
 ## §8 Repository layout
@@ -76,7 +76,7 @@ theygrow-app/
 ## §9 Working conventions
 
 - **Commits.** Conventional Commits: `feat | fix | docs | chore | refactor | test | ci`. Subject ≤ 72 chars. Body explains *why*, not *what*.
-- **Branches.** One branch per milestone, e.g. `feat/m1-harness`. Packets land as separate commits on that branch. No per-packet branches, no per-packet PRs.
+- **Branches.** One branch per milestone. The prefix reflects the milestone's nature: `chore/` for enablement / config, `docs/` for docs-only, `refactor/` for internal cleanup, `feat/` for product behavior. Packets land as separate commits on that branch — no per-packet branches, no per-packet PRs.
 - **PRs.** A single PR per milestone, opened at milestone close, after all packets have landed as commits.
 - **Decision log.** Entries live in `docs/decision-log.md`. Id format `M{N}-DL-{NNN}`. Required fields: **Date**, **Decision**, **Rationale**, **Alternatives considered**, **Supersedes**, **Effects**.
 - **Scope discipline.** Do not widen scope inside a packet. Surface forks as questions. Gated-out items (§5) stay gated.
