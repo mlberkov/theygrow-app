@@ -1,0 +1,31 @@
+# Tool configuration for theygrow-app.
+#
+# This file carries quality-harness config only (Ruff + mypy). It is intentionally
+# NOT a buildable package: there is no [project] table and no Python source yet.
+# The Python subtree lands at /api in M2 (AGENTS.md §8); these tools are pre-sized
+# for it. Until then there are zero Python targets and the tools no-op cleanly.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["api"]
+extend-exclude = [".ruff_cache", ".mypy_cache", ".pytest_cache"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I isort (replaces standalone isort), UP pyupgrade,
+# B flake8-bugbear. Conservative starter set; widened when /api lands.
+select = ["E", "W", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+# Strict-on-new-code posture. No `files`/`packages` is set on purpose: pointing at
+# a not-yet-existent api/ would error. mypy runs on CLI-provided paths (CI) and on
+# staged Python files (pre-commit). Real teeth arrive with /api in M2.
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_reexport = true

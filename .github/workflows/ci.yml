@@ -1,0 +1,51 @@
+# Quality-only CI — the gate of record for theygrow-app.
+#
+# Runs Ruff (format + lint), mypy, and the full pre-commit suite (which also runs
+# the gitleaks secret-scan and the contract-integrity gate). It does NOT build,
+# deploy, or touch GCP, and is fully independent of the Cloud Build pipeline
+# (cloudbuild.yaml), which deploys on push to main. No secrets or cloud
+# credentials are referenced here.
+#
+# With zero Python in the tree today, Ruff no-ops cleanly and mypy is guarded so
+# it does not fail on "no files". Real teeth arrive when /api lands in M2.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so gitleaks can scan commits
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: python -m pip install "ruff==0.9.2" "mypy==1.14.1" "pre-commit==4.0.1"
+
+      - name: Ruff format (check)
+        run: ruff format --check .
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: mypy (guarded — no Python targets until /api lands)
+        run: |
+          if find . -path ./.git -prune -o -name '*.py' -print | grep -q .; then
+            mypy .
+          else
+            echo "No Python files yet — skipping mypy (real teeth arrive with /api in M2)."
+          fi
+
+      - name: pre-commit (all files)
+        run: pre-commit run --all-files --show-diff-on-failure

@@ -1,2 +1,23 @@
 /data/*
 !/data/mvp_masterplan.md
+
+# Tooling caches (minimal P3 entries; full .gitignore pass is P4)
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Standard ignores (P4 pass)
+.venv/
+__pycache__/
+node_modules/
+dist/
+build/
+coverage/
+htmlcov/
+.cache/
+.tox/
+*.egg-info/
+.DS_Store
+*.log
+.env*
+!.env.example

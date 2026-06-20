@@ -1,3 +1,13 @@
+> **SUPERSEDED 2026-06-19 / УСТАРЕЛО 2026-06-19**
+>
+> This document is a February 2026 full-stack monolith blueprint, retained as a historical artifact. It is **not** the plan of record and is **not** a task source.
+>
+> Plan of record: **ADR-005** + **roadmap v2** (see [`AGENTS.md`](../AGENTS.md)). Decision recorded in [`docs/decision-log.md`](../docs/decision-log.md), entry `M1-DL-001`.
+>
+> Этот документ — план полнофункционального монолита от февраля 2026, сохранён как исторический артефакт. **Не является** действующим планом и **не** служит источником задач. Действующий контракт — `AGENTS.md`.
+
+---
+
 # TheyGrow MVP — Мастер-план разработки
 
 **Источник:** `data/TheyGrow-MVP-Blueprint.md`  
