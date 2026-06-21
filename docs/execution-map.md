@@ -6,7 +6,7 @@ This file is the living "where are we / what's next" state map. It is the index,
 
 - **M1** — Repository preparation for agentic development (enablement harness).
 - **M2** — `/api` skeleton (Python / FastAPI lands; monorepo split `/app` + `/api` lands).
-- **M3** — Episodic store (Postgres + pgvector) + `/export` importer from `diary-memory-service`.
+- **M3** — Core store (one managed PostgreSQL as SoT; pgvector-derived vector port, ADR-008) + `/export` importer from `diary-memory-service`.
 - **M4** — Retrieval lift from the engine (`diary-memory-service` → `theygrow-app`).
 - **M5** — Closed-corpus family-memory chat.
 
