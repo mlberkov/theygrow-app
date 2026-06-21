@@ -1,0 +1,30 @@
+# theygrow-api — the FastAPI backend (M2).
+#
+# Self-contained PEP 621 package: /api owns its runtime + dev dependencies, the
+# same way /app owns its static assets. The ROOT pyproject.toml stays the single
+# source of tooling config (Ruff + mypy); this file carries metadata + deps ONLY
+# and intentionally defines no [tool.*] config.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "theygrow-api"
+version = "0.0.0"
+description = "theygrow-app FastAPI backend (M2 skeleton)."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic-settings>=2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "httpx>=0.27",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["theygrow_api"]

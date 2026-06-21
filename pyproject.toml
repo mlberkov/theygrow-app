@@ -20,9 +20,14 @@ select = ["E", "W", "F", "I", "UP", "B"]
 quote-style = "double"
 
 [tool.mypy]
-# Strict-on-new-code posture. No `files`/`packages` is set on purpose: pointing at
-# a not-yet-existent api/ would error. mypy runs on CLI-provided paths (CI) and on
-# staged Python files (pre-commit). Real teeth arrive with /api in M2.
+# Strict-on-new-code posture. No `files`/`packages` is set on purpose: mypy runs on
+# CLI-provided paths (CI: `mypy api`) and on staged Python files (pre-commit). With
+# /api landed (M2-P2) it has teeth on the api/ subtree.
+#
+# The pydantic plugin is required for env-sourced pydantic-settings BaseSettings:
+# without it, dataclass_transform makes default-less fields required constructor
+# args, but those fields are populated from the environment, not at the call site.
+plugins = ["pydantic.mypy"]
 python_version = "3.12"
 strict = true
 warn_unused_configs = true

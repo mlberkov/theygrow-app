@@ -62,4 +62,5 @@ Child names, diary texts, and birthdates never cross the running boundary into t
 
 - Intent source: `AGENTS.md` §4 "Privacy precondition".
 - Runtime contract: every logging / telemetry / error-tracking / third-party surface either has no path to PII fields or redacts them at the boundary; tests assert that the precondition holds end-to-end.
-- Status: documented. Enforcement begins: M2. Packet: TBD.
+- Status: enforced (forward guard). Enforcement begins: M2. Packet: M2-P2 — `api/theygrow_api/logging.py` (`PiiRedactionFilter`) + `api/tests/test_logging_redaction.py`; see `INVARIANTS.md` `M2-P2-INV-001`.
+- Coverage note: M2-P2 establishes the redaction *mechanism* and telemetry discipline from byte one. No live child-PII data path exists yet (data arrives at M3), so end-to-end coverage over live child data builds up as those paths land (M3 → M5).

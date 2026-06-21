@@ -25,6 +25,20 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 - **Landed in.** M1-P3.
 - **Scope.** Governs the contract + spine corpus: `AGENTS.md`, `CLAUDE.md`, `docs/INVARIANTS.md`, `docs/RUNTIME-INVARIANTS.md`, `docs/execution-map.md`, `docs/RUNBOOK.md`, `docs/product/BuildPlan.md`, `docs/product/TechSpec.md`, `.cursor/rules/masterplan.mdc`. Live-deploy paths are out of scope — they carry live-infra identifiers as operational reality. Historical artifacts (`docs/decision-log.md`, `data/mvp_masterplan.md`) are exempt — they record the superseded plan by design. This promotes the previously-manual P1/P2 negative-checks into an enforced gate. P4 tightened check (b) to a strict ban by removing its interim pairing exception once the residual naming sweep was complete.
 
+### M2-P2-INV-001 — No child PII in logs / telemetry (forward guard)
+
+- **Statement.** No known child-PII field (child name, diary text, birthdate / dob) is emitted through the logging boundary: known PII field names carried on a log record are redacted to `[REDACTED]` before any handler formats the record.
+- **Enforced by.** `api/theygrow_api/logging.py` (`PiiRedactionFilter`) + `api/tests/test_logging_redaction.py`, run by `mypy api` + `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M2-P2.
+- **Scope.** A **forward guard**: it establishes telemetry/redaction discipline from the first byte of backend code (AGENTS.md §4). At P2 there is **no live child-PII data path** — those arrive at M3 — so this covers the logging-boundary redaction *mechanism* and its test, not end-to-end coverage over live child data; coverage extends as data paths land (M3 → M5). It governs known structured PII field names only, not free-text message bodies.
+
+### M2-P2-INV-002 — `/api` is type- and test-gated
+
+- **Statement.** All Python under `api/` is type-checked (mypy strict) and unit-tested (pytest) on every CI run; a failure blocks the gate.
+- **Enforced by.** `.github/workflows/ci.yml` (installs `./api[dev]`, runs `mypy api` + `pytest api`) and `.pre-commit-config.yaml` (mypy hook with `additional_dependencies`, checking `api/`).
+- **Landed in.** M2-P2.
+- **Scope.** Covers the `api/` subtree. Replaces the M1 zero-Python mypy guard with unconditional teeth now that `/api` exists. Does not cover `/app` (static PWA, no Python).
+
 ## Entry format (for future entries)
 
 - **Id.** `M{N}-P{k}-INV-{NNN}` — `N` is the milestone number, `k` is the packet number within the milestone, `NNN` is zero-padded sequence within the packet (`001`, `002`, …).

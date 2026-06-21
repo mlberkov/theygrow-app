@@ -12,10 +12,14 @@
 #   3. Live-infra names stay confined to docs/RUNBOOK.md (the sole carrier).
 #
 # Out of scope by design (never scanned):
-#   - Live-deploy paths (cloudbuild.yaml, Dockerfile, nginx.conf, index.html,
-#     sw.js, manifest.json, offline.html, icons/) — they legitimately carry the
-#     live-infra names as operational reality (docs/RUNBOOK.md "Live-infra
-#     divergence").
+#   - Live-deploy paths (app/{cloudbuild.yaml,Dockerfile,nginx.conf,index.html,
+#     sw.js,manifest.json,offline.html,icons/}, api/{cloudbuild.yaml,Dockerfile})
+#     — they legitimately carry the live-infra names as operational reality
+#     (docs/RUNBOOK.md "Live-infra divergence"). The build-config relocated into
+#     the owning subtrees in M2-P3.
+#   - api/pyproject.toml — its PEP 621 distribution name is "theygrow-api"
+#     (the same token as the /api Cloud Run service); it is not a contract/spine
+#     file, so check 3 never scans it. See the bare-service-name note at check 3.
 #   - Historical artifacts (docs/decision-log.md, data/mvp_masterplan.md) — they
 #     record the superseded plan verbatim by design (decision M1-DL-001).
 set -euo pipefail
@@ -61,7 +65,14 @@ for f in "${CONTRACT_FILES[@]}"; do
 done
 
 # --- Check 3: live-infra names confined to docs/RUNBOOK.md -------------------
-INFRA_RE='child-tracker(-service|-repo)'
+# Confines the unambiguous live-infra identifiers to RUNBOOK: the legacy PWA
+# names (child-tracker-service / -repo) and the /api Artifact Registry repo
+# (theygrow-api-repo). The bare /api service name "theygrow-api" is intentionally
+# NOT matched — it collides with the PEP 621 distribution name (api/pyproject.toml),
+# the FastAPI app title, and the /api/health "service" value, so a bare-name ban
+# would false-positive on legitimate, non-infra usage. "theygrow-api-repo" is
+# unambiguous (an Artifact Registry repo), so it is the guarded token.
+INFRA_RE='child-tracker(-service|-repo)|theygrow-api-repo'
 for f in "${CONTRACT_FILES[@]}"; do
   [ -f "$f" ] || continue
   [ "$f" = "docs/RUNBOOK.md" ] && continue

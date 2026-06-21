@@ -1,6 +1,7 @@
 # Используем супер-легкий веб-сервер Nginx
 FROM nginx:alpine
 
+# Build context is the /app subtree (self-contained per-app build, M2-P3).
 # Копируем файл nginx.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 

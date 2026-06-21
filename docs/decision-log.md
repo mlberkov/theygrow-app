@@ -46,3 +46,47 @@ This file records architectural and scope-shaping decisions for `theygrow-app`. 
   - Auto-fixing hygiene hooks are scoped to exclude the live-deploy paths (`AGENTS.md` §7) and `data/`, so the harness never churns those files.
   - The new CI workflow is quality-only and independent of the Cloud Build deploy pipeline (`cloudbuild.yaml`); the live Cloud Run deploy is unaffected.
   - Minimal tool-cache entries added to `.gitignore`; the full ignore pass remains M1-P4.
+
+---
+
+## M2-DL-001 — Adopt ADR-007 + its 3-packet M2 ladder
+
+- **Date.** 2026-06-21
+- **Decision.** Adopt **ADR-007** as the shaping decision for **M2 — `/api` skeleton**, structured as a **3-packet ladder**: **P1** monorepo split (PWA → `/app`; **Done** @ a77dfef); **P2** FastAPI `/api` skeleton — `GET /api/health`, env-driven read-only config, provider-port interface stub, the privacy precondition as a concrete forward guard, and the quality harness gaining teeth on `api/` (this packet); **P3** docker-compose + Postgres 16 / pgvector + the `/api` deploy path. *(This wording originally read "(incl. the nginx same-origin `/api` proxy)"; that misrecorded ADR-007 — the origin-unification proxy is **M5**, not P3. Amended by **M2-DL-002**.)* Two P2 implementation choices are recorded here: (a) `/api` is a **self-contained PEP 621 package** (`api/pyproject.toml`, with a `dev` optional-dependencies extra) while the **root `pyproject.toml` stays the single source of Ruff + mypy config**; (b) configuration uses **pydantic-settings `BaseSettings`** with required, default-less infra fields. The FastAPI health route is **`/api/health`** (not `/health`) — it avoids the existing nginx `/health` (the PWA container's Cloud Run check) and keeps the path stable for the P3 same-origin proxy.
+- **Rationale.** The ladder reaches the M2 goal (`/api/health` green in CI and, at P3, deployed) without pulling P3's runtime into P2: at P2 the health endpoint is pure in-process, so nothing has to be stood up, the engine stays out of perimeter (a stub seam, not a live import), and the config guard establishes "all infra endpoints from env, no secret defaults" before any connection exists. Landing the harness teeth and the PII forward guard in P2 means contract drift, type errors, and PII-in-logs fail loudly from the first byte of backend code (AGENTS.md §4). The packaging choice keeps the M1-deliberate "root pyproject = tooling/contract-only" stance intact while letting each monorepo subtree own its dependencies.
+- **Alternatives considered.**
+  1. **PR M2 after P1 (split only).** Rejected — a milestone named "/api skeleton" with no `api/` is incoherent; the harness would still no-op.
+  2. **Collapse P2+P3 into one packet.** Rejected — violates packet discipline and couples the in-process skeleton to runtime/deploy concerns (Postgres, compose, proxy) that have independent risk.
+  3. **Root pyproject becomes a buildable package for the deps.** Rejected — reverses the M1-deliberate tooling-only stance and couples root to `/api` runtime deps.
+  4. **stdlib `os.environ` config instead of pydantic-settings.** Rejected — pydantic-settings gives mypy-strict-clean, default-less required fields that fail loudly, with a thin marginal dependency (pydantic already ships with FastAPI).
+- **Supersedes.** None — first entry in the M2 series.
+- **Effects.**
+  - Adds the `api/` package: `api/pyproject.toml`, `theygrow_api/{__init__,main,config,logging}.py`, `theygrow_api/ports/{__init__,provider}.py`, `api/tests/*`, `api/.env.example`.
+  - Harness teeth: `.github/workflows/ci.yml` installs `./api[dev]` and runs `mypy api` + `pytest api` (replacing the zero-Python mypy guard); `.pre-commit-config.yaml` mypy hook gains `additional_dependencies` and checks `api/`.
+  - `docs/INVARIANTS.md` gains `M2-P2-INV-001` (no child PII in logs — redaction forward guard) and `M2-P2-INV-002` (`/api` type- + test-gated in CI).
+  - `docs/RUNTIME-INVARIANTS.md` "No child PII" entry moves `documented` → `enforced (forward guard)`, packet `M2-P2`.
+  - `docs/execution-map.md` reconciled (M1 closed; M2 P1 Done, P2 Current); `docs/product/BuildPlan.md` M2 section gains the 3-packet ladder; `docs/RUNBOOK.md` gains `/api` local-dev instructions.
+
+---
+
+## M2-DL-002 — M2-P3 runtime + deploy path; ADR-007 P3-shape reconciliation; ADR-008 prod store
+
+- **Date.** 2026-06-21
+- **Decision.** Land the M2-P3 runtime + deploy path and reconcile three recordings.
+  **(1) `/api` deploys as its own Cloud Run service** — its own URL, its own build-config — **not** behind an nginx same-origin `/api` proxy. Per **ADR-007**, the origin-unification router (the nginx `/api` proxy) is an **M5** concern, not P3. The M2-DL-001 P3 wording and the `BuildPlan.md` / `execution-map.md` P3 lines that placed the proxy in P3 misrecorded ADR-007 and are corrected here (proxy → M5). No CORS is exposed — the frontend↔API relationship stays same-origin by contract, unified at M5.
+  **(2) Build topology.** Build-config relocates from the repository root into the owning subtree — `app/{Dockerfile,nginx.conf,cloudbuild.yaml}` (PWA) and `api/{Dockerfile,cloudbuild.yaml}` (API) — driven by **two self-contained per-app Cloud Build triggers** with `includedFiles` path filters (`app/**` → the PWA service; `api/**` → the `/api` service). Each subtree builds and deploys independently; a change in one does not rebuild the other. Each build uses its subtree as the Docker build context.
+  **(3) Prod store (ADR-008).** The production episodic store is **managed Cloud SQL Postgres + pgvector** (→ AlloyDB by load). The repo's root `docker-compose.yml` (Postgres 16 + pgvector) is **strictly dev-only**; dev(compose) vs prod(managed) is a config difference — the P2 env guard already reads all connection/infra endpoints from the environment — not a code difference. M2-P3 opens **no** real DB connection from product code and creates **no** episodic schema/tables/migrations (those land in M3). The dev `db` service only enables the pgvector extension for parity.
+- **Rationale.** Own-service deploy keeps the API an independently deployable unit (own image, build, rollout risk) and defers origin-unification to the milestone that needs same-origin chat (M5). Two path-filtered triggers mean a PWA change never rebuilds the API and vice-versa. Relocating each build-config into its owning subtree makes each app self-contained (mirroring the P2 packaging stance) and is the deliberate ADR-007 P3 step. Recording ADR-008 now fixes the dev/prod store boundary before any connection code exists, so M3 schema work targets the right surface.
+- **Alternatives considered.**
+  1. **nginx same-origin `/api` proxy in P3** (as originally recorded). Rejected — misreads ADR-007; the proxy is the M5 origin-unification router. Building it now pulls M5 surface into M2 and couples the API deploy to the PWA container.
+  2. **One build-config building both images on every push.** Rejected — couples the two deploy units; every PWA change would rebuild/redeploy the API and vice-versa. Two path-filtered triggers keep them independent.
+  3. **Keep build-config at the repository root.** Rejected — leaves the API build-config homeless and the PWA build-config detached from its subtree; the per-subtree relocation is the ADR-007 P3 step and makes each app self-contained.
+  4. **Stand up managed Cloud SQL now.** Rejected — out of M2-P3 scope; no product code opens a connection yet. The env guard already makes dev/prod a config switch; provisioning is a later, owner-approved change.
+- **Supersedes.** Amends the P3 description in **M2-DL-001** (nginx `/api` proxy: P3 → M5); does not supersede the entry.
+- **Effects.**
+  - Relocates `Dockerfile` / `nginx.conf` / `cloudbuild.yaml` from the repository root into `app/` (served `/` byte-identical); adds `api/Dockerfile`, `api/cloudbuild.yaml`, `api/.dockerignore`, a dev-only root `docker-compose.yml`, and `scripts/dev/init-pgvector.sql`.
+  - `.pre-commit-config.yaml` hygiene-exclude patterns repoint to the relocated `app/` build-config paths and add the new `api/` build-configs, preserving the AGENTS.md §7 "never churn live-deploy paths" guardrail.
+  - `scripts/check-contract-integrity.sh` check 3 extends `INFRA_RE` to also confine `theygrow-api-repo` to `docs/RUNBOOK.md`. The bare service name `theygrow-api` is intentionally **not** matched — it collides with the PEP 621 distribution name (`api/pyproject.toml`), the FastAPI app title, and the `/api/health` `service` value.
+  - `docs/RUNBOOK.md` gains the `/api` live identifiers (the `/api` Cloud Run service, the `theygrow-api-repo` registry, image path, region) beside the existing `child-tracker-*` divergence, and records the relocated, two-trigger build + deploy path (including the PWA trigger filename change).
+  - `docs/product/BuildPlan.md` (P3 line; proxy → M5 under M5) and `docs/execution-map.md` (P2 Done @ 4be3860; P3 Current; proxy → M5) corrected; `docs/product/TechSpec.md` monorepo + episodic-store notes reconciled (build-config relocated; dev compose vs managed prod store).
+  - Owner-run GCP actions (create `theygrow-api-repo`; update the PWA trigger filename → `app/cloudbuild.yaml` with `includedFiles app/**`; create the `api/**` trigger; first deploy) are recorded as an owner checklist — Claude Code does not run `gcloud`.

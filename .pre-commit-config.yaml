@@ -1,11 +1,14 @@
 # Pre-commit hooks for theygrow-app — local mirror of the CI quality gate.
 # CI (.github/workflows/ci.yml) is the gate of record; this runs the same checks
-# locally. With zero Python in the tree today, the Ruff/mypy hooks no-op cleanly.
+# locally. With /api landed (M2-P2), the Ruff/mypy hooks have teeth on api/.
 #
 # Auto-fixing hygiene hooks (trailing-whitespace, end-of-file-fixer) EXCLUDE the
 # live-deploy paths (AGENTS.md §7 guardrail) and data/ (the frozen masterplan) so
-# the harness never churns or touches those files. Read-only validators
-# (check-yaml, check-json) run repo-wide.
+# the harness never churns or touches those files. The build-config relocated
+# into the owning subtrees in M2-P3, so the excludes track app/ (PWA:
+# index.html/sw.js/manifest.json/offline.html/nginx.conf/Dockerfile/cloudbuild.yaml/icons)
+# and api/ (Dockerfile/cloudbuild.yaml). Read-only validators (check-yaml,
+# check-json) run repo-wide.
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -19,16 +22,25 @@ repos:
     rev: v1.14.1
     hooks:
       - id: mypy
-        # types: [python] means this no-ops until /api lands in M2.
-        args: [--config-file=pyproject.toml]
+        # Strict type-check the /api package. pass_filenames is off so the whole
+        # package resolves as a unit; additional_dependencies make api's imports
+        # available in the hook's isolated venv.
+        args: [--config-file=pyproject.toml, api]
+        pass_filenames: false
+        additional_dependencies:
+          - fastapi
+          - pydantic
+          - pydantic-settings
+          - pytest
+          - httpx
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: end-of-file-fixer
-        exclude: '^(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 

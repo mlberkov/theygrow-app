@@ -6,8 +6,8 @@
 # (cloudbuild.yaml), which deploys on push to main. No secrets or cloud
 # credentials are referenced here.
 #
-# With zero Python in the tree today, Ruff no-ops cleanly and mypy is guarded so
-# it does not fail on "no files". Real teeth arrive when /api lands in M2.
+# With /api landed (M2-P2), the harness has teeth: Ruff lints the tree, and the
+# /api package is installed so mypy (strict) and pytest run against it.
 
 name: CI
 
@@ -33,19 +33,20 @@ jobs:
       - name: Install tools
         run: python -m pip install "ruff==0.9.2" "mypy==1.14.1" "pre-commit==4.0.1"
 
+      - name: Install /api package (with dev extras)
+        run: python -m pip install "./api[dev]"
+
       - name: Ruff format (check)
         run: ruff format --check .
 
       - name: Ruff lint
         run: ruff check .
 
-      - name: mypy (guarded — no Python targets until /api lands)
-        run: |
-          if find . -path ./.git -prune -o -name '*.py' -print | grep -q .; then
-            mypy .
-          else
-            echo "No Python files yet — skipping mypy (real teeth arrive with /api in M2)."
-          fi
+      - name: mypy (api — strict)
+        run: mypy api
+
+      - name: pytest (api)
+        run: pytest api
 
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure

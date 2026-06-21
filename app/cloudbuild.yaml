@@ -1,7 +1,7 @@
 steps:
-  # Шаг 1: Собираем Docker образ
+  # Шаг 1: Собираем Docker образ (build context = ./app)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/child-tracker-repo/web-app:$COMMIT_SHA', '.']
+    args: ['build', '-t', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/child-tracker-repo/web-app:$COMMIT_SHA', 'app']
 
   # Шаг 2: Отправляем образ в Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
