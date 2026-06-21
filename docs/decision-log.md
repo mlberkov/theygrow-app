@@ -46,3 +46,23 @@ This file records architectural and scope-shaping decisions for `theygrow-app`. 
   - Auto-fixing hygiene hooks are scoped to exclude the live-deploy paths (`AGENTS.md` §7) and `data/`, so the harness never churns those files.
   - The new CI workflow is quality-only and independent of the Cloud Build deploy pipeline (`cloudbuild.yaml`); the live Cloud Run deploy is unaffected.
   - Minimal tool-cache entries added to `.gitignore`; the full ignore pass remains M1-P4.
+
+---
+
+## M2-DL-001 — Adopt ADR-007 + its 3-packet M2 ladder
+
+- **Date.** 2026-06-21
+- **Decision.** Adopt **ADR-007** as the shaping decision for **M2 — `/api` skeleton**, structured as a **3-packet ladder**: **P1** monorepo split (PWA → `/app`; **Done** @ a77dfef); **P2** FastAPI `/api` skeleton — `GET /api/health`, env-driven read-only config, provider-port interface stub, the privacy precondition as a concrete forward guard, and the quality harness gaining teeth on `api/` (this packet); **P3** docker-compose + Postgres 16 / pgvector + the `/api` deploy path (incl. the nginx same-origin `/api` proxy). Two P2 implementation choices are recorded here: (a) `/api` is a **self-contained PEP 621 package** (`api/pyproject.toml`, with a `dev` optional-dependencies extra) while the **root `pyproject.toml` stays the single source of Ruff + mypy config**; (b) configuration uses **pydantic-settings `BaseSettings`** with required, default-less infra fields. The FastAPI health route is **`/api/health`** (not `/health`) — it avoids the existing nginx `/health` (the PWA container's Cloud Run check) and keeps the path stable for the P3 same-origin proxy.
+- **Rationale.** The ladder reaches the M2 goal (`/api/health` green in CI and, at P3, deployed) without pulling P3's runtime into P2: at P2 the health endpoint is pure in-process, so nothing has to be stood up, the engine stays out of perimeter (a stub seam, not a live import), and the config guard establishes "all infra endpoints from env, no secret defaults" before any connection exists. Landing the harness teeth and the PII forward guard in P2 means contract drift, type errors, and PII-in-logs fail loudly from the first byte of backend code (AGENTS.md §4). The packaging choice keeps the M1-deliberate "root pyproject = tooling/contract-only" stance intact while letting each monorepo subtree own its dependencies.
+- **Alternatives considered.**
+  1. **PR M2 after P1 (split only).** Rejected — a milestone named "/api skeleton" with no `api/` is incoherent; the harness would still no-op.
+  2. **Collapse P2+P3 into one packet.** Rejected — violates packet discipline and couples the in-process skeleton to runtime/deploy concerns (Postgres, compose, proxy) that have independent risk.
+  3. **Root pyproject becomes a buildable package for the deps.** Rejected — reverses the M1-deliberate tooling-only stance and couples root to `/api` runtime deps.
+  4. **stdlib `os.environ` config instead of pydantic-settings.** Rejected — pydantic-settings gives mypy-strict-clean, default-less required fields that fail loudly, with a thin marginal dependency (pydantic already ships with FastAPI).
+- **Supersedes.** None — first entry in the M2 series.
+- **Effects.**
+  - Adds the `api/` package: `api/pyproject.toml`, `theygrow_api/{__init__,main,config,logging}.py`, `theygrow_api/ports/{__init__,provider}.py`, `api/tests/*`, `api/.env.example`.
+  - Harness teeth: `.github/workflows/ci.yml` installs `./api[dev]` and runs `mypy api` + `pytest api` (replacing the zero-Python mypy guard); `.pre-commit-config.yaml` mypy hook gains `additional_dependencies` and checks `api/`.
+  - `docs/INVARIANTS.md` gains `M2-P2-INV-001` (no child PII in logs — redaction forward guard) and `M2-P2-INV-002` (`/api` type- + test-gated in CI).
+  - `docs/RUNTIME-INVARIANTS.md` "No child PII" entry moves `documented` → `enforced (forward guard)`, packet `M2-P2`.
+  - `docs/execution-map.md` reconciled (M1 closed; M2 P1 Done, P2 Current); `docs/product/BuildPlan.md` M2 section gains the 3-packet ladder; `docs/RUNBOOK.md` gains `/api` local-dev instructions.

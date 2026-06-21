@@ -12,12 +12,16 @@ This file is the living "where are we / what's next" state map. It is the index,
 
 ## Current state
 
-- **M1 in progress.**
+- **M1 — Done.**
   - **P1** — Contract redirect. **Done** @ f04d2ee (`AGENTS.md` rewritten, `CLAUDE.md` added, `.cursor/rules/masterplan.mdc` neutralized, `data/mvp_masterplan.md` reframed, `docs/decision-log.md` opened with `M1-DL-001`).
   - **P2** — Docs spine. **Done** @ 2886d0f (`INVARIANTS.md`, `RUNTIME-INVARIANTS.md`, `execution-map.md`, `RUNBOOK.md`, `product/BuildPlan.md`, `product/TechSpec.md`; cursor stub extended with the execution-map pointer).
   - **P3** — Quality harness. **Done** @ d67c70d (`pyproject.toml` / Ruff / mypy / `.editorconfig` / `.pre-commit-config.yaml` / GitHub Actions CI / gitleaks secret-scan / `scripts/check-contract-integrity.sh`; first enforced `INVARIANTS.md` entries `M1-P3-INV-001` + `M1-P3-INV-002`; decision `M1-DL-002`).
-  - **P4** — Naming / `.gitignore` / `README.md` cleanup. **Current** (this packet — `README.md` overview, full `.gitignore` pass, residual naming sweep, contract-integrity gate tightened to a strict ban with `INV-002` updated to match).
-- **M2-M5** — Not started.
+  - **P4** — Naming / `.gitignore` / `README.md` cleanup. **Done** @ 9088762 (`README.md` overview, full `.gitignore` pass, residual naming sweep, contract-integrity gate tightened to a strict ban with `INV-002` updated to match). Branch-convention reconcile @ ca98842; milestone merged via PR #1 @ 56facb5.
+- **M2 in progress.**
+  - **P1** — Monorepo `/app` split (PWA migrated from repo root into `/app`; `Dockerfile` COPY sources repointed; RUNBOOK/TechSpec reconciled; served `/` byte-identical). **Done** @ a77dfef.
+  - **P2** — FastAPI `/api` skeleton: `GET /api/health`, env-driven read-only config (pydantic-settings), provider-port interface stub, PII-redaction forward guard, quality harness teeth on `api/`. Decision `M2-DL-001`; invariants `M2-P2-INV-001` + `M2-P2-INV-002`. **Current** (this packet).
+  - **P3** — docker-compose + Postgres 16 / pgvector + `/api` deploy path (incl. the nginx same-origin `/api` proxy). **Not started.**
+- **M3-M5** — Not started.
 
 ## How to update this file
 

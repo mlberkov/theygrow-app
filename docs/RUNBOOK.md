@@ -13,7 +13,7 @@ The product in production is a **static PWA** served by nginx and deployed on GC
 - CI / CD: GCP Cloud Build, driven by `cloudbuild.yaml`.
 - Hosting: GCP Cloud Run.
 
-`/api` does **not** run today. The Python / FastAPI backend lands in M2.
+The Python / FastAPI backend (`/api`) skeleton landed in M2-P2 and runs **locally** (see "Local dev"); it is **not yet deployed** — the `/api` deploy path lands in M2-P3. The production container today still serves only the static PWA.
 
 ## Build + deploy path
 
@@ -30,7 +30,16 @@ The current PWA is single-file. Two minimal options:
 - **Static server.** Serve the repository root with any static file server (e.g. `python -m http.server 8080`) and open `http://localhost:8080`.
 - **Container parity.** Build and run the production container locally via `docker build -t theygrow-app . && docker run --rm -p 8080:8080 theygrow-app`. This matches the production nginx config.
 
-`/api` local dev lands when M2 introduces FastAPI.
+### `/api` (FastAPI skeleton, M2-P2)
+
+The `/api` skeleton runs as a standalone ASGI app — not yet behind nginx (the same-origin `/api` proxy lands in M2-P3).
+
+- **Install** (the api-scoped PEP 621 package, with dev extras): `python -m pip install "./api[dev]"`.
+- **Run**: `uvicorn theygrow_api.main:app --reload`. No environment is required — the health skeleton constructs no config and opens no connections.
+- **Check**: `curl http://localhost:8000/api/health` → `{"status":"ok","service":"theygrow-api"}`.
+- **Types / tests**: `mypy api` and `pytest api`.
+
+The config module (`theygrow_api.config.Settings`) requires `DATABASE_URL` (no default) **when constructed**, but no M2-P2 route constructs it and it opens no connection; real DB use lands in M2-P3.
 
 ## Live-infra divergence
 
