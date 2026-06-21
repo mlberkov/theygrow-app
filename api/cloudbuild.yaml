@@ -1,0 +1,32 @@
+steps:
+  # Step 1: build the /api image (build context = ./api)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA', 'api']
+
+  # Step 2: push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA']
+
+  # Step 3: deploy to its OWN Cloud Run service (own URL; no nginx proxy — that is M5).
+  # No --set-env-vars: /api/health needs no environment. Real DB config lands with M3.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'theygrow-api'
+      - '--image'
+      - 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+
+images:
+  - 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,43 @@
+# Dev-only stack — NOT a deploy artifact.
+#
+# ADR-008: the PRODUCTION episodic store is managed Cloud SQL Postgres + pgvector
+# (→ AlloyDB by load). This compose file brings up a local Postgres 16 + pgvector
+# alongside the /api container for development parity ONLY. dev(compose) vs
+# prod(managed) is a config difference (the env-driven config from M2-P2), not a
+# code difference.
+#
+# At M2-P3 product code opens NO DB connection and creates NO episodic
+# schema/tables/migrations (those land in M3). The db service only makes the
+# pgvector extension available; DATABASE_URL is bound + validated by the config
+# guard but never dialed.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      # Dev-only trust auth — no password, so nothing secret-shaped is committed.
+      POSTGRES_USER: theygrow
+      POSTGRES_DB: theygrow
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./scripts/dev/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U theygrow -d theygrow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+    ports:
+      - "8080:8080"
+    environment:
+      # Bound + validated by the P2 config guard; no connection is opened by
+      # product code at M2-P3. Dev value only — prod uses managed Cloud SQL.
+      DATABASE_URL: postgresql://theygrow@db:5432/theygrow
+      LOG_LEVEL: INFO
+    depends_on:
+      db:
+        condition: service_healthy

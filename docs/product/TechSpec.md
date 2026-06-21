@@ -6,8 +6,8 @@ For the delivery order, see `BuildPlan.md`. For runtime behavioral contract, see
 
 ## Monorepo
 
-- `/app` — the PWA. The static PWA served assets now live here (`app/index.html` + PWA assets), migrated from repo root in M2; build-config (`Dockerfile`/`nginx.conf`/`cloudbuild.yaml`) stays at root for now.
-- `/api` — Python / FastAPI backend. Lands in M2.
+- `/app` — the PWA. The static PWA served assets live here (`app/index.html` + PWA assets), migrated from repo root in M2-P1; its build-config (`app/Dockerfile`/`app/nginx.conf`/`app/cloudbuild.yaml`) relocated into the subtree in M2-P3.
+- `/api` — Python / FastAPI backend. Lands in M2; from M2-P3 it deploys as **its own Cloud Run service** with its own build-config (`api/Dockerfile`/`api/cloudbuild.yaml`). Origin unification (the same-origin `/api` proxy, no CORS) is M5.
 - `/docs` — operating contract, decision log, invariants, runbook, execution map, product specs (this file).
 - `/scripts` — ops + dev scripts (lands as needed).
 - `/infra` — IaC (post-M5).
@@ -21,6 +21,7 @@ No other top-level product directories.
 - Records land via the M3 `/export` importer from `diary-memory-service`.
 - Vector index lives in the same Postgres instance via pgvector — not a separate vector DB.
 - Schema lands in M3 once the `/export` verification gate clears.
+- **Prod vs dev (ADR-008).** Production is **managed Cloud SQL Postgres + pgvector** (→ AlloyDB by load). Dev uses a local Postgres 16 + pgvector via the dev-only `docker-compose.yml`. dev vs prod is a config difference (the env-driven config reads connection/infra endpoints from the environment), not a code difference. No connection is opened and no schema exists before M3.
 
 ## Retrieval / RAG
 

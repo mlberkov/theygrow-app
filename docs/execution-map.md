@@ -19,8 +19,8 @@ This file is the living "where are we / what's next" state map. It is the index,
   - **P4** — Naming / `.gitignore` / `README.md` cleanup. **Done** @ 9088762 (`README.md` overview, full `.gitignore` pass, residual naming sweep, contract-integrity gate tightened to a strict ban with `INV-002` updated to match). Branch-convention reconcile @ ca98842; milestone merged via PR #1 @ 56facb5.
 - **M2 in progress.**
   - **P1** — Monorepo `/app` split (PWA migrated from repo root into `/app`; `Dockerfile` COPY sources repointed; RUNBOOK/TechSpec reconciled; served `/` byte-identical). **Done** @ a77dfef.
-  - **P2** — FastAPI `/api` skeleton: `GET /api/health`, env-driven read-only config (pydantic-settings), provider-port interface stub, PII-redaction forward guard, quality harness teeth on `api/`. Decision `M2-DL-001`; invariants `M2-P2-INV-001` + `M2-P2-INV-002`. **Current** (this packet).
-  - **P3** — docker-compose + Postgres 16 / pgvector + `/api` deploy path (incl. the nginx same-origin `/api` proxy). **Not started.**
+  - **P2** — FastAPI `/api` skeleton: `GET /api/health`, env-driven read-only config (pydantic-settings), provider-port interface stub, PII-redaction forward guard, quality harness teeth on `api/`. Decision `M2-DL-001`; invariants `M2-P2-INV-001` + `M2-P2-INV-002`. **Done** @ 4be3860.
+  - **P3** — Runtime + deploy path: dev-only docker-compose (Postgres 16 / pgvector), build-config relocated into `/app` + `/api`, and the `/api` deploy path — `/api` deploys as its own Cloud Run service so `/api/health` is green deployed. No real DB connection or schema yet (M3). The nginx same-origin `/api` proxy is **M5** (corrected from the original P3 recording). Decision `M2-DL-002`. **Current** (this packet).
 - **M3-M5** — Not started.
 
 ## How to update this file

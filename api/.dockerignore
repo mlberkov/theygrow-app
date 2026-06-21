@@ -1,0 +1,13 @@
+# Keep the /api image lean and reproducible: ship only the package + its
+# build metadata. Tests, caches, and any local env files stay out of the image.
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+.env
+.env.*
+.dockerignore
+Dockerfile

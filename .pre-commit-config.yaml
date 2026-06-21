@@ -4,8 +4,11 @@
 #
 # Auto-fixing hygiene hooks (trailing-whitespace, end-of-file-fixer) EXCLUDE the
 # live-deploy paths (AGENTS.md §7 guardrail) and data/ (the frozen masterplan) so
-# the harness never churns or touches those files. Read-only validators
-# (check-yaml, check-json) run repo-wide.
+# the harness never churns or touches those files. The build-config relocated
+# into the owning subtrees in M2-P3, so the excludes track app/ (PWA:
+# index.html/sw.js/manifest.json/offline.html/nginx.conf/Dockerfile/cloudbuild.yaml/icons)
+# and api/ (Dockerfile/cloudbuild.yaml). Read-only validators (check-yaml,
+# check-json) run repo-wide.
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -35,9 +38,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: end-of-file-fixer
-        exclude: '^(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 
