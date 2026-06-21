@@ -6,7 +6,7 @@ For the delivery order, see `BuildPlan.md`. For runtime behavioral contract, see
 
 ## Monorepo
 
-- `/app` — the PWA. Today the static PWA still lives at repo root (single `index.html` + nginx + Docker + Cloud Run); the migration into `/app` lands in M2.
+- `/app` — the PWA. The static PWA served assets now live here (`app/index.html` + PWA assets), migrated from repo root in M2; build-config (`Dockerfile`/`nginx.conf`/`cloudbuild.yaml`) stays at root for now.
 - `/api` — Python / FastAPI backend. Lands in M2.
 - `/docs` — operating contract, decision log, invariants, runbook, execution map, product specs (this file).
 - `/scripts` — ops + dev scripts (lands as needed).

@@ -4,11 +4,11 @@ Operational reality of `theygrow-app` today, plus the live-infra divergence note
 
 ## What runs today
 
-The product in production is a **static PWA** served by nginx and deployed on GCP Cloud Run. The PWA lives at the repository root (single `index.html` plus PWA assets); the monorepo split into `/app` + `/api` lands in M2.
+The product in production is a **static PWA** served by nginx and deployed on GCP Cloud Run. The served PWA assets now live under `/app` (the M2 monorepo split moved them there from the repository root); `/api` lands later in M2. Build-config (`Dockerfile`, `nginx.conf`, `cloudbuild.yaml`) stays at the repository root.
 
-- Entry point: `index.html` (single-file PWA).
-- PWA assets: `manifest.json`, `sw.js`, `offline.html`, `icons/`.
-- Web server: nginx (configured by `nginx.conf`) inside the container.
+- Entry point: `app/index.html` (single-file PWA).
+- PWA assets: `app/manifest.json`, `app/sw.js`, `app/offline.html`, `app/icons/`.
+- Web server: nginx (configured by root `nginx.conf`) inside the container.
 - Container: `Dockerfile` (nginx-based).
 - CI / CD: GCP Cloud Build, driven by `cloudbuild.yaml`.
 - Hosting: GCP Cloud Run.
