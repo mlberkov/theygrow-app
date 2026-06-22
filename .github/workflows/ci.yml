@@ -8,6 +8,12 @@
 #
 # With /api landed (M2-P2), the harness has teeth: Ruff lints the tree, and the
 # /api package is installed so mypy (strict) and pytest run against it.
+#
+# From M3-P1 the job also runs a pgvector Postgres service so the DB-backed
+# schema tests (PK / composite-key / route CHECK / pgvector column) execute
+# against a real engine. DATABASE_URL points at that service; the importer is
+# M3-P2, so no /export data is loaded here. The service is a container in the
+# runner — it touches no GCP and is independent of the Cloud Build deploy.
 
 name: CI
 
@@ -21,6 +27,23 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: theygrow
+          POSTGRES_DB: theygrow
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U theygrow -d theygrow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # DB-backed schema tests dial this; the config test deletes it per-test.
+      DATABASE_URL: postgresql://theygrow@localhost:5432/theygrow
     steps:
       - uses: actions/checkout@v4
         with:
