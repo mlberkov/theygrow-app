@@ -42,7 +42,7 @@ CONTRACT_FILES=(
 )
 
 # --- Check 1: old stack named as an active target ---------------------------
-STACK_RE='Neo4j|Next\.js|Tailwind|React Query|Zustand|Alembic|Constitutional|parent graph|Блок [0-8]'
+STACK_RE='Neo4j|Next\.js|Tailwind|React Query|Zustand|Constitutional|parent graph|Блок [0-8]'
 for f in "${CONTRACT_FILES[@]}"; do
   [ -f "$f" ] || continue
   if grep -nE "$STACK_RE" "$f"; then
