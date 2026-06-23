@@ -6,6 +6,10 @@
 .mypy_cache/
 .pytest_cache/
 
+# M3-P2 /export importer quarantine sidecars (never commit; may reference
+# engine-minted source ids). Configurable path via --quarantine-report.
+*.quarantine.json
+
 # Standard ignores (P4 pass)
 .venv/
 __pycache__/

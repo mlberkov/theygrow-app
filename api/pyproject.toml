@@ -32,5 +32,9 @@ dev = [
   "httpx>=0.27",
 ]
 
+[project.scripts]
+# M3-P2 offline /export importer (also runnable as `python -m theygrow_api.importer`).
+theygrow-import-export = "theygrow_api.importer:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["theygrow_api"]

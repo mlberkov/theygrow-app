@@ -1,0 +1,50 @@
+{
+  "export": {
+    "format": "theygrow.export",
+    "schema_version": 1,
+    "scope": {
+      "community_id": "comm-sample",
+      "requester_user_id": "requester-sample"
+    },
+    "generated_at": "2026-06-01T09:00:00+00:00",
+    "record_count": 3
+  },
+  "records": [
+    {
+      "source_message_id": "sm-0001",
+      "community_id": "comm-sample",
+      "author_user_id": "author-a",
+      "external_chat_id": "chat-1",
+      "external_user_id": "user-a",
+      "external_message_id": "msg-100",
+      "edit_seq": 0,
+      "raw_text": "synthetic diary line one",
+      "detected_route": "note",
+      "created_at": "2026-01-01T12:00:00+00:00"
+    },
+    {
+      "source_message_id": "sm-0002",
+      "community_id": "comm-sample",
+      "author_user_id": "author-a",
+      "external_chat_id": "chat-1",
+      "external_user_id": "user-a",
+      "external_message_id": "msg-101",
+      "edit_seq": 0,
+      "raw_text": "synthetic draft line",
+      "detected_route": "draft",
+      "created_at": "2026-01-02T08:30:00+00:00"
+    },
+    {
+      "source_message_id": "sm-0003",
+      "community_id": "comm-sample",
+      "author_user_id": "author-b",
+      "external_chat_id": "chat-2",
+      "external_user_id": "user-b",
+      "external_message_id": "msg-200",
+      "edit_seq": 1717171717000,
+      "raw_text": "synthetic diary line two",
+      "detected_route": "note",
+      "created_at": "2026-02-15T18:45:00+00:00"
+    }
+  ]
+}
