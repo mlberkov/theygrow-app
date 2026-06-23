@@ -1,6 +1,6 @@
 # Tech spec — decided shape
 
-This document records the **decided architectural shape** of `theygrow-app` per ADR-005 + roadmap v2. Items that are intentionally open at owner level are listed under **Unresolved (gated)** — they are **not** pre-resolved here.
+This document records the **decided architectural shape** of `theygrow-app` per ADR-005 + roadmap v3 (tracks А/Б/В). Items that are intentionally open at owner level are listed under **Unresolved (gated)** — they are **not** pre-resolved here.
 
 For the delivery order, see `BuildPlan.md`. For runtime behavioral contract, see `../RUNTIME-INVARIANTS.md`.
 
@@ -14,12 +14,12 @@ For the delivery order, see `BuildPlan.md`. For runtime behavioral contract, see
 
 No other top-level product directories.
 
-## Episodic store
+## Core store
 
-**Postgres + pgvector.** This is the live perimeter store for family-memory records. There is no graph database in the live perimeter.
+**One managed PostgreSQL — single source of truth (ADR-008).** This is the live perimeter store for family-memory records. Vector, lexical, and graph-state are **derived ports within that one database**, not separate stores; there is no separate graph database in the live perimeter.
 
 - Records land via the M3 `/export` importer from `diary-memory-service`.
-- Vector index lives in the same Postgres instance via pgvector — not a separate vector DB.
+- Vector index lives in the same Postgres instance via pgvector (a derived port) — not a separate vector DB. Embeddings are **≤1536-dim from M3**.
 - Schema lands in M3 once the `/export` verification gate clears.
 - **Prod vs dev (ADR-008).** Production is **managed Cloud SQL Postgres + pgvector** (→ AlloyDB by load). Dev uses a local Postgres 16 + pgvector via the dev-only `docker-compose.yml`. dev vs prod is a config difference (the env-driven config reads connection/infra endpoints from the environment), not a code difference. No connection is opened and no schema exists before M3.
 
@@ -31,7 +31,7 @@ No other top-level product directories.
 
 **Two grounded sources only.**
 
-- **Family memory** — the episodic store (Postgres + pgvector), seeded at M3 from `/export` and grown over time.
+- **Family memory** — the episodic records in the one managed PostgreSQL core store (pgvector-derived vector port), seeded at M3 from `/export` and grown over time.
 - **Canon** — skill descriptions today, additional canon content as it lands. Canon is not the episodic store; it is reference content.
 
 The chat surface, grounding gate, honest degradation, per-segment provenance, and medical boundary all land in M5. See `RUNTIME-INVARIANTS.md` for the runtime contract; see `BuildPlan.md` M5 for the delivery shape.

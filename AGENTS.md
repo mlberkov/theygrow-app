@@ -1,6 +1,6 @@
 # theygrow-app — Operating contract for AI agents
 
-This file is the in-repo operating contract for any AI agent working on `theygrow-app`. The plan of record is **ADR-005** + **roadmap v2**. The product is closed-corpus family memory: chat answers ONLY from family memory (episodic store) and canon (skill descriptions and future canon content). No web, no model parametric knowledge.
+This file is the in-repo operating contract for any AI agent working on `theygrow-app`. The plan of record is **ADR-005** + **roadmap v3** (tracks А/Б/В). The product is closed-corpus family memory: chat answers ONLY from family memory (episodic store) and canon (skill descriptions and future canon content). No web, no model parametric knowledge.
 
 ---
 
@@ -21,7 +21,7 @@ This file is the in-repo operating contract for any AI agent working on `theygro
 ## §3 Architecture invariants (intent-level)
 
 - **Monorepo.** `/app` (the PWA) + `/api` (Python FastAPI). The split lands in M2; the current static PWA at repo root migrates into `/app` then.
-- **Episodic store = Postgres + pgvector.** No graph database is part of the live perimeter.
+- **Core store = one managed PostgreSQL (single source of truth) (ADR-008).** Vector, lexical, and graph-state are **derived ports within that one database** (pgvector for vectors; embeddings ≤1536 from M3) — not separate stores. No separate graph database is part of the live perimeter.
 - **Engine `diary-memory-service` is OUT of perimeter.** It is a **code donor** for the M4 retrieval lift and the **/export migration source** for M3. It is **not** a live dependency of `theygrow-app` and must not become one.
 - **Persona resolution at import = stub.** A real persona / identity model is gated out (see §5).
 

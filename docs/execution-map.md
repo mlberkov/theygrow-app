@@ -6,7 +6,7 @@ This file is the living "where are we / what's next" state map. It is the index,
 
 - **M1** — Repository preparation for agentic development (enablement harness).
 - **M2** — `/api` skeleton (Python / FastAPI lands; monorepo split `/app` + `/api` lands).
-- **M3** — Episodic store (Postgres + pgvector) + `/export` importer from `diary-memory-service`.
+- **M3** — Core store (one managed PostgreSQL as SoT; pgvector-derived vector port, ADR-008) + `/export` importer from `diary-memory-service`.
 - **M4** — Retrieval lift from the engine (`diary-memory-service` → `theygrow-app`).
 - **M5** — Closed-corpus family-memory chat.
 
@@ -17,11 +17,15 @@ This file is the living "where are we / what's next" state map. It is the index,
   - **P2** — Docs spine. **Done** @ 2886d0f (`INVARIANTS.md`, `RUNTIME-INVARIANTS.md`, `execution-map.md`, `RUNBOOK.md`, `product/BuildPlan.md`, `product/TechSpec.md`; cursor stub extended with the execution-map pointer).
   - **P3** — Quality harness. **Done** @ d67c70d (`pyproject.toml` / Ruff / mypy / `.editorconfig` / `.pre-commit-config.yaml` / GitHub Actions CI / gitleaks secret-scan / `scripts/check-contract-integrity.sh`; first enforced `INVARIANTS.md` entries `M1-P3-INV-001` + `M1-P3-INV-002`; decision `M1-DL-002`).
   - **P4** — Naming / `.gitignore` / `README.md` cleanup. **Done** @ 9088762 (`README.md` overview, full `.gitignore` pass, residual naming sweep, contract-integrity gate tightened to a strict ban with `INV-002` updated to match). Branch-convention reconcile @ ca98842; milestone merged via PR #1 @ 56facb5.
-- **M2 in progress.**
+- **M2 — Done.**
   - **P1** — Monorepo `/app` split (PWA migrated from repo root into `/app`; `Dockerfile` COPY sources repointed; RUNBOOK/TechSpec reconciled; served `/` byte-identical). **Done** @ a77dfef.
   - **P2** — FastAPI `/api` skeleton: `GET /api/health`, env-driven read-only config (pydantic-settings), provider-port interface stub, PII-redaction forward guard, quality harness teeth on `api/`. Decision `M2-DL-001`; invariants `M2-P2-INV-001` + `M2-P2-INV-002`. **Done** @ 4be3860.
-  - **P3** — Runtime + deploy path: dev-only docker-compose (Postgres 16 / pgvector), build-config relocated into `/app` + `/api`, and the `/api` deploy path — `/api` deploys as its own Cloud Run service so `/api/health` is green deployed. No real DB connection or schema yet (M3). The nginx same-origin `/api` proxy is **M5** (corrected from the original P3 recording). Decision `M2-DL-002`. **Current** (this packet).
-- **M3-M5** — Not started.
+  - **P3** — Runtime + deploy path: dev-only docker-compose (Postgres 16 / pgvector), build-config relocated into `/app` + `/api`, and the `/api` deploy path — `/api` deploys as its own Cloud Run service so `/api/health` is green deployed. No real DB connection or schema yet (M3). The nginx same-origin `/api` proxy is **M5** (corrected from the original P3 recording). Decision `M2-DL-002`. **Done** @ 6249590; milestone merged via PR #2 @ db4c1f3.
+- **M3 in progress.**
+  - **Pre-execution gate** — `/export` v1 schema confirmed (`SCHEMA_VERSION=1`, D-029) + `memory_rag` lift map. Decision `M3-DL-001`. **Done** @ ac441de.
+  - **P1** — Episodic source schema + migration: the `source_messages` table (v1 wire mirror; engine-faithful TEXT ids; BIGINT `edit_seq`; PK + composite assertion-key UNIQUE; defensive `detected_route` CHECK; ADR-004 dual-timestamp; persona stub; reserved unindexed `vector(≤1536)` shell), Alembic migration tooling, the first real DB connection from product code, and DB-backed constraint tests run against a pgvector Postgres in CI. Decision `M3-DL-002`. **Done** @ 415a5a2.
+  - **P2** — `/export` v1 importer: an offline module/CLI (`theygrow_api.importer`; no `/api` HTTP endpoint) that reads an `/export` file and idempotently upserts live `{note, draft}` rows on the composite assertion key (`recorded_at` + PK excluded from the update; `valid_at := created_at`; persona/embedding NULL), fail-closed on malformed/wrong-version input, with non-`{note, draft}` rows quarantined to a minimized §4-safe sidecar report. DB-backed importer tests. Decision `M3-DL-003`. **Current** (this packet).
+- **M4-M5** — Not started.
 
 ## How to update this file
 

@@ -18,6 +18,12 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic-settings>=2.5",
+  # Core store (ADR-008): one managed PostgreSQL as SoT. The episodic source
+  # layer lands in M3-P1 (schema + migration; the importer is M3-P2).
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.2",   # psycopg3 driver — postgresql+psycopg://
+  "pgvector>=0.3",          # reserved vector(<=1536) shell; populated at M4
+  "alembic>=1.13",          # migration tooling + deploy-time release step
 ]
 
 [project.optional-dependencies]
@@ -25,6 +31,10 @@ dev = [
   "pytest>=8.0",
   "httpx>=0.27",
 ]
+
+[project.scripts]
+# M3-P2 offline /export importer (also runnable as `python -m theygrow_api.importer`).
+theygrow-import-export = "theygrow_api.importer:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["theygrow_api"]

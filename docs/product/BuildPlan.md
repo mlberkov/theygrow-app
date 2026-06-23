@@ -1,6 +1,6 @@
 # Build plan — M1 through M5
 
-This is the milestone-level build plan that follows from `AGENTS.md` §6 + ADR-005 + roadmap v2. `TechSpec.md` documents the decided architectural shape; this file documents the **delivery order** that gets us there.
+This is the milestone-level build plan that follows from `AGENTS.md` §6 + ADR-005 + roadmap v3 (tracks А/Б/В). `TechSpec.md` documents the decided architectural shape; this file documents the **delivery order** that gets us there.
 
 ## M1 — enablement harness
 
@@ -25,7 +25,7 @@ Introduce the monorepo split (`/app` + `/api`) and stand up the FastAPI skeleton
 
 ## M3 — episodic store + `/export` importer
 
-Introduce the episodic store (Postgres + pgvector) and import family-memory records from the `diary-memory-service` engine via its `/export` surface. The engine remains **out of perimeter** — it is a code/data donor, not a live dependency.
+Introduce the core store — one managed PostgreSQL as single source of truth (pgvector-derived vector port; ADR-008) — and import family-memory records from the `diary-memory-service` engine via its `/export` surface. The engine remains **out of perimeter** — it is a code/data donor, not a live dependency.
 
 ### Pre-execution verification gate
 

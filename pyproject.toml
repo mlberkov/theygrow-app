@@ -30,7 +30,19 @@ quote-style = "double"
 plugins = ["pydantic.mypy"]
 python_version = "3.12"
 strict = true
+# Alembic migration plumbing (env.py + generated versions/) is excluded from the
+# strict gate: it is imperative DDL scaffolding, not product code, and the
+# generated revision modules don't carry strict annotations. The table shape it
+# emits is validated at runtime by the DB-backed constraint tests instead.
+exclude = ['^api/alembic/']
 warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 no_implicit_reexport = true
+
+# pgvector ships no py.typed marker (its SQLAlchemy `Vector` type is used in the
+# M3 source model). Allow the untyped import without relaxing strictness anywhere
+# else.
+[[tool.mypy.overrides]]
+module = "pgvector.*"
+ignore_missing_imports = true
