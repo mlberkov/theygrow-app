@@ -26,8 +26,8 @@ def _by_name() -> dict[str, Parameter]:
 
 def test_schema_version_is_int() -> None:
     assert isinstance(PARAMETERS_SCHEMA_VERSION, int)
-    # v3 (M4-DL-004): the P3 fusion knobs were added.
-    assert PARAMETERS_SCHEMA_VERSION == 3
+    # v4 (M4-DL-005): the P4 grounded-ask knobs (answers_model, grounding_min_segments) added.
+    assert PARAMETERS_SCHEMA_VERSION == 4
 
 
 def test_every_parameter_carries_nonempty_changed_in() -> None:
@@ -104,6 +104,31 @@ def test_p3_fusion_knobs_are_env_overridable(monkeypatch: pytest.MonkeyPatch) ->
     assert by["candidate_k"].value == 33
     assert by["top_k"].value == 4
     assert by["rrf_dense_weight"].value == 2.5
+
+
+def test_p4_grounded_ask_knobs_are_runtime_with_provenance() -> None:
+    by = _by_name()
+    answers = by["answers_model"]
+    assert answers.scope == "runtime"
+    assert answers.changed_in == "M4-DL-005"
+    assert isinstance(answers.value, str) and answers.value
+    # The note records the per-egress (ADR-014) clearance contract, distinct from the embedder.
+    assert "ADR-014" in (answers.note or "")
+
+    gate = by["grounding_min_segments"]
+    assert gate.scope == "runtime"
+    assert gate.changed_in == "M4-DL-005"
+    assert gate.type_label == "int"
+    assert gate.value == 1  # documented default: need >=1 grounded segment
+    assert "no_evidence" in (gate.note or "")
+
+
+def test_p4_knobs_are_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("THEYGROW_PARAM_ANSWERS_MODEL", "custom-chat-model")
+    monkeypatch.setenv("THEYGROW_PARAM_GROUNDING_MIN_SEGMENTS", "3")
+    by = _by_name()
+    assert by["answers_model"].value == "custom-chat-model"
+    assert by["grounding_min_segments"].value == 3
 
 
 def test_embedding_dimension_is_schema_bound_with_provenance() -> None:

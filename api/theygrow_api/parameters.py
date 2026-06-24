@@ -45,8 +45,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 #: value change. v2 (M4-DL-003): the ``embedding_model`` + ``embedding_dimension`` knobs
 #: were added. v3 (M4-DL-004): the P3 fusion knobs (``candidate_k``, ``top_k``, ``rrf_k``,
 #: ``rrf_dense_weight``, ``rrf_sparse_weight``) were added — a knob-count change, not a
-#: value change.
-PARAMETERS_SCHEMA_VERSION = 3
+#: value change. v4 (M4-DL-005): the P4 grounded-ask knobs (``answers_model``,
+#: ``grounding_min_segments``) were added — a knob-count change, not a value change.
+PARAMETERS_SCHEMA_VERSION = 4
 
 #: Sparse-FTS text-search configuration — the SURFACE value of this knob. ``'simple'``
 #: does no Russian stemming (known recall limitation, ADR-008; port-out trigger ->
@@ -123,6 +124,21 @@ class RuntimeParameters(BaseSettings):
     #: one leg to bias the blend toward dense (semantic) or sparse (lexical) recall.
     rrf_dense_weight: float = 1.0
     rrf_sparse_weight: float = 1.0
+
+    #: Answers/chat model id behind the ``AnswersProvider`` port (M4-P4 / ADR-014). Default
+    #: is the donor chat model. Env-overridable + swappable behind the port; the provider
+    #: must be ZDR + DPA + EU-residency-bound (an operational precondition, separate from the
+    #: embedder's — ADR-014 per-egress clearance).
+    answers_model: str = "gpt-4.1"
+
+    #: Grounding-gate threshold (M4-P4 / ADR-015): the MINIMUM number of eligible grounded
+    #: segments retrieval must return before the grounded-ask service will call the answers
+    #: LLM at all. Below it -> honest degradation (mode="no_evidence"), ZERO provider calls,
+    #: never a parametric/web fallback (closed corpus). COUNT-based, not score-based: RRF
+    #: fuses on rank, not calibrated scores (score calibration is deliberately out of scope,
+    #: M4-DL-004), so a score threshold would be meaningless across queries. Default 1 =
+    #: "need >=1 grounded segment"; raise to require denser grounding.
+    grounding_min_segments: int = 1
 
 
 def current_parameters() -> tuple[Parameter, ...]:
@@ -228,5 +244,32 @@ def current_parameters() -> tuple[Parameter, ...]:
             scope="runtime",
             changed_in="M4-DL-004",
             note="Sparse-leg weight in RRF fusion (default 1.0 = unweighted).",
+        ),
+        Parameter(
+            name="answers_model",
+            value=runtime.answers_model,
+            type_label="str",
+            scope="runtime",
+            changed_in="M4-DL-005",
+            note=(
+                "Answers/chat model behind the AnswersProvider port (ADR-014). "
+                "Runtime/env-overridable + swappable behind the port; the provider must be "
+                "ZDR+DPA+EU-residency-bound under its OWN clearance (answers_privacy_cleared), "
+                "distinct from the embedder's (per-egress clearance)."
+            ),
+        ),
+        Parameter(
+            name="grounding_min_segments",
+            value=runtime.grounding_min_segments,
+            type_label="int",
+            scope="runtime",
+            changed_in="M4-DL-005",
+            note=(
+                "Grounding-gate threshold (ADR-015): minimum eligible grounded segments "
+                "retrieval must return before the grounded-ask service calls the answers LLM. "
+                "Below it -> honest degradation (no_evidence), zero provider calls, never a "
+                "parametric/web fallback. Count-based, not score-based (RRF fuses on rank; "
+                "score calibration is out of scope, M4-DL-004). Default 1."
+            ),
         ),
     )

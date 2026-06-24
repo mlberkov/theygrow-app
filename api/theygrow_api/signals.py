@@ -13,10 +13,10 @@ Taxonomy:
   * ``RETRIEVAL_LATENCY``   — P1/P3, emitted: per-leg (sparse/dense/fused) candidate
     count + query latency, distinguished by a §4-safe ``leg`` label.
   * ``EMBEDDING_COUNTERS``  — P2, emitted: embeddings backfill counts + token cost + timing.
-  * ``GROUNDING_COVERAGE``  — P4, defined-not-emitted (grounded-ask assembly).
-  * ``DEGRADATION_EVENT``   — P3/P4, defined-not-emitted (honest-degradation events).
+  * ``GROUNDING_COVERAGE``  — P4, emitted: cited vs offered segment counts per answer.
+  * ``DEGRADATION_EVENT``   — P4, emitted: honest-degradation events (a §4-safe mode label).
 
-P2/P3 signals MUST emit through this SAME seam (M4-DL-002). The seam is an injectable
+P2/P3/P4 signals MUST emit through this SAME seam (M4-DL-002). The seam is an injectable
 ``SignalSink`` so tests capture emissions and a future metrics backend swaps in without
 touching producers.
 """
@@ -95,15 +95,22 @@ SIGNAL_TAXONOMY: dict[SignalKind, SignalDescriptor] = {
         kind=SignalKind.GROUNDING_COVERAGE,
         field_names=("covered", "total"),
         producing_stage="P4",
-        emitted_now=False,
-        note="Grounded-ask coverage; emitted when context_assembler/query_service land (P4).",
+        emitted_now=True,
+        note=(
+            "Grounded-ask coverage (M4-P4): cited segment count vs offered segment count for "
+            "one answered query (counts only). Emitted by services.query_service.answer_query."
+        ),
     ),
     SignalKind.DEGRADATION_EVENT: SignalDescriptor(
         kind=SignalKind.DEGRADATION_EVENT,
         field_names=("mode",),
-        producing_stage="P3",
-        emitted_now=False,
-        note="Honest-degradation event; emitted when retrieval/assembly fallbacks land (P3/P4).",
+        producing_stage="P4",
+        emitted_now=True,
+        note=(
+            "Honest-degradation event (M4-P4): a §4-safe bounded mode label ('no_evidence' | "
+            "'provider_unavailable' | 'parse_failure' | 'weak_evidence' | 'ambiguous'). "
+            "Emitted by services.query_service.answer_query on each degraded contour."
+        ),
     ),
 }
 
@@ -193,6 +200,39 @@ class EmbeddingCounters:
             "total_tokens": self.total_tokens,
             "duration_ms": self.duration_ms,
         }
+
+
+@dataclass(frozen=True)
+class GroundingCoverage:
+    """P4 signal: grounded-ask coverage — cited vs offered segment counts (counts only).
+
+    §4-safe: ``covered`` = segments the answer actually cited (validated against the
+    assembled context); ``total`` = segments offered to the model. Never carries text or
+    family-identifying ids.
+    """
+
+    covered: int
+    total: int
+    kind: SignalKind = SignalKind.GROUNDING_COVERAGE
+
+    def fields(self) -> dict[str, object]:
+        return {"covered": self.covered, "total": self.total}
+
+
+@dataclass(frozen=True)
+class DegradationEvent:
+    """P4 signal: an honest-degradation event carrying a §4-safe bounded ``mode`` label.
+
+    ``mode`` is one of a bounded set ('no_evidence' | 'provider_unavailable' |
+    'parse_failure' | 'weak_evidence' | 'ambiguous') — a label in the counts/ids class,
+    like ``RetrievalLatency.leg``, never family-identifying.
+    """
+
+    mode: str
+    kind: SignalKind = SignalKind.DEGRADATION_EVENT
+
+    def fields(self) -> dict[str, object]:
+        return {"mode": self.mode}
 
 
 @runtime_checkable

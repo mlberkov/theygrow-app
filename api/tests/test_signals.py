@@ -13,8 +13,10 @@ import pytest
 
 from theygrow_api.signals import (
     SIGNAL_TAXONOMY,
+    DegradationEvent,
     DerivationCounters,
     EmbeddingCounters,
+    GroundingCoverage,
     LoggingSignalSink,
     RetrievalLatency,
     SignalKind,
@@ -25,8 +27,9 @@ from theygrow_api.signals import (
 _FORBIDDEN = {"raw_text", "chunk_text", "community_id", "author_user_id"}
 
 #: Bounded enum-style label keys (counts/ids class, §4-safe) whose values are short labels
-#: rather than numeric counts/timings — e.g. the retrieval ``leg`` discriminator.
-_LABEL_KEYS = {"leg"}
+#: rather than numeric counts/timings — e.g. the retrieval ``leg`` discriminator and the
+#: degradation ``mode`` label (M4-P4).
+_LABEL_KEYS = {"leg", "mode"}
 
 
 def test_taxonomy_defines_every_kind() -> None:
@@ -36,13 +39,14 @@ def test_taxonomy_defines_every_kind() -> None:
         assert desc.producing_stage in {"P1", "P2", "P3", "P4"}
 
 
-def test_downstream_kinds_defined_but_not_emitted_in_p1() -> None:
-    assert SIGNAL_TAXONOMY[SignalKind.GROUNDING_COVERAGE].emitted_now is False
-    assert SIGNAL_TAXONOMY[SignalKind.DEGRADATION_EVENT].emitted_now is False
-    # The P1 producers and the P2 embeddings backfill are emitted now.
-    assert SIGNAL_TAXONOMY[SignalKind.DERIVATION_COUNTERS].emitted_now is True
-    assert SIGNAL_TAXONOMY[SignalKind.RETRIEVAL_LATENCY].emitted_now is True
-    assert SIGNAL_TAXONOMY[SignalKind.EMBEDDING_COUNTERS].emitted_now is True
+def test_all_kinds_are_emitted_now_as_of_p4() -> None:
+    # As of M4-P4 every declared kind has a live producer (the two P4 kinds — GROUNDING_COVERAGE
+    # and DEGRADATION_EVENT — were activated when query_service landed). INV-003
+    # (test_signal_emitters) is the producer-coupling guarantee; here we just pin the taxonomy.
+    for kind, desc in SIGNAL_TAXONOMY.items():
+        assert desc.emitted_now is True, f"{kind} should be emitted as of P4"
+    assert SIGNAL_TAXONOMY[SignalKind.GROUNDING_COVERAGE].producing_stage == "P4"
+    assert SIGNAL_TAXONOMY[SignalKind.DEGRADATION_EVENT].producing_stage == "P4"
     assert SIGNAL_TAXONOMY[SignalKind.EMBEDDING_COUNTERS].producing_stage == "P2"
 
 
@@ -64,6 +68,8 @@ def test_signal_payloads_are_safe_counts_and_timings() -> None:
             total_tokens=11,
             duration_ms=3.0,
         ),
+        GroundingCoverage(covered=1, total=3),
+        DegradationEvent(mode="no_evidence"),
     ):
         payload = sig.fields()
         assert not (_FORBIDDEN & set(payload)), "signal payload must carry no §4 fields"

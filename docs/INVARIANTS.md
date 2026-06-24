@@ -98,9 +98,23 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 ### M4-P3-INV-003 — Emitted signal kinds are wired to real producers
 
 - **Statement.** The set of `SignalKind` declared `emitted_now=True` in the taxonomy equals the set actually emitted when the known producers run — so flipping a defined-not-emitted kind (`GROUNDING_COVERAGE` / `DEGRADATION_EVENT`) to `emitted_now=True` without a producer fails the gate, and a new emitted producer must register here (ADR-013 operability; closes OQ#1, structural half).
-- **Enforced by.** `api/theygrow_api/signals.py` (the `SIGNAL_TAXONOMY` `emitted_now` flags) + `api/tests/test_signal_emitters.py` (`test_every_emitted_now_kind_has_a_wired_producer`, driving `rederive` / the sparse leg / `embed_backfill` through a recording sink and comparing kind-sets; `test_defined_not_emitted_kinds_are_absent_from_producers`), run by `pytest api` in `.github/workflows/ci.yml`.
-- **Landed in.** M4-P3.
+- **Enforced by.** `api/theygrow_api/signals.py` (the `SIGNAL_TAXONOMY` `emitted_now` flags) + `api/tests/test_signal_emitters.py` (`test_every_emitted_now_kind_has_a_wired_producer`, driving `rederive` / the sparse leg / `embed_backfill` / `query_service.answer_query` through a recording sink and comparing kind-sets; `test_no_defined_not_emitted_kinds_remain_as_of_p4`), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P3 (extended M4-P4: the two P4 kinds `GROUNDING_COVERAGE` + `DEGRADATION_EVENT` were flipped to `emitted_now=True`, so the test now REQUIRES their real emission via the `answer_query` driver).
 - **Scope.** The explicit-coupling form: the test enumerates the known producers and asserts the emitted-kind set matches the `emitted_now=True` set. It guarantees no `emitted_now` kind is unproduced and no enumerated producer emits an undeclared kind; it does not reflectively discover producers not listed in the test (adding one requires extending the driver).
+
+### M4-P4-INV-001 — Answer synthesis is fail-closed without the answers ZDR clearance gate
+
+- **Statement.** The grounded-ask service sends family context to the answers LLM and synthesizes an answer ONLY when `answers_privacy_cleared` is set; uncleared (or endpoint/key missing) it raises `AnswersNotReady` before any provider call or text egress — even with a provider injected — making ZERO answers-provider calls (ADR-014, per-egress clearance; the answers LLM is a distinct residency surface from the embedder, so the embedder's clearance does not clear it).
+- **Enforced by.** `api/theygrow_api/services/query_service.py` (`_ensure_answers_cleared` runs first, before `retrieve`/build/call) + `api/tests/test_query_service.py` (`test_answers_fail_closed_when_uncleared_zero_calls`, asserting `AnswersNotReady` and zero recorded provider calls), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P4.
+- **Scope.** Covers the answers/chat egress only (the second §4 surface); the query-embedding egress stays gated by `embedder_privacy_cleared` inside `retrieve()` (M4-P3-INV / ADR-011). It is a structural refusal (loud no-op), not a content degradation.
+
+### M4-P4-INV-002 — Grounded answers are closed-corpus or honestly degraded
+
+- **Statement.** A non-`None` `answer_text` is produced ONLY from retrieved + cited family episodic memory — never a parametric/model or web fallback. Three independent edges enforce this: the prompt carries only retrieved `chunk_text`; the parser rejects any `cited_chunk_id` absent from the assembled context (a fabricated citation → suppressed `parse_failure`); and a pre-provider grounding gate (`grounding_min_segments`) returns an honest `no_evidence` result with ZERO provider calls below the bar. A model-declared `no_evidence` (present-but-irrelevant context) also suppresses the answer.
+- **Enforced by.** `api/theygrow_api/services/context_assembler.py` (`parse_structured_answer` citation grounding) + `api/theygrow_api/services/query_service.py` (the grounding gate + degradation contours) + `api/tests/test_query_service.py` (`test_fabricated_citation_is_parse_failure`, `test_no_context_degrades_with_zero_answers_calls`, `test_present_but_irrelevant_context_llm_declares_no_evidence`), run by `pytest api`.
+- **Landed in.** M4-P4.
+- **Scope.** Family episodic memory is the only grounded source at M4 (canon/KB is M5, out of perimeter), so provenance is family-observation lineage only. Grounded-but-uncertain answers are RETURNED with an honesty flag (ADR-015), not suppressed — they remain closed-corpus (cited retrieved context). These are deterministic seam-mechanics guarantees with injected fakes; real retrieval recall / grounding QUALITY is the M4-CLOSE eval, not enforced here.
 
 ## Entry format (for future entries)
 

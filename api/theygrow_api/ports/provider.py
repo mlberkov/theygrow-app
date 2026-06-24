@@ -11,6 +11,15 @@ DOES reach the cloud embedder — but that is a provider call, not an engine cal
 and is admitted only because child ``chunk_text`` leaves the perimeter under the
 owner-cleared ZDR + DPA + EU-residency surface (the offline backfill gates on that
 clearance before sending any text).
+
+``AnswersProvider`` is the M4-P4 grounded-ask seam — the SECOND third-party egress:
+the assembled family context (retrieved ``chunk_text``) is sent to the chat/answers
+LLM to synthesize an answer. It is a distinct service/DPA/residency surface from the
+embedder (ADR-014, per-egress clearance), so ``query_service`` gates it on its OWN
+``answers_privacy_cleared`` flag, fail-closed, before constructing this adapter or
+sending any text. The method takes the rendered prompt strings (not the domain
+``AnswerPrompt``) so this port stays decoupled from the service/domain layer, mirroring
+``EmbeddingProvider`` taking a plain ``Sequence[str]``.
 """
 
 from collections.abc import Sequence
@@ -56,4 +65,34 @@ class EmbeddingProvider(Protocol):
 
     def embed_texts(self, texts: Sequence[str]) -> EmbeddingBatch:
         """Embed ``texts`` -> vectors aligned by position, plus token usage."""
+        ...
+
+
+@dataclass(frozen=True)
+class AnswerResponse:
+    """One answers/chat response: the raw model text plus the §4-safe token tally.
+
+    ``raw_text`` is the provider's structured-answer JSON, parsed + citation-grounded
+    by ``services.context_assembler.parse_structured_answer``. ``total_tokens`` is the
+    provider-reported usage (a count), carried so a future cost signal sources real
+    numbers; it is never the text. ``0`` when the backend cannot report usage.
+    """
+
+    raw_text: str
+    total_tokens: int
+
+
+@runtime_checkable
+class AnswersProvider(Protocol):
+    """Structural interface the M4-P4 grounded-ask adapter satisfies (ADR-014).
+
+    One method: given the rendered prompt strings, return the model's answer text +
+    usage. Strings in / response out keeps the port free of any domain import; the
+    ``cited_chunk_ids`` / ``prompt_version`` provenance stays in the service layer. The
+    concrete adapter is bound by ZDR + DPA + EU-residency; the model is a config knob
+    (``parameters.answers_model``) behind this port, so it is swappable.
+    """
+
+    def complete(self, system_text: str, user_text: str) -> AnswerResponse:
+        """Send the rendered prompt -> the model's raw answer text + token usage."""
         ...
