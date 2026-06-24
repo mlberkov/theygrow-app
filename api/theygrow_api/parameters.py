@@ -43,8 +43,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 #: SURFACE-STRUCTURE version — orthogonal to per-parameter ``changed_in`` (M4-DL-002).
 #: Bump only when the registry's shape / the ``Parameter`` descriptor changes; NEVER on a
 #: value change. v2 (M4-DL-003): the ``embedding_model`` + ``embedding_dimension`` knobs
-#: were added (a knob-count change, not a value change).
-PARAMETERS_SCHEMA_VERSION = 2
+#: were added. v3 (M4-DL-004): the P3 fusion knobs (``candidate_k``, ``top_k``, ``rrf_k``,
+#: ``rrf_dense_weight``, ``rrf_sparse_weight``) were added — a knob-count change, not a
+#: value change.
+PARAMETERS_SCHEMA_VERSION = 3
 
 #: Sparse-FTS text-search configuration — the SURFACE value of this knob. ``'simple'``
 #: does no Russian stemming (known recall limitation, ADR-008; port-out trigger ->
@@ -102,6 +104,26 @@ class RuntimeParameters(BaseSettings):
     #: provider must be ZDR + DPA + EU-residency-bound (an operational precondition).
     embedding_model: str = "text-embedding-3-large"
 
+    #: Per-leg candidate depth the fusion orchestrator (``services.retrieval.retrieve``)
+    #: passes to BOTH the dense and sparse legs (M4-P3 / M4-DL-004). One symmetric cap so
+    #: RRF fuses comparable-depth rankings. Precedence: the orchestrator always passes this
+    #: explicitly; ``sparse_candidate_limit`` is the bare-leg default for DIRECT sparse calls
+    #: only — the two never compete on the fused path.
+    candidate_k: int = 50
+
+    #: Final fused-result cap returned by the orchestrator after RRF (M4-P3 / M4-DL-004).
+    top_k: int = 10
+
+    #: RRF rank-bias constant ``k`` in ``weight / (k + rank)`` (M4-P3 / M4-DL-004). The
+    #: donor/standard default is 60: larger ``k`` flattens the contribution of top ranks
+    #: (more democratic across legs), smaller ``k`` sharpens it.
+    rrf_k: int = 60
+
+    #: Per-leg RRF weights (M4-P3 / M4-DL-004). Default 1.0/1.0 = unweighted fusion; raise
+    #: one leg to bias the blend toward dense (semantic) or sparse (lexical) recall.
+    rrf_dense_weight: float = 1.0
+    rrf_sparse_weight: float = 1.0
+
 
 def current_parameters() -> tuple[Parameter, ...]:
     """The current parameter set as data — the shape a later read-only view RENDERS.
@@ -157,5 +179,54 @@ def current_parameters() -> tuple[Parameter, ...]:
                 "new-migration event AND a re-embed. The drift guard links this surface value "
                 "to the live column type."
             ),
+        ),
+        Parameter(
+            name="candidate_k",
+            value=runtime.candidate_k,
+            type_label="int",
+            scope="runtime",
+            changed_in="M4-DL-004",
+            note=(
+                "Per-leg candidate depth the fusion orchestrator passes to BOTH legs (RRF "
+                "fuses comparable-depth rankings). Precedence: the orchestrator passes this; "
+                "sparse_candidate_limit is the bare-leg default for direct sparse calls only. "
+                "ef_search (HNSW recall/latency knob) deliberately DEFERRED past P3 — to be "
+                "introduced only when a recall metric demands it (M4-DL-004)."
+            ),
+        ),
+        Parameter(
+            name="top_k",
+            value=runtime.top_k,
+            type_label="int",
+            scope="runtime",
+            changed_in="M4-DL-004",
+            note="Final fused-result cap returned by the retrieval orchestrator after RRF.",
+        ),
+        Parameter(
+            name="rrf_k",
+            value=runtime.rrf_k,
+            type_label="int",
+            scope="runtime",
+            changed_in="M4-DL-004",
+            note=(
+                "RRF rank-bias constant in weight/(k+rank); donor/standard default 60. Larger "
+                "flattens top-rank dominance across legs, smaller sharpens it."
+            ),
+        ),
+        Parameter(
+            name="rrf_dense_weight",
+            value=runtime.rrf_dense_weight,
+            type_label="float",
+            scope="runtime",
+            changed_in="M4-DL-004",
+            note="Dense-leg weight in RRF fusion (default 1.0 = unweighted).",
+        ),
+        Parameter(
+            name="rrf_sparse_weight",
+            value=runtime.rrf_sparse_weight,
+            type_label="float",
+            scope="runtime",
+            changed_in="M4-DL-004",
+            note="Sparse-leg weight in RRF fusion (default 1.0 = unweighted).",
         ),
     )

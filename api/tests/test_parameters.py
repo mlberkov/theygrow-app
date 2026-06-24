@@ -26,6 +26,20 @@ def _by_name() -> dict[str, Parameter]:
 
 def test_schema_version_is_int() -> None:
     assert isinstance(PARAMETERS_SCHEMA_VERSION, int)
+    # v3 (M4-DL-004): the P3 fusion knobs were added.
+    assert PARAMETERS_SCHEMA_VERSION == 3
+
+
+def test_every_parameter_carries_nonempty_changed_in() -> None:
+    # M4-P3-INV-002 (operability, ADR-013): the surface is decision-log-traceable — every
+    # rendered Parameter carries a non-empty changed_in. A new knob added without provenance
+    # fails here. Enforced-only: this assertion IS the guarantee.
+    params = current_parameters()
+    assert params, "the parameter surface must not be empty"
+    for p in params:
+        assert isinstance(p.changed_in, str) and p.changed_in.strip(), (
+            f"parameter {p.name!r} is missing changed_in provenance"
+        )
 
 
 def test_fts_config_is_schema_bound_with_provenance() -> None:
@@ -62,6 +76,34 @@ def test_embedding_model_is_runtime_with_provenance() -> None:
 def test_embedding_model_is_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("THEYGROW_PARAM_EMBEDDING_MODEL", "custom-embed-model")
     assert _by_name()["embedding_model"].value == "custom-embed-model"
+
+
+def test_p3_fusion_knobs_are_runtime_with_provenance() -> None:
+    by = _by_name()
+    for name, type_label in (
+        ("candidate_k", "int"),
+        ("top_k", "int"),
+        ("rrf_k", "int"),
+        ("rrf_dense_weight", "float"),
+        ("rrf_sparse_weight", "float"),
+    ):
+        p = by[name]
+        assert p.scope == "runtime"
+        assert p.changed_in == "M4-DL-004"
+        assert p.type_label == type_label
+    # The candidate_k note records the cap precedence + the deliberate ef_search deferral.
+    assert "ef_search" in (by["candidate_k"].note or "")
+    assert by["rrf_k"].value == 60  # donor/standard default
+
+
+def test_p3_fusion_knobs_are_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("THEYGROW_PARAM_CANDIDATE_K", "33")
+    monkeypatch.setenv("THEYGROW_PARAM_TOP_K", "4")
+    monkeypatch.setenv("THEYGROW_PARAM_RRF_DENSE_WEIGHT", "2.5")
+    by = _by_name()
+    assert by["candidate_k"].value == 33
+    assert by["top_k"].value == 4
+    assert by["rrf_dense_weight"].value == 2.5
 
 
 def test_embedding_dimension_is_schema_bound_with_provenance() -> None:

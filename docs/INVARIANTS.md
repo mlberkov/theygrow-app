@@ -81,6 +81,27 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 - **Landed in.** M4-P2.
 - **Scope.** Covers the offline backfill pass over already-derived chunks. Embedding quality / vector correctness beyond dimension is out of scope; the injected fake provider exercises mechanics, not a live embedder.
 
+### M4-P3-INV-001 — Episodic eligibility is note-only, enforced in both retrieval legs
+
+- **Statement.** Only chunks whose `source_messages.detected_route='note'` are retrievable; `draft` chunks — though embedded and indexed — are dropped at retrieval by a hard FK-join WHERE in BOTH the sparse and dense legs, so the fused result inherits note-only by construction (ADR-012, fork b). The filter is binary and always-on (not a tier/weight knob); `detected_route` stays on `source_messages` (not denormalized).
+- **Enforced by.** `api/theygrow_api/retrieval/search_repository.py` (the `detected_route='note'` join on both `sparse_candidates` and `dense_candidates`) + `api/theygrow_api/services/retrieval.py` (`retrieve` fuses only the filtered legs) + `api/tests/test_search_repository.py` (`test_both_legs_exclude_draft_route`) + `api/tests/test_retrieval.py` (`test_retrieve_excludes_draft_end_to_end`), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P3.
+- **Scope.** Covers the retrieval-layer eligibility filter (which chunks may surface). It does not cover grounded-ask assembly or the "no verified info" honest-degradation message (P4), nor retrieval ranking quality.
+
+### M4-P3-INV-002 — Every config-surface parameter carries value provenance
+
+- **Statement.** Every `Parameter` rendered by `current_parameters()` carries a non-empty `changed_in` decision-log id, so the parameters-as-data surface is fully traceable — a knob added without provenance fails the gate (ADR-013 operability; closes OQ#1, structural half).
+- **Enforced by.** `api/theygrow_api/parameters.py` (each `Parameter` sets `changed_in`) + `api/tests/test_parameters.py` (`test_every_parameter_carries_nonempty_changed_in`), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P3.
+- **Scope.** Covers the presence + non-emptiness of `changed_in` on every surface parameter. It does not assert the id resolves to a real decision-log entry, nor validate the `scope` classification.
+
+### M4-P3-INV-003 — Emitted signal kinds are wired to real producers
+
+- **Statement.** The set of `SignalKind` declared `emitted_now=True` in the taxonomy equals the set actually emitted when the known producers run — so flipping a defined-not-emitted kind (`GROUNDING_COVERAGE` / `DEGRADATION_EVENT`) to `emitted_now=True` without a producer fails the gate, and a new emitted producer must register here (ADR-013 operability; closes OQ#1, structural half).
+- **Enforced by.** `api/theygrow_api/signals.py` (the `SIGNAL_TAXONOMY` `emitted_now` flags) + `api/tests/test_signal_emitters.py` (`test_every_emitted_now_kind_has_a_wired_producer`, driving `rederive` / the sparse leg / `embed_backfill` through a recording sink and comparing kind-sets; `test_defined_not_emitted_kinds_are_absent_from_producers`), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P3.
+- **Scope.** The explicit-coupling form: the test enumerates the known producers and asserts the emitted-kind set matches the `emitted_now=True` set. It guarantees no `emitted_now` kind is unproduced and no enumerated producer emits an undeclared kind; it does not reflectively discover producers not listed in the test (adding one requires extending the driver).
+
 ## Entry format (for future entries)
 
 - **Id.** `M{N}-P{k}-INV-{NNN}` — `N` is the milestone number, `k` is the packet number within the milestone, `NNN` is zero-padded sequence within the packet (`001`, `002`, …).

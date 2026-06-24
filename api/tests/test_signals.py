@@ -24,6 +24,10 @@ from theygrow_api.signals import (
 #: §4-forbidden keys that must never appear in a signal payload.
 _FORBIDDEN = {"raw_text", "chunk_text", "community_id", "author_user_id"}
 
+#: Bounded enum-style label keys (counts/ids class, §4-safe) whose values are short labels
+#: rather than numeric counts/timings — e.g. the retrieval ``leg`` discriminator.
+_LABEL_KEYS = {"leg"}
+
 
 def test_taxonomy_defines_every_kind() -> None:
     assert set(SIGNAL_TAXONOMY) == set(SignalKind)
@@ -51,7 +55,7 @@ def test_signal_payloads_are_safe_counts_and_timings() -> None:
             chunks=2,
             skipped_empty=0,
         ),
-        RetrievalLatency(candidate_count=3, latency_ms=1.5),
+        RetrievalLatency(leg="sparse", candidate_count=3, latency_ms=1.5),
         EmbeddingCounters(
             attempted=2,
             embedded=2,
@@ -63,16 +67,31 @@ def test_signal_payloads_are_safe_counts_and_timings() -> None:
     ):
         payload = sig.fields()
         assert not (_FORBIDDEN & set(payload)), "signal payload must carry no §4 fields"
-        assert all(isinstance(v, int | float) for v in payload.values())
+        # Non-label fields are numeric counts/timings; label fields (e.g. leg) are short str.
+        for key, value in payload.items():
+            if key in _LABEL_KEYS:
+                assert isinstance(value, str)
+            else:
+                assert isinstance(value, int | float)
         # The payload keys match the taxonomy descriptor for this kind.
         assert set(payload) == set(SIGNAL_TAXONOMY[sig.kind].field_names)
+
+
+def test_retrieval_latency_leg_label_is_distinguishing_and_safe() -> None:
+    # The leg discriminator (M4-DL-004) distinguishes the three P3 emissions through one
+    # kind; it is a bounded label, NOT a §4-forbidden identifier.
+    assert "leg" not in _FORBIDDEN
+    for leg in ("sparse", "dense", "fused"):
+        payload = RetrievalLatency(leg=leg, candidate_count=1, latency_ms=0.5).fields()
+        assert payload["leg"] == leg
+        assert set(payload) == set(SIGNAL_TAXONOMY[SignalKind.RETRIEVAL_LATENCY].field_names)
 
 
 def test_logging_sink_emits_through_logging_boundary(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level(logging.INFO, logger="theygrow_api.signals"):
-        default_sink().emit(RetrievalLatency(candidate_count=3, latency_ms=2.0))
+        default_sink().emit(RetrievalLatency(leg="sparse", candidate_count=3, latency_ms=2.0))
     records = [r for r in caplog.records if r.getMessage() == "retrieval.latency"]
     assert len(records) == 1
     # The signal's count field rode through as a structured record attribute (extra=).

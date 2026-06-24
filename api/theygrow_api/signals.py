@@ -10,7 +10,8 @@ the PII-guarded logging boundary (``logging.py``).
 
 Taxonomy:
   * ``DERIVATION_COUNTERS`` — P1, emitted: notes/event_chunks re-derivation counts.
-  * ``RETRIEVAL_LATENCY``   — P1, emitted: sparse leg candidate count + query latency.
+  * ``RETRIEVAL_LATENCY``   — P1/P3, emitted: per-leg (sparse/dense/fused) candidate
+    count + query latency, distinguished by a §4-safe ``leg`` label.
   * ``EMBEDDING_COUNTERS``  — P2, emitted: embeddings backfill counts + token cost + timing.
   * ``GROUNDING_COVERAGE``  — P4, defined-not-emitted (grounded-ask assembly).
   * ``DEGRADATION_EVENT``   — P3/P4, defined-not-emitted (honest-degradation events).
@@ -67,10 +68,14 @@ SIGNAL_TAXONOMY: dict[SignalKind, SignalDescriptor] = {
     ),
     SignalKind.RETRIEVAL_LATENCY: SignalDescriptor(
         kind=SignalKind.RETRIEVAL_LATENCY,
-        field_names=("candidate_count", "latency_ms"),
+        field_names=("leg", "candidate_count", "latency_ms"),
         producing_stage="P1",
         emitted_now=True,
-        note="Sparse FTS leg: candidate count + query latency (co-emitted).",
+        note=(
+            "Retrieval leg latency: a §4-safe leg label ('sparse'|'dense'|'fused') + "
+            "candidate count + query latency (co-emitted). P1 sparse leg; P3 adds dense + "
+            "fused emissions through the same kind."
+        ),
     ),
     SignalKind.EMBEDDING_COUNTERS: SignalDescriptor(
         kind=SignalKind.EMBEDDING_COUNTERS,
@@ -141,14 +146,25 @@ class DerivationCounters:
 
 @dataclass(frozen=True)
 class RetrievalLatency:
-    """P1 signal: sparse leg candidate count + query latency (co-emitted)."""
+    """Retrieval-leg signal: a §4-safe leg label + candidate count + query latency.
 
+    ``leg`` is a bounded label (``"sparse"`` | ``"dense"`` | ``"fused"``) — counts/ids
+    class, never family-identifying — so the three P3 emissions are distinguishable
+    through one kind (M4-DL-004; reuse/extend, not duplicate). It is REQUIRED (no default):
+    every emission is labelled, never unlabelled.
+    """
+
+    leg: str
     candidate_count: int
     latency_ms: float
     kind: SignalKind = SignalKind.RETRIEVAL_LATENCY
 
     def fields(self) -> dict[str, object]:
-        return {"candidate_count": self.candidate_count, "latency_ms": self.latency_ms}
+        return {
+            "leg": self.leg,
+            "candidate_count": self.candidate_count,
+            "latency_ms": self.latency_ms,
+        }
 
 
 @dataclass(frozen=True)
