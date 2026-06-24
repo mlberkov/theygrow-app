@@ -15,17 +15,22 @@ Scope guardrails (this model lands schema only; the importer is M3-P2):
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Computed,
+    Date,
     DateTime,
+    ForeignKey,
+    Integer,
     Text,
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Full RouteKind wire-value set (lowercase), verified against the engine enum
@@ -53,6 +58,20 @@ ROUTE_KINDS: tuple[str, ...] = (
 # embeddings, so the ceiling satisfies the invariant; narrowing this shell at M4
 # is a cheap ALTER on an all-NULL column.
 EMBEDDING_DIM_CEILING = 1536
+
+# Per-chunk embedding-progress states (M4-P1 lifts the engine's reserved
+# ``embedding_status`` discriminator). M4-P1 writes only ``pending`` — the
+# embedding step (provider call + status flip to ``ready`` / ``failed``) is
+# M4-P2 (gated: fork a). This is the chunk-layer analogue of M3's reserved
+# embedding shell.
+EMBEDDING_STATUSES: tuple[str, ...] = ("pending", "ready", "failed")
+
+# NOTE on FTS config: the sparse-leg text-search config ('simple', a faithful donor lift;
+# ADR-005 §7) is SCHEMA-BOUND — it is frozen into the generated tsvector DDL below (and in
+# migration 0002) as a literal, because a generated column is a schema artifact. The
+# MUTABLE surface value lives in `theygrow_api.parameters.FTS_CONFIG`; the surface<->schema
+# link is the drift guard in test_parameters (not a shared import). Changing the FTS config
+# is a NEW-migration event, never an edit to this literal alone (M4-DL-002).
 
 
 class Base(DeclarativeBase):
@@ -115,5 +134,77 @@ class SourceMessage(Base):
         CheckConstraint(
             "detected_route IN (" + ", ".join(f"'{route}'" for route in ROUTE_KINDS) + ")",
             name="ck_source_messages_detected_route",
+        ),
+    )
+
+
+class Note(Base):
+    """One logical note re-derived from a single ``source_messages`` row (M4-P1).
+
+    Lifted from the engine domain model (``memory_rag.core.domain.models.Note``;
+    ADR-005 §7). ``note_id`` is deterministic (``= source_message_id``) so the
+    offline re-derivation pass is idempotent — the engine mints fresh UUIDs
+    inline at ingest, but theygrow re-derives a batch over already-imported rows
+    (M4-DL-001). ``note_date`` is the recovered event date (first ISO line of
+    ``raw_text``) or, in the fallback case, ``created_at`` (M4-DL-001).
+    """
+
+    __tablename__ = "notes"
+
+    note_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    source_message_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("source_messages.source_message_id"), nullable=False
+    )
+    community_id: Mapped[str] = mapped_column(Text, nullable=False)
+    author_user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    note_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EventChunk(Base):
+    """One event line; ``chunk -> note -> source`` lineage preserved (M4-P1).
+
+    Lifted from the engine domain model + baseline DDL
+    (``memory_rag.core.domain.models.EventChunk``; ADR-005 §7). ``chunk_id`` is
+    deterministic (``f"{source_message_id}#{event_index}"``) for idempotent
+    re-derivation (M4-DL-001). ``chunk_text_tsv`` is a GENERATED STORED tsvector
+    over ``chunk_text`` (config ``FTS_CONFIG``) backing the sparse FTS leg's GIN
+    index; it is DB-maintained and excluded from INSERTs. ``embedding_status``
+    is a reserved discriminator written as ``pending`` in M4-P1 (the embedding
+    step is M4-P2 / fork a); there is NO vector column here and NO HNSW index.
+    """
+
+    __tablename__ = "event_chunks"
+
+    chunk_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    note_id: Mapped[str] = mapped_column(Text, ForeignKey("notes.note_id"), nullable=False)
+    source_message_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("source_messages.source_message_id"), nullable=False
+    )
+    community_id: Mapped[str] = mapped_column(Text, nullable=False)
+    author_user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    note_date: Mapped[date] = mapped_column(Date, nullable=False)
+    event_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    embedding_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    # Generated, DB-maintained sparse-FTS vector (donor lift). Read-only; SQLAlchemy
+    # excludes Computed columns from INSERTs. The 'simple' config is a FROZEN-schema
+    # literal (NOT parameters.FTS_CONFIG): the drift guard in test_parameters links it to
+    # the surface, and a config change is a new migration (M4-DL-002).
+    chunk_text_tsv: Mapped[str] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('simple', chunk_text)", persisted=True),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("event_index >= 0", name="ck_event_chunks_event_index_nonneg"),
+        CheckConstraint(
+            "embedding_status IN ("
+            + ", ".join(f"'{status}'" for status in EMBEDDING_STATUSES)
+            + ")",
+            name="ck_event_chunks_embedding_status",
         ),
     )

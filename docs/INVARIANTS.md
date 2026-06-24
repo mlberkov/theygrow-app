@@ -39,6 +39,27 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 - **Landed in.** M2-P2.
 - **Scope.** Covers the `api/` subtree. Replaces the M1 zero-Python mypy guard with unconditional teeth now that `/api` exists. Does not cover `/app` (static PWA, no Python).
 
+### M4-P1-INV-001 — Sparse FTS leg is index-backed
+
+- **Statement.** The sparse (lexical) retrieval leg matches against a generated, DB-maintained `tsvector` (`event_chunks.chunk_text_tsv`, `to_tsvector('simple', chunk_text)`) backed by a GIN index, and is community-scoped — a query never crosses community boundaries.
+- **Enforced by.** `api/alembic/versions/0002_notes_event_chunks.py` (the GENERATED STORED column + `idx_event_chunks_chunk_text_tsv` GIN index) + `api/tests/test_search_repository.py` (match, `ts_rank_cd` ordering, community scoping, inclusive `note_date` range, empty-query / non-positive-limit short-circuits), run by `mypy api` + `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P1.
+- **Scope.** Covers the sparse leg's **mechanics** only. It does **not** establish Russian lexical recall adequacy: the `'simple'` config does no morphological stemming (the documented limitation and named port-out trigger, `M4-DL-001`); recall is measured at the M4-close mini-eval, not here. The dense leg, RRF fusion, and the episodic-eligibility filter are out of scope (M4-P2/P3).
+
+### M4-P1-INV-002 — Re-derivation is idempotent
+
+- **Statement.** Re-running the offline `notes` / `event_chunks` re-derivation over the same `source_messages` converges to the same derived rows — no duplication and no drift (deterministic ids + delete-then-insert over the processed source ids).
+- **Enforced by.** `api/theygrow_api/derivation.py` (deterministic `note_id` / `chunk_id`; delete-then-insert) + `api/tests/test_rederive.py` (`test_rederive_is_idempotent`, plus the derived-layer / fallback / `valid_at`-recovery / route-scoping cases), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P1.
+- **Scope.** Covers the offline re-derivation pass over already-imported live `{note, draft}` rows. Embeddings are out of scope (M4-P2); the pass writes none.
+
+### M4-P1-INV-003 — Operational signals are §4-safe
+
+- **Statement.** Every emitted operational signal carries only counts / ids / timings — never child diary text (`raw_text` / `chunk_text`) nor family-identifying ids (`community_id`). Signals emit through the single `SignalSink` seam, whose default implementation routes through the PII-guarded logging boundary.
+- **Enforced by.** `api/theygrow_api/signals.py` (typed `Signal.fields()` payloads + `LoggingSignalSink` over the `logging.py` boundary) + `api/tests/test_signals.py` (asserts payloads exclude the §4 field set and are numeric) + the emission assertions in `api/tests/test_rederive.py` / `api/tests/test_search_repository.py`, run by `mypy api` + `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P1.
+- **Scope.** Covers the P1-emitted signals (derivation counters; sparse candidate count + latency). Downstream kinds (`grounding.coverage`, `degradation.event`) are defined in the taxonomy but not emitted until their producing code lands (P3/P4); the §4 payload constraint binds them when they do.
+
 ## Entry format (for future entries)
 
 - **Id.** `M{N}-P{k}-INV-{NNN}` — `N` is the milestone number, `k` is the packet number within the milestone, `NNN` is zero-padded sequence within the packet (`001`, `002`, …).

@@ -35,6 +35,8 @@ dev = [
 [project.scripts]
 # M3-P2 offline /export importer (also runnable as `python -m theygrow_api.importer`).
 theygrow-import-export = "theygrow_api.importer:main"
+# M4-P1 offline notes/event_chunks re-derivation pass (also `python -m theygrow_api.derivation`).
+theygrow-rederive = "theygrow_api.derivation:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["theygrow_api"]
