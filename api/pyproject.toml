@@ -22,8 +22,11 @@ dependencies = [
   # layer lands in M3-P1 (schema + migration; the importer is M3-P2).
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.2",   # psycopg3 driver — postgresql+psycopg://
-  "pgvector>=0.3",          # reserved vector(<=1536) shell; populated at M4
+  "pgvector>=0.3",          # per-chunk vector(1536); populated by the M4-P2 backfill
   "alembic>=1.13",          # migration tooling + deploy-time release step
+  # Embeddings PROVIDER client (M4-P2 / ADR-011 §1) — a donor-lifted adapter behind
+  # the provider-port, NOT the diary-memory-service engine (no memory_rag import).
+  "openai>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +40,8 @@ dev = [
 theygrow-import-export = "theygrow_api.importer:main"
 # M4-P1 offline notes/event_chunks re-derivation pass (also `python -m theygrow_api.derivation`).
 theygrow-rederive = "theygrow_api.derivation:main"
+# M4-P2 offline embeddings backfill (also `python -m theygrow_api.embeddings_backfill`).
+theygrow-embed = "theygrow_api.embeddings_backfill:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["theygrow_api"]

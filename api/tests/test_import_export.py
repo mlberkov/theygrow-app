@@ -3,7 +3,7 @@
 Covers the M3-DL-001/003 contract: fail-closed validation (schema_version,
 envelope integrity, record shape), atomic idempotent upsert on the composite
 assertion key (recorded_at + source_message_id excluded from the update),
-``valid_at := created_at``, NULL persona/embedding, and the minimized quarantine
+``valid_at := created_at``, NULL persona, and the minimized quarantine
 sidecar (reject-with-report). Reuses the P1 ``connection`` fixture (per-test
 transaction, rolled back), so the suite skips without Postgres just like P1.
 """
@@ -73,7 +73,6 @@ def test_happy_path_imports_fixture(connection: Connection) -> None:
     ).one()
     assert row.valid_at == row.created_at
     assert row.persona_id is None
-    assert row.embedding is None
     assert row.recorded_at is not None  # DB server default applied
     assert row.detected_route == "note"
 

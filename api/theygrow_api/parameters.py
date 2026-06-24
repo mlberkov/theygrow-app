@@ -42,8 +42,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: SURFACE-STRUCTURE version — orthogonal to per-parameter ``changed_in`` (M4-DL-002).
 #: Bump only when the registry's shape / the ``Parameter`` descriptor changes; NEVER on a
-#: value change.
-PARAMETERS_SCHEMA_VERSION = 1
+#: value change. v2 (M4-DL-003): the ``embedding_model`` + ``embedding_dimension`` knobs
+#: were added (a knob-count change, not a value change).
+PARAMETERS_SCHEMA_VERSION = 2
 
 #: Sparse-FTS text-search configuration — the SURFACE value of this knob. ``'simple'``
 #: does no Russian stemming (known recall limitation, ADR-008; port-out trigger ->
@@ -52,6 +53,15 @@ PARAMETERS_SCHEMA_VERSION = 1
 #: the mutable surface value; the drift guard links the two. Changing it is a new-migration
 #: event (M4-DL-002).
 FTS_CONFIG = "simple"
+
+#: Per-chunk embedding dimension — the SURFACE value of this knob (ADR-011 §2,
+#: FINAL = 1536). SCHEMA-BOUND: the frozen ``0003`` DDL hardcodes ``vector(1536)`` on
+#: ``event_chunks.embedding`` (and ``models.EMBEDDING_DIMENSION`` mirrors the literal);
+#: this is the mutable surface value, and the drift guard in ``test_parameters`` links
+#: the two (the live column's ``format_type`` must read ``vector(1536)``). Changing it is
+#: a new-migration event (M4-DL-002 discipline) AND a re-embed — a mixed-dimension column
+#: is not indexable.
+EMBEDDING_DIMENSION = 1536
 
 
 ParameterScope = Literal["schema-bound", "runtime"]
@@ -85,6 +95,13 @@ class RuntimeParameters(BaseSettings):
     #: Default candidate cap for the sparse FTS leg when a caller passes no explicit limit.
     sparse_candidate_limit: int = 20
 
+    #: Embedder model id (M4-P2 / ADR-011 §1). Default is the donor model,
+    #: MRL-truncated to ``EMBEDDING_DIMENSION``. Env-overridable, BUT "runtime" here
+    #: means swappable-WITH-BACKFILL: changing it against already-populated rows
+    #: requires a re-embed (a mixed-model HNSW index is incoherent), and the new
+    #: provider must be ZDR + DPA + EU-residency-bound (an operational precondition).
+    embedding_model: str = "text-embedding-3-large"
+
 
 def current_parameters() -> tuple[Parameter, ...]:
     """The current parameter set as data — the shape a later read-only view RENDERS.
@@ -114,5 +131,31 @@ def current_parameters() -> tuple[Parameter, ...]:
             scope="runtime",
             changed_in="M4-DL-002",
             note="Default candidate cap for the sparse FTS leg when no explicit limit is passed.",
+        ),
+        Parameter(
+            name="embedding_model",
+            value=runtime.embedding_model,
+            type_label="str",
+            scope="runtime",
+            changed_in="M4-DL-003",
+            note=(
+                "Embedder model behind the provider-port (ADR-011 §1), MRL-truncated to "
+                "embedding_dimension. Runtime/env-overridable, but swappable-WITH-BACKFILL: "
+                "changing it against populated rows requires a re-embed (a mixed-model index "
+                "is incoherent), and the provider must be ZDR+DPA+EU-residency-bound."
+            ),
+        ),
+        Parameter(
+            name="embedding_dimension",
+            value=EMBEDDING_DIMENSION,
+            type_label="int",
+            scope="schema-bound",
+            changed_in="M4-DL-003",
+            note=(
+                "Per-chunk embedding dimension (ADR-011 §2, FINAL=1536). Schema-bound: frozen "
+                "as vector(1536) in the 0003 event_chunks.embedding DDL; changing it is a "
+                "new-migration event AND a re-embed. The drift guard links this surface value "
+                "to the live column type."
+            ),
         ),
     )

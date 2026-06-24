@@ -11,6 +11,7 @@ the PII-guarded logging boundary (``logging.py``).
 Taxonomy:
   * ``DERIVATION_COUNTERS`` — P1, emitted: notes/event_chunks re-derivation counts.
   * ``RETRIEVAL_LATENCY``   — P1, emitted: sparse leg candidate count + query latency.
+  * ``EMBEDDING_COUNTERS``  — P2, emitted: embeddings backfill counts + token cost + timing.
   * ``GROUNDING_COVERAGE``  — P4, defined-not-emitted (grounded-ask assembly).
   * ``DEGRADATION_EVENT``   — P3/P4, defined-not-emitted (honest-degradation events).
 
@@ -34,6 +35,7 @@ class SignalKind(StrEnum):
 
     DERIVATION_COUNTERS = "derivation.counters"
     RETRIEVAL_LATENCY = "retrieval.latency"
+    EMBEDDING_COUNTERS = "embedding.counters"
     GROUNDING_COVERAGE = "grounding.coverage"
     DEGRADATION_EVENT = "degradation.event"
 
@@ -44,7 +46,7 @@ class SignalDescriptor:
 
     kind: SignalKind
     field_names: tuple[str, ...]
-    producing_stage: str  # "P1" | "P3" | "P4"
+    producing_stage: str  # "P1" | "P2" | "P3" | "P4"
     emitted_now: bool
     note: str
 
@@ -69,6 +71,20 @@ SIGNAL_TAXONOMY: dict[SignalKind, SignalDescriptor] = {
         producing_stage="P1",
         emitted_now=True,
         note="Sparse FTS leg: candidate count + query latency (co-emitted).",
+    ),
+    SignalKind.EMBEDDING_COUNTERS: SignalDescriptor(
+        kind=SignalKind.EMBEDDING_COUNTERS,
+        field_names=(
+            "attempted",
+            "embedded",
+            "failed",
+            "skipped_ready",
+            "total_tokens",
+            "duration_ms",
+        ),
+        producing_stage="P2",
+        emitted_now=True,
+        note="Embeddings backfill: per-run counts + token cost + wall-clock (counts/timings only).",
     ),
     SignalKind.GROUNDING_COVERAGE: SignalDescriptor(
         kind=SignalKind.GROUNDING_COVERAGE,
@@ -133,6 +149,34 @@ class RetrievalLatency:
 
     def fields(self) -> dict[str, object]:
         return {"candidate_count": self.candidate_count, "latency_ms": self.latency_ms}
+
+
+@dataclass(frozen=True)
+class EmbeddingCounters:
+    """P2 signal: embeddings-backfill counts + token cost + wall-clock.
+
+    §4-safe: ``total_tokens`` is the embedder usage tally (a count), never the text.
+    ``attempted`` = pending/failed rows selected this run; ``skipped_ready`` = rows
+    already ``ready`` and left untouched (the idempotent no-op tally).
+    """
+
+    attempted: int
+    embedded: int
+    failed: int
+    skipped_ready: int
+    total_tokens: int
+    duration_ms: float
+    kind: SignalKind = SignalKind.EMBEDDING_COUNTERS
+
+    def fields(self) -> dict[str, object]:
+        return {
+            "attempted": self.attempted,
+            "embedded": self.embedded,
+            "failed": self.failed,
+            "skipped_ready": self.skipped_ready,
+            "total_tokens": self.total_tokens,
+            "duration_ms": self.duration_ms,
+        }
 
 
 @runtime_checkable

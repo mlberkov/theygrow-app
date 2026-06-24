@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import Connection, text
 
 from theygrow_api.parameters import (
+    EMBEDDING_DIMENSION,
     FTS_CONFIG,
     PARAMETERS_SCHEMA_VERSION,
     Parameter,
@@ -47,6 +48,40 @@ def test_sparse_limit_is_runtime_with_its_own_provenance() -> None:
 def test_sparse_limit_is_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("THEYGROW_PARAM_SPARSE_CANDIDATE_LIMIT", "7")
     assert _by_name()["sparse_candidate_limit"].value == 7
+
+
+def test_embedding_model_is_runtime_with_provenance() -> None:
+    model = _by_name()["embedding_model"]
+    assert model.scope == "runtime"
+    assert model.changed_in == "M4-DL-003"
+    assert isinstance(model.value, str) and model.value
+    # The note records the swappable-WITH-BACKFILL contract (model swap ⇒ re-embed).
+    assert "re-embed" in (model.note or "")
+
+
+def test_embedding_model_is_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("THEYGROW_PARAM_EMBEDDING_MODEL", "custom-embed-model")
+    assert _by_name()["embedding_model"].value == "custom-embed-model"
+
+
+def test_embedding_dimension_is_schema_bound_with_provenance() -> None:
+    dim = _by_name()["embedding_dimension"]
+    assert dim.value == EMBEDDING_DIMENSION == 1536
+    assert dim.scope == "schema-bound"
+    assert dim.changed_in == "M4-DL-003"
+
+
+def test_embedding_dimension_surface_matches_frozen_schema_ddl(connection: Connection) -> None:
+    # DRIFT GUARD (mirrors fts_config): the live event_chunks.embedding column type must
+    # carry the surface's dimension. A surface bump without a matching migration fails here.
+    col_type = connection.execute(
+        text(
+            "SELECT format_type(a.atttypid, a.atttypmod) "
+            "FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid "
+            "WHERE c.relname = 'event_chunks' AND a.attname = 'embedding'"
+        )
+    ).scalar_one()
+    assert col_type == f"vector({EMBEDDING_DIMENSION})"
 
 
 def test_fts_config_surface_matches_frozen_schema_ddl(connection: Connection) -> None:

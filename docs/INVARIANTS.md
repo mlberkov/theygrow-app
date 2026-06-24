@@ -60,6 +60,27 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 - **Landed in.** M4-P1.
 - **Scope.** Covers the P1-emitted signals (derivation counters; sparse candidate count + latency). Downstream kinds (`grounding.coverage`, `degradation.event`) are defined in the taxonomy but not emitted until their producing code lands (P3/P4); the §4 payload constraint binds them when they do.
 
+### M4-P2-INV-001 — Per-chunk embedding is dimension-pinned and drift-guarded
+
+- **Statement.** The dense leg's vector is per-chunk on `event_chunks.embedding`, typed `vector(1536)` as a frozen literal in the migration DDL; the schema-bound `embedding_dimension` surface value is linked to the live column type by a drift guard (a surface bump without a matching migration fails). The M3 dormant per-`source_message` `embedding` shell is dropped (per-chunk granularity is final).
+- **Enforced by.** `api/alembic/versions/0003_event_chunk_embeddings.py` (the `vector(1536)` column + the dropped shell) + `api/tests/test_parameters.py` (`test_embedding_dimension_surface_matches_frozen_schema_ddl`, reading `format_type` over the live column) + `api/tests/test_embedding_schema.py` and `api/tests/test_source_message_schema.py` (`test_source_messages_has_no_embedding_column`), run by `mypy api` + `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P2.
+- **Scope.** Covers the per-chunk vector's storage shape, the surface↔schema dimension link, and the dropped shell. It does not cover retrieval quality or the dense leg's ranking (RRF is M4-P3).
+
+### M4-P2-INV-002 — Embeddings backfill is fail-closed without the ZDR clearance gate
+
+- **Statement.** The offline embeddings backfill sends no `chunk_text` to the embedder and writes nothing unless the operator-set `embedder_privacy_cleared` flag (the ZDR + DPA + EU-residency clearance) is set — and, on the real path, the embedder endpoint/key are present. With the gate unmet the run refuses before any provider call or DB write (zero provider calls, zero writes).
+- **Enforced by.** `api/theygrow_api/embeddings_backfill.py` (`_ensure_embedder_cleared` / `_build_provider`, raising `EmbedderNotReady` before any text egress) + `api/theygrow_api/config.py` (the default-false `embedder_privacy_cleared` flag) + `api/tests/test_embeddings_backfill.py` (`test_fail_closed_when_uncleared`, `test_fail_closed_when_unconfigured`), run by `mypy api` + `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P2.
+- **Scope.** A structural §4 gate over the one permitted child-text egress (ADR-011 §1). It governs the offline backfill path; there is no live request path that embeds (chat is M5). It binds the gate mechanism, not the external provider's actual ZDR posture (an operational precondition the owner clears).
+
+### M4-P2-INV-003 — Embeddings backfill is idempotent and index-after-population
+
+- **Statement.** The backfill embeds only `pending` (and, unless `--no-retry-failed`, `failed`) chunks and skips `ready` ones, so a re-run over a fully-embedded corpus is a no-op (no duplicate writes, no extra provider calls); a provider error marks the batch `failed` for retry, never a partial vector. The HNSW index is built by the backfill AFTER bulk population, not by the migration.
+- **Enforced by.** `api/theygrow_api/embeddings_backfill.py` (status-driven selection; `CREATE INDEX IF NOT EXISTS` after population) + `api/tests/test_embeddings_backfill.py` (`test_backfill_is_idempotent`, `test_backfill_marks_failed_then_retries`, `test_backfill_builds_hnsw_index_after_population`) + `api/tests/test_embedding_schema.py` (`test_migration_alone_builds_no_hnsw_index`), run by `pytest api` in `.github/workflows/ci.yml`.
+- **Landed in.** M4-P2.
+- **Scope.** Covers the offline backfill pass over already-derived chunks. Embedding quality / vector correctness beyond dimension is out of scope; the injected fake provider exercises mechanics, not a live embedder.
+
 ## Entry format (for future entries)
 
 - **Id.** `M{N}-P{k}-INV-{NNN}` — `N` is the milestone number, `k` is the packet number within the milestone, `NNN` is zero-padded sequence within the packet (`001`, `002`, …).

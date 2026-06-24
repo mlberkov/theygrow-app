@@ -6,9 +6,12 @@ matching the engine's own ``source_messages`` baseline DDL), plus the derived
 columns M3 owns. This is the raw, pre-enrichment layer — notes/chunks/embeddings
 are re-derived app-side at M4, never imported (M3-DL-001 §2).
 
-Scope guardrails (this model lands schema only; the importer is M3-P2):
-  * No embedding is written in M3. ``embedding`` is a reserved, nullable shell;
-    it is NOT indexed here (M4 populates it and builds the HNSW index).
+Scope guardrails:
+  * No embedding lives on this table. The M3 per-message reserved shell was
+    DROPPED at M4-P2 (migration ``0003``): ADR-011 §3 fixed per-CHUNK
+    granularity, so the dense vector lives on ``event_chunks`` (the donor
+    ``embedding_records.chunk_id`` analogue), and an unwritten per-message column
+    would only misread as "messages are embeddable" (M4-DL-003).
   * Persona resolution is a stub seam (``persona_id`` nullable, no FK, no person
     table). The real person model is gated (PDR-002 OQ#3, post-M5).
 """
@@ -52,12 +55,20 @@ ROUTE_KINDS: tuple[str, ...] = (
     "unknown",
 )
 
-# pgvector dimension is a CEILING placeholder, not a frozen dimension. ADR-008
-# caps embeddings at <=1536 (HNSW-indexable); the exact dimension is finalized
-# at M4 with the provider/model choice (a provider-port parameter). M3 writes no
-# embeddings, so the ceiling satisfies the invariant; narrowing this shell at M4
-# is a cheap ALTER on an all-NULL column.
+# pgvector dimension CEILING placeholder used by the M3 ``0001`` migration (kept
+# so that immutable migration still imports). ADR-008 caps embeddings at <=1536
+# (HNSW-indexable). M4-P2 finalized the exact dimension at ``EMBEDDING_DIMENSION``
+# below (== this ceiling); the M3 reserved shell that used this constant is
+# dropped in ``0003``.
 EMBEDDING_DIM_CEILING = 1536
+
+# FINAL per-chunk embedding dimension (ADR-011 §2 / M4-DL-003): the embedder is
+# ``text-embedding-3-large`` MRL-truncated to 1536. SCHEMA-BOUND: frozen as the
+# literal ``vector(1536)`` in the ``0003`` DDL on ``event_chunks.embedding``. The
+# MUTABLE surface value lives in ``parameters.EMBEDDING_DIMENSION``; the
+# surface<->schema link is the drift guard in ``test_parameters`` (not a shared
+# import). Changing the dimension is a NEW-migration event (M4-DL-002 discipline).
+EMBEDDING_DIMENSION = 1536
 
 # Per-chunk embedding-progress states (M4-P1 lifts the engine's reserved
 # ``embedding_status`` discriminator). M4-P1 writes only ``pending`` — the
@@ -117,11 +128,9 @@ class SourceMessage(Base):
     # Persona-resolution stub seam: importer leaves NULL in M3 (no FK, no person
     # table). The real person model is gated (PDR-002 OQ#3, post-M5).
     persona_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Reserved <=1536 ceiling shell — unwritten and unindexed in M3 (see
-    # EMBEDDING_DIM_CEILING). M4 finalizes the dimension and builds the HNSW index.
-    embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(EMBEDDING_DIM_CEILING), nullable=True
-    )
+    # NOTE: the M3 reserved per-message ``embedding`` shell was DROPPED at M4-P2
+    # (migration ``0003``); the dense vector is per-chunk on ``event_chunks``
+    # (ADR-011 §3; M4-DL-003).
 
     __table_args__ = (
         UniqueConstraint(
@@ -170,9 +179,12 @@ class EventChunk(Base):
     deterministic (``f"{source_message_id}#{event_index}"``) for idempotent
     re-derivation (M4-DL-001). ``chunk_text_tsv`` is a GENERATED STORED tsvector
     over ``chunk_text`` (config ``FTS_CONFIG``) backing the sparse FTS leg's GIN
-    index; it is DB-maintained and excluded from INSERTs. ``embedding_status``
-    is a reserved discriminator written as ``pending`` in M4-P1 (the embedding
-    step is M4-P2 / fork a); there is NO vector column here and NO HNSW index.
+    index; it is DB-maintained and excluded from INSERTs. ``embedding`` is the
+    per-chunk dense vector (M4-P2 / ADR-011 §3, the donor
+    ``embedding_records.chunk_id`` analogue); ``embedding_status`` discriminates
+    its population (``pending`` -> ``ready`` / ``failed``). The HNSW index is
+    built by the offline backfill AFTER bulk population (M4-DL-003), so it is not
+    declared on the model.
     """
 
     __tablename__ = "event_chunks"
@@ -189,6 +201,14 @@ class EventChunk(Base):
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     embedding_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    # Per-chunk dense embedding — vector(1536), nullable until the offline backfill
+    # populates it and flips ``embedding_status`` to ``ready`` (``failed`` on a
+    # provider error). The dimension is the frozen-schema literal EMBEDDING_DIMENSION
+    # (the surface value lives in parameters.EMBEDDING_DIMENSION; drift guard links
+    # them). No HNSW index here — the backfill builds it after bulk population (M4-DL-003).
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSION), nullable=True
+    )
     # Generated, DB-maintained sparse-FTS vector (donor lift). Read-only; SQLAlchemy
     # excludes Computed columns from INSERTs. The 'simple' config is a FROZEN-schema
     # literal (NOT parameters.FTS_CONFIG): the drift guard in test_parameters links it to
