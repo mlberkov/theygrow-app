@@ -241,7 +241,5 @@ def dense_candidates(
     latency_ms = (time.perf_counter() - started) * 1000.0
     candidates = [_row_to_candidate(row) for row in rows]
     # §4: counts/timings only — no community_id, no chunk_text.
-    sink.emit(
-        RetrievalLatency(leg="dense", candidate_count=len(candidates), latency_ms=latency_ms)
-    )
+    sink.emit(RetrievalLatency(leg="dense", candidate_count=len(candidates), latency_ms=latency_ms))
     return candidates

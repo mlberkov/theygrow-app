@@ -191,9 +191,7 @@ def test_retrieve_emits_three_labelled_latency_signals(connection: Connection) -
         sink=sink,
     )
 
-    legs = [
-        str(s.fields()["leg"]) for s in sink.signals if s.kind == SignalKind.RETRIEVAL_LATENCY
-    ]
+    legs = [str(s.fields()["leg"]) for s in sink.signals if s.kind == SignalKind.RETRIEVAL_LATENCY]
     assert sorted(legs) == ["dense", "fused", "sparse"]
 
 
@@ -244,9 +242,7 @@ def test_retrieve_fail_closed_when_uncleared(connection: Connection) -> None:
 def test_retrieve_empty_query_short_circuits_before_embedding(connection: Connection) -> None:
     provider = _FakeProvider(_unit_vec(1.0))
 
-    out = retrieve(
-        connection, "comm-1", "   ", provider=provider, settings=_cleared_settings()
-    )
+    out = retrieve(connection, "comm-1", "   ", provider=provider, settings=_cleared_settings())
 
     assert out == []
     assert provider.calls == []  # no embed on an empty query
