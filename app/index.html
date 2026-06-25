@@ -1804,6 +1804,31 @@
             }
         }
 
+        // ZPD readiness (ADR-018): навык готов к освоению, если он ещё не освоен
+        // И все его prerequisites уже освоены. Чистый граф зависимостей —
+        // без возрастного окна и без возрастного гейта (возраст здесь справочный).
+        function isSkillReady(skill, completedSkills) {
+            if (!skill || completedSkills.has(skill.id)) return false;
+            return (skill.prerequisites || []).every(p => completedSkills.has(p));
+        }
+
+        // Идемпотентно проставляет маркер готовности на строку навыка.
+        // data-zpd-ready — хук для фильтра (P2); класс zpd-ready — хук для оформления (P3).
+        function setRowZpdReadiness(tr, ready) {
+            tr.dataset.zpdReady = ready ? 'true' : 'false';
+            tr.classList.toggle('zpd-ready', ready);
+        }
+
+        // Пересчёт готовности по всем отрисованным строкам навыков на месте,
+        // без перестроения таблицы. Изменение освоенности одного навыка влияет
+        // на готовность его зависимых навыков, поэтому пересчитываем все строки.
+        function refreshAllZpdReadiness(completedSkills) {
+            document.querySelectorAll('tr[data-skill-id]').forEach(tr => {
+                const skill = DATA._skillsMap[tr.dataset.skillId];
+                if (skill) setRowZpdReadiness(tr, isSkillReady(skill, completedSkills));
+            });
+        }
+
         // Вычисление возраста
         function calculateAge(birthdate) {
             if (!birthdate) return null;
@@ -2061,6 +2086,9 @@
                 tr.classList.add('skill-completed');
             }
 
+            // ZPD: маркер готовности навыка (ADR-018), невидимый до P2/P3
+            setRowZpdReadiness(tr, isSkillReady(skill, completedSkills));
+
             const tdDone = document.createElement('td');
             tdDone.className = 'col-done checkbox-cell';
             const checkbox = document.createElement('input');
@@ -2174,6 +2202,10 @@
 
                 // Обновить счётчик категории
                 updateCategoryCounter(skillRow);
+
+                // ZPD: пересчитать готовность по всем строкам на месте — переключение
+                // влияет на готовность зависимых навыков, а не только текущего
+                refreshAllZpdReadiness(completedSkills);
 
                 // Применить фильтры, если они активны (обновит видимость без перестроения DOM)
                 applyFilter();
