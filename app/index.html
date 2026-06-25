@@ -344,6 +344,13 @@
             position: relative;
         }
 
+        .zpd-empty-state {
+            padding: 24px 16px;
+            text-align: center;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
         table {
             border-collapse: collapse;
             width: max-content;
@@ -1556,6 +1563,11 @@
         </table>
     </div>
 
+    <!-- Честная деградация (ADR-018): сообщение вместо пустой таблицы, когда ЗБР-фильтр включён и ни один навык не готов -->
+    <div id="zpdEmptyState" class="zpd-empty-state" hidden>
+        Сейчас нет навыков, готовых к освоению
+    </div>
+
     <!-- Нижняя панель управления -->
     <footer class="control-footer">
         <button class="filter-toggle-btn" id="filterToggleBtn">
@@ -2240,6 +2252,12 @@
                     row.classList.remove('hidden');
                 }
             });
+
+            // Честная деградация (ADR-018 / контракт §2): если ЗБР-фильтр включён и
+            // ни один навык не готов к освоению, показываем сообщение вместо пустой таблицы.
+            // Считаем видимые строки навыков по тому же механизму скрытия (класс .hidden).
+            const visibleSkillCount = tbody.querySelectorAll('tr:not(.category-row):not(.hidden)').length;
+            document.getElementById('zpdEmptyState').hidden = !(isZpdFilterActive && visibleSkillCount === 0);
 
             // Обновляем кнопку фильтра освоенных навыков
             if (isFilterActive) {
