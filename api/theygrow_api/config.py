@@ -24,6 +24,34 @@ class Settings(BaseSettings):
     database_url: str
     log_level: str = "INFO"
 
+    # --- M4-P2 embedder seam (ADR-011 §1). These bind strings only; no client is
+    # built here. They are OPTIONAL on Settings (so the importer / derivation /
+    # sparse-leg paths, which need only database_url, still construct cleanly) —
+    # the offline embeddings backfill enforces presence + clearance itself,
+    # fail-closed, before any chunk_text is sent (the §4 gate lives there, not here).
+    embedder_base_url: str | None = None
+    embedder_api_key: str | None = None
+    # ZDR + DPA + EU-residency clearance affirmation. Defaults to FALSE (uncleared):
+    # there is no implicit "cleared" state — an operator must explicitly set it via
+    # the environment once the privacy surface is confirmed. Unset -> the backfill
+    # sends NO child text and writes nothing (structural §4 enforcement, ADR-011 §1).
+    embedder_privacy_cleared: bool = False
+
+    # --- M4-P4 answers/chat seam (ADR-014: per-egress clearance). These bind strings
+    # only; no client is built here. The answers LLM is a SECOND third-party egress and a
+    # DISTINCT service/DPA/residency surface from the embedder, so it carries its OWN
+    # clearance flag — clearing the embedder does NOT clear answers. OPTIONAL on Settings
+    # (so the importer / derivation / embedding paths still construct cleanly); the grounded
+    # query service enforces presence + clearance itself, fail-closed, before any context
+    # text is sent (the §4 gate lives there, not here).
+    answers_base_url: str | None = None
+    answers_api_key: str | None = None
+    # ZDR + DPA + EU-residency clearance affirmation for the answers LLM. Defaults to FALSE
+    # (uncleared): no implicit "cleared" state — an operator sets it explicitly once the
+    # answers privacy surface is confirmed. Unset -> the query service sends NO context text
+    # and synthesizes nothing (structural §4 enforcement, ADR-014).
+    answers_privacy_cleared: bool = False
+
 
 def get_settings() -> Settings:
     """Construct settings from the environment.

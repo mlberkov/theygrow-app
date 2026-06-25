@@ -2,9 +2,9 @@
 
 Covers the M3-DL-001 idempotency contract (PK + composite assertion key, with
 ``edit_seq`` significant), the defensive ``detected_route`` CHECK over the full
-RouteKind set, the reserved (nullable, unindexed) embedding shell, the persona
-stub, and the ADR-004 dual-timestamp semantics (``recorded_at`` defaulted,
-``valid_at`` required).
+RouteKind set, the persona stub, the ADR-004 dual-timestamp semantics
+(``recorded_at`` defaulted, ``valid_at`` required), and — since M4-P2 — that the
+M3 dormant embedding shell has been DROPPED (per-chunk granularity; M4-DL-003).
 """
 
 from __future__ import annotations
@@ -90,22 +90,33 @@ def test_detected_route_check_rejects_unknown_value(connection: Connection) -> N
         _insert(connection, detected_route="garbage")
 
 
-def test_persona_and_embedding_are_nullable(connection: Connection) -> None:
-    _insert(connection, persona_id=None, embedding=None)
+def test_persona_is_nullable(connection: Connection) -> None:
+    _insert(connection, persona_id=None)
     persona = connection.execute(select(SourceMessage.persona_id)).scalar_one()
     assert persona is None
 
 
-def test_embedding_column_has_no_index(connection: Connection) -> None:
-    rows = connection.execute(
-        text("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'source_messages'")
-    ).fetchall()
-    indexdefs = [str(r[1]).lower() for r in rows]
-    assert not any("embedding" in d for d in indexdefs), (
-        "embedding must stay unindexed in M3 (HNSW index is M4)"
+def test_source_messages_has_no_embedding_column(connection: Connection) -> None:
+    # The M3 dormant per-message embedding shell was DROPPED at M4-P2 (0003): the
+    # dense vector is per-chunk on event_chunks (ADR-011 §3; M4-DL-003).
+    cols = (
+        connection.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'source_messages'"
+            )
+        )
+        .scalars()
+        .all()
     )
-    # Sanity: the PK + composite-key indexes Postgres creates do exist.
-    names = {str(r[0]) for r in rows}
+    assert "embedding" not in cols
+    # Sanity: the PK + composite-key indexes Postgres creates still exist.
+    names = {
+        str(r[0])
+        for r in connection.execute(
+            text("SELECT indexname FROM pg_indexes WHERE tablename = 'source_messages'")
+        ).fetchall()
+    }
     assert "pk_source_messages" in names
     assert "uq_source_messages_assertion_key" in names
 
