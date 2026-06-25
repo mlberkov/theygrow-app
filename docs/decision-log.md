@@ -341,3 +341,29 @@ This file records architectural and scope-shaping decisions for `theygrow-app`. 
   - This entry (`M4-DL-006`) records the eight per-seam fidelity dispositions and the mini-eval disposition. No new enforced invariant (so `docs/INVARIANTS.md` is untouched), no parameter / signal change, no `api/` edit, no schema, no migration.
   - Gate recorded green at this packet: `ruff@0.9.2 format --check` (49 files formatted) + `ruff@0.9.2 check` (all checks passed); `mypy@1.14.1 --config-file=pyproject.toml api` (strict — no issues, 45 source files); `pytest api` (104 passed, DB-backed against `pgvector/pgvector:pg16`); `scripts/check-contract-integrity.sh` (OK, with the edited `execution-map.md` in the scanned corpus); the perimeter grep (zero `memory_rag` imports). Note: the repo-of-record pins `ruff` v0.9.2 — a stale standalone `ruff` 0.2.1 reports false stub-formatting drift; the pinned version is clean.
   - Out of this packet: the M4-CLOSE recall/grounding mini-eval (owner-run, cleared real providers); the vault repo-bridge re-revision (orchestrator/vault, post-merge cadence); everything M5 (chat endpoint + nginx; canon/KB + medical boundary); the `ef_search` and FTS → `'russian'` metric-gated port-outs.
+
+---
+
+## B1-DL-018 — Б1 ZPD filter (= vault ADR-018): readiness as pure prerequisite graph; age demoted; close-out
+
+- **Date.** 2026-06-25
+- **Type.** Decision record + docs reconciliation — close-out of the frozen Б1 functional ladder (P1–P4); no product-code, schema, or migration change. The ZPD filter is frozen as shipped; this packet only records and reconciles. *(Id note: this log's "Entry format" header describes ids as `M{N}-DL-{NNN}`; `B1-DL-018` (the Б-series frontend track) is a deliberate, owner-pinned one-off — it matches the four shipped commit trailers. The id is pinned to the trailers, not renumbered; the format header is intentionally left unedited this packet.)*
+- **Decision.** Define the ZPD (zone-of-proximal-development) readiness decision as shipped across the Б1 `/app` skills-tracker ladder, recorded here as repo decision-log id `B1-DL-018` (= vault **ADR-018**):
+  1. **Readiness = pure prerequisite graph.** A skill is *ready* iff `not-completed ∧ all prerequisites completed` — **no age gate** (P1 `62a07d6`: the readiness predicate + presentational row markers, the presentational core).
+  2. **Age demoted to a passive display reference** — age is no longer a filter input.
+  3. **The active age filter is replaced by the ZPD filter** (P2 `e2ecf60`: toggle + `applyFilter`).
+  4. **Honest empty-state** — when the ZPD filter is on and no skill is ready, the tracker shows an honest message, not an empty table (P3 `51cc9e2`; cites `ADR-018 / контракт §2`, matching `app/index.html:2256`).
+  5. **Onboarding copy reconciled** to the ZPD filter (P4 `79b6b28`).
+  - **Cross-link (explicit).** Vault **ADR-018** is the upstream decision. The in-code `ADR-018` citations (`app/index.html:1566, 1819, 2101, 2256`) resolve to it, and this entry is the **repo-side definition site** the four `B1-DL-018` commit trailers cite — so both citation forms (`ADR-018` in code, `B1-DL-018` in trailers) now resolve transitively.
+- **Rationale.** Readiness is a property of the prerequisite graph, not of age; gating on age conflated "old enough" with "prerequisites met". Demoting age to display and replacing the age filter makes the ready-zone a pure ZPD lens — the skills a child is positioned to learn next. The honest empty-state keeps the filter truthful when the ready-zone is empty (no silent empty table that reads as "nothing exists"). Recording the decision in the repo log closes the gap where the shipped commit trailers and the in-code `ADR-018` comments cited records that did not resolve in the repo.
+- **Alternatives considered.**
+  1. **Renumber to `B1-DL-001`.** Rejected (owner) — the four shipped trailers cite `B1-DL-018`; renumbering would desync the log from the trailers or force a git-history edit. The id is pinned to the trailers.
+  2. **Keep age as a secondary gate alongside prerequisites.** Rejected — readiness is a pure prerequisite-graph property; an age co-gate would hide ready skills and reintroduce the conflation the milestone removed. Age is display-only.
+  3. **Empty table when no skill is ready.** Rejected — dishonest; P3's explicit empty-state message is the honest-degradation form (`ADR-018 / контракт §2`).
+- **Supersedes.** None in this log — the `/app` age filter predates this decision-log (a backend M-series artifact) and was never a logged decision. The ZPD filter **replaces** that prior product behavior (active age filter → ZPD filter; age → passive display).
+- **Effects.**
+  - Functional ladder (frozen, shipped before this packet): **P1** `62a07d6` (ZPD readiness predicate + presentational row markers), **P2** `e2ecf60` (ZPD filter replaces the age filter — toggle + `applyFilter`), **P3** `51cc9e2` (honest empty-state for the empty ready-zone), **P4** `79b6b28` (onboarding copy reconciled to the ZPD filter).
+  - `docs/execution-map.md` reconciled this packet: the `Б1 — Done` block added (P1–P4 + this B1-CLOSE close-out), and the `M5` line reconciled to deferred-per-ADR-017 (Б1 was sequenced ahead of M5; the next milestone is an open owner decision).
+  - **No `docs/INVARIANTS.md` entry** — Б1 added no enforced test / lint / schema / runtime guard (enforced-only; nothing is owed).
+  - **No product-code / schema / migration change** in this packet — the ZPD filter is frozen as shipped (`app/index.html`).
+  - Cross-links vault **ADR-018** (the upstream decision; the definition site for the in-code `ADR-018` citations). This entry does **not** reference its own (future) commit SHA — the close-out lands "this packet".
