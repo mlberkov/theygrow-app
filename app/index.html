@@ -344,6 +344,13 @@
             position: relative;
         }
 
+        .zpd-empty-state {
+            padding: 24px 16px;
+            text-align: center;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
         table {
             border-collapse: collapse;
             width: max-content;
@@ -1556,13 +1563,18 @@
         </table>
     </div>
 
+    <!-- Честная деградация (ADR-018): сообщение вместо пустой таблицы, когда ЗБР-фильтр включён и ни один навык не готов -->
+    <div id="zpdEmptyState" class="zpd-empty-state" hidden>
+        Сейчас нет навыков, готовых к освоению
+    </div>
+
     <!-- Нижняя панель управления -->
     <footer class="control-footer">
         <button class="filter-toggle-btn" id="filterToggleBtn">
             Скрыть освоенные навыки
         </button>
-        <button class="filter-toggle-btn" id="ageFilterToggleBtn">
-            Оставить актуальное для возраста
+        <button class="filter-toggle-btn" id="zpdFilterToggleBtn">
+            Показать готовые к освоению
         </button>
         <button class="filter-toggle-btn" id="activitiesBtn">
             Развивающие активности месяца
@@ -1631,7 +1643,7 @@
                 <p>Кнопки, которые будут для тебя максимально полезными:</p>
                 <ol>
                     <li>"Скрыть освоенные навыки" - оставляет только навыки, которые ребёнку ещё предстоит освоить до 7 лет.</li>
-                    <li>"Оставить актуальное для возраста" - убирает навыки, которые по международной статистике дети в этом возрасте ещё не начинают осваивать.</li>
+                    <li>"Показать готовые к освоению" - оставляет только навыки, которые ребёнок уже готов осваивать прямо сейчас: те, для которых всё необходимое уже освоено.</li>
                     <li>"Развивающие активности месяца" - выводит на экран наборы игр и других активностей, которые могут помочь упростить и ускорить освоение навыков, которые для данного ребёнка актуальны по возрасту, но ещё не освоены.</li>
                 </ol>
             </div>
@@ -1721,7 +1733,7 @@
         const STORAGE_KEY_LEGACY = 'childDevTracker_completed'; // Для миграции
         const STORAGE_KEY_ACCORDION = 'milestones_accordion_states';
         const STORAGE_KEY_FILTER_COMPLETED = 'milestones_filter_completed';
-        const STORAGE_KEY_FILTER_AGE = 'milestones_filter_age';
+        const STORAGE_KEY_FILTER_ZPD = 'milestones_filter_zpd';
         const STORAGE_KEY_ONBOARDING_DISMISSED = 'onboarding_dismissed';
 
         // Состояние приложения
@@ -1802,6 +1814,31 @@
                 profile.completedSkills = [...completedSet];
                 saveProfiles();
             }
+        }
+
+        // ZPD readiness (ADR-018): навык готов к освоению, если он ещё не освоен
+        // И все его prerequisites уже освоены. Чистый граф зависимостей —
+        // без возрастного окна и без возрастного гейта (возраст здесь справочный).
+        function isSkillReady(skill, completedSkills) {
+            if (!skill || completedSkills.has(skill.id)) return false;
+            return (skill.prerequisites || []).every(p => completedSkills.has(p));
+        }
+
+        // Идемпотентно проставляет маркер готовности на строку навыка.
+        // data-zpd-ready — хук для фильтра (P2); класс zpd-ready — хук для оформления (P3).
+        function setRowZpdReadiness(tr, ready) {
+            tr.dataset.zpdReady = ready ? 'true' : 'false';
+            tr.classList.toggle('zpd-ready', ready);
+        }
+
+        // Пересчёт готовности по всем отрисованным строкам навыков на месте,
+        // без перестроения таблицы. Изменение освоенности одного навыка влияет
+        // на готовность его зависимых навыков, поэтому пересчитываем все строки.
+        function refreshAllZpdReadiness(completedSkills) {
+            document.querySelectorAll('tr[data-skill-id]').forEach(tr => {
+                const skill = DATA._skillsMap[tr.dataset.skillId];
+                if (skill) setRowZpdReadiness(tr, isSkillReady(skill, completedSkills));
+            });
         }
 
         // Вычисление возраста
@@ -2061,6 +2098,9 @@
                 tr.classList.add('skill-completed');
             }
 
+            // ZPD: маркер готовности навыка (ADR-018), невидимый до P2/P3
+            setRowZpdReadiness(tr, isSkillReady(skill, completedSkills));
+
             const tdDone = document.createElement('td');
             tdDone.className = 'col-done checkbox-cell';
             const checkbox = document.createElement('input');
@@ -2175,6 +2215,10 @@
                 // Обновить счётчик категории
                 updateCategoryCounter(skillRow);
 
+                // ZPD: пересчитать готовность по всем строкам на месте — переключение
+                // влияет на готовность зависимых навыков, а не только текущего
+                refreshAllZpdReadiness(completedSkills);
+
                 // Применить фильтры, если они активны (обновит видимость без перестроения DOM)
                 applyFilter();
             }
@@ -2182,16 +2226,12 @@
 
         // Применение фильтра
         let isFilterActive = false;
-        let isAgeFilterActive = false;
+        let isZpdFilterActive = false;
 
         function applyFilter() {
             const tbody = document.getElementById('tableBody');
             const filterBtn = document.getElementById('filterToggleBtn');
-            const ageFilterBtn = document.getElementById('ageFilterToggleBtn');
-
-            // Получаем текущий возраст ребёнка
-            const profile = getCurrentProfile();
-            const currentLifeMonth = profile ? calculateCurrentLifeMonth(profile.birthdate) : null;
+            const zpdFilterBtn = document.getElementById('zpdFilterToggleBtn');
 
             tbody.querySelectorAll('tr:not(.category-row)').forEach(row => {
                 let shouldHide = false;
@@ -2201,12 +2241,9 @@
                     shouldHide = true;
                 }
 
-                // Фильтр по возрасту
-                if (isAgeFilterActive && currentLifeMonth) {
-                    const startMonth = parseInt(row.dataset.startMonth);
-                    if (startMonth > currentLifeMonth) {
-                        shouldHide = true;
-                    }
+                // Фильтр ЗБР: показывать только готовые к освоению (data-zpd-ready === "true")
+                if (isZpdFilterActive && row.dataset.zpdReady !== 'true') {
+                    shouldHide = true;
                 }
 
                 if (shouldHide) {
@@ -2215,6 +2252,12 @@
                     row.classList.remove('hidden');
                 }
             });
+
+            // Честная деградация (ADR-018 / контракт §2): если ЗБР-фильтр включён и
+            // ни один навык не готов к освоению, показываем сообщение вместо пустой таблицы.
+            // Считаем видимые строки навыков по тому же механизму скрытия (класс .hidden).
+            const visibleSkillCount = tbody.querySelectorAll('tr:not(.category-row):not(.hidden)').length;
+            document.getElementById('zpdEmptyState').hidden = !(isZpdFilterActive && visibleSkillCount === 0);
 
             // Обновляем кнопку фильтра освоенных навыков
             if (isFilterActive) {
@@ -2225,13 +2268,13 @@
                 filterBtn.textContent = 'Скрыть освоенные навыки';
             }
 
-            // Обновляем кнопку фильтра по возрасту
-            if (isAgeFilterActive) {
-                ageFilterBtn.classList.add('active');
-                ageFilterBtn.textContent = 'Не фильтровать по возрасту';
+            // Обновляем кнопку фильтра ЗБР
+            if (isZpdFilterActive) {
+                zpdFilterBtn.classList.add('active');
+                zpdFilterBtn.textContent = 'Не фильтровать по готовности';
             } else {
-                ageFilterBtn.classList.remove('active');
-                ageFilterBtn.textContent = 'Оставить актуальное для возраста';
+                zpdFilterBtn.classList.remove('active');
+                zpdFilterBtn.textContent = 'Показать готовые к освоению';
             }
 
             hideEmptyCategories();
@@ -2244,7 +2287,7 @@
             const tbody = document.getElementById('tableBody');
 
             // Если фильтр не активен, показываем все колонки
-            if (!isFilterActive && !isAgeFilterActive) {
+            if (!isFilterActive && !isZpdFilterActive) {
                 // Показываем все колонки месяцев в заголовке
                 thead.querySelectorAll('th.col-month').forEach(th => {
                     th.classList.remove('hidden-column');
@@ -2308,16 +2351,16 @@
             trackEvent('filter_completed_toggle', { filter_state: isFilterActive ? 'enabled' : 'disabled' });
         }
 
-        function toggleAgeFilter() {
-            isAgeFilterActive = !isAgeFilterActive;
+        function toggleZpdFilter() {
+            isZpdFilterActive = !isZpdFilterActive;
 
             // Сохранить состояние фильтра в localStorage
-            localStorage.setItem(STORAGE_KEY_FILTER_AGE, JSON.stringify(isAgeFilterActive));
+            localStorage.setItem(STORAGE_KEY_FILTER_ZPD, JSON.stringify(isZpdFilterActive));
 
             applyFilter();
 
             // Google Analytics event
-            trackEvent('filter_age_toggle', { filter_state: isAgeFilterActive ? 'enabled' : 'disabled' });
+            trackEvent('filter_zpd_toggle', { filter_state: isZpdFilterActive ? 'enabled' : 'disabled' });
         }
 
         // Скрытие пустых категорий
@@ -2548,14 +2591,18 @@
                 }
             }
 
-            const savedFilterAge = localStorage.getItem(STORAGE_KEY_FILTER_AGE);
-            if (savedFilterAge !== null) {
+            const savedFilterZpd = localStorage.getItem(STORAGE_KEY_FILTER_ZPD);
+            if (savedFilterZpd !== null) {
                 try {
-                    isAgeFilterActive = JSON.parse(savedFilterAge);
+                    isZpdFilterActive = JSON.parse(savedFilterZpd);
                 } catch (e) {
-                    console.warn('[Mobile] Ошибка при загрузке состояния фильтра по возрасту:', e);
+                    console.warn('[Mobile] Ошибка при загрузке состояния ЗБР-фильтра:', e);
                 }
             }
+
+            // Б1-P2: возрастной фильтр заменён ЗБР-фильтром — убрать осиротевшее состояние
+            // (идемпотентно; без семантической миграции age-on → zpd-on)
+            localStorage.removeItem('milestones_filter_age');
 
             buildTableHeader();
             buildTableBody();
@@ -2602,8 +2649,8 @@
             // Обработчик кнопки фильтра освоенных навыков
             document.getElementById('filterToggleBtn').addEventListener('click', toggleFilter);
 
-            // Обработчик кнопки фильтра по возрасту
-            document.getElementById('ageFilterToggleBtn').addEventListener('click', toggleAgeFilter);
+            // Обработчик кнопки ЗБР-фильтра
+            document.getElementById('zpdFilterToggleBtn').addEventListener('click', toggleZpdFilter);
 
             // Обработчики модального окна деталей навыка
             document.getElementById('skillModalClose').addEventListener('click', navigateBackOrCloseSkillModal);
