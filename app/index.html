@@ -1561,8 +1561,8 @@
         <button class="filter-toggle-btn" id="filterToggleBtn">
             Скрыть освоенные навыки
         </button>
-        <button class="filter-toggle-btn" id="ageFilterToggleBtn">
-            Оставить актуальное для возраста
+        <button class="filter-toggle-btn" id="zpdFilterToggleBtn">
+            Показать готовые к освоению
         </button>
         <button class="filter-toggle-btn" id="activitiesBtn">
             Развивающие активности месяца
@@ -1721,7 +1721,7 @@
         const STORAGE_KEY_LEGACY = 'childDevTracker_completed'; // Для миграции
         const STORAGE_KEY_ACCORDION = 'milestones_accordion_states';
         const STORAGE_KEY_FILTER_COMPLETED = 'milestones_filter_completed';
-        const STORAGE_KEY_FILTER_AGE = 'milestones_filter_age';
+        const STORAGE_KEY_FILTER_ZPD = 'milestones_filter_zpd';
         const STORAGE_KEY_ONBOARDING_DISMISSED = 'onboarding_dismissed';
 
         // Состояние приложения
@@ -2214,16 +2214,12 @@
 
         // Применение фильтра
         let isFilterActive = false;
-        let isAgeFilterActive = false;
+        let isZpdFilterActive = false;
 
         function applyFilter() {
             const tbody = document.getElementById('tableBody');
             const filterBtn = document.getElementById('filterToggleBtn');
-            const ageFilterBtn = document.getElementById('ageFilterToggleBtn');
-
-            // Получаем текущий возраст ребёнка
-            const profile = getCurrentProfile();
-            const currentLifeMonth = profile ? calculateCurrentLifeMonth(profile.birthdate) : null;
+            const zpdFilterBtn = document.getElementById('zpdFilterToggleBtn');
 
             tbody.querySelectorAll('tr:not(.category-row)').forEach(row => {
                 let shouldHide = false;
@@ -2233,12 +2229,9 @@
                     shouldHide = true;
                 }
 
-                // Фильтр по возрасту
-                if (isAgeFilterActive && currentLifeMonth) {
-                    const startMonth = parseInt(row.dataset.startMonth);
-                    if (startMonth > currentLifeMonth) {
-                        shouldHide = true;
-                    }
+                // Фильтр ЗБР: показывать только готовые к освоению (data-zpd-ready === "true")
+                if (isZpdFilterActive && row.dataset.zpdReady !== 'true') {
+                    shouldHide = true;
                 }
 
                 if (shouldHide) {
@@ -2257,13 +2250,13 @@
                 filterBtn.textContent = 'Скрыть освоенные навыки';
             }
 
-            // Обновляем кнопку фильтра по возрасту
-            if (isAgeFilterActive) {
-                ageFilterBtn.classList.add('active');
-                ageFilterBtn.textContent = 'Не фильтровать по возрасту';
+            // Обновляем кнопку фильтра ЗБР
+            if (isZpdFilterActive) {
+                zpdFilterBtn.classList.add('active');
+                zpdFilterBtn.textContent = 'Не фильтровать по готовности';
             } else {
-                ageFilterBtn.classList.remove('active');
-                ageFilterBtn.textContent = 'Оставить актуальное для возраста';
+                zpdFilterBtn.classList.remove('active');
+                zpdFilterBtn.textContent = 'Показать готовые к освоению';
             }
 
             hideEmptyCategories();
@@ -2276,7 +2269,7 @@
             const tbody = document.getElementById('tableBody');
 
             // Если фильтр не активен, показываем все колонки
-            if (!isFilterActive && !isAgeFilterActive) {
+            if (!isFilterActive && !isZpdFilterActive) {
                 // Показываем все колонки месяцев в заголовке
                 thead.querySelectorAll('th.col-month').forEach(th => {
                     th.classList.remove('hidden-column');
@@ -2340,16 +2333,16 @@
             trackEvent('filter_completed_toggle', { filter_state: isFilterActive ? 'enabled' : 'disabled' });
         }
 
-        function toggleAgeFilter() {
-            isAgeFilterActive = !isAgeFilterActive;
+        function toggleZpdFilter() {
+            isZpdFilterActive = !isZpdFilterActive;
 
             // Сохранить состояние фильтра в localStorage
-            localStorage.setItem(STORAGE_KEY_FILTER_AGE, JSON.stringify(isAgeFilterActive));
+            localStorage.setItem(STORAGE_KEY_FILTER_ZPD, JSON.stringify(isZpdFilterActive));
 
             applyFilter();
 
             // Google Analytics event
-            trackEvent('filter_age_toggle', { filter_state: isAgeFilterActive ? 'enabled' : 'disabled' });
+            trackEvent('filter_zpd_toggle', { filter_state: isZpdFilterActive ? 'enabled' : 'disabled' });
         }
 
         // Скрытие пустых категорий
@@ -2580,14 +2573,18 @@
                 }
             }
 
-            const savedFilterAge = localStorage.getItem(STORAGE_KEY_FILTER_AGE);
-            if (savedFilterAge !== null) {
+            const savedFilterZpd = localStorage.getItem(STORAGE_KEY_FILTER_ZPD);
+            if (savedFilterZpd !== null) {
                 try {
-                    isAgeFilterActive = JSON.parse(savedFilterAge);
+                    isZpdFilterActive = JSON.parse(savedFilterZpd);
                 } catch (e) {
-                    console.warn('[Mobile] Ошибка при загрузке состояния фильтра по возрасту:', e);
+                    console.warn('[Mobile] Ошибка при загрузке состояния ЗБР-фильтра:', e);
                 }
             }
+
+            // Б1-P2: возрастной фильтр заменён ЗБР-фильтром — убрать осиротевшее состояние
+            // (идемпотентно; без семантической миграции age-on → zpd-on)
+            localStorage.removeItem('milestones_filter_age');
 
             buildTableHeader();
             buildTableBody();
@@ -2634,8 +2631,8 @@
             // Обработчик кнопки фильтра освоенных навыков
             document.getElementById('filterToggleBtn').addEventListener('click', toggleFilter);
 
-            // Обработчик кнопки фильтра по возрасту
-            document.getElementById('ageFilterToggleBtn').addEventListener('click', toggleAgeFilter);
+            // Обработчик кнопки ЗБР-фильтра
+            document.getElementById('zpdFilterToggleBtn').addEventListener('click', toggleZpdFilter);
 
             // Обработчики модального окна деталей навыка
             document.getElementById('skillModalClose').addEventListener('click', navigateBackOrCloseSkillModal);
