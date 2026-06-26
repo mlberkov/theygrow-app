@@ -25,8 +25,6 @@ The deploy is fully driven by Cloud Build. There are **two self-contained per-ap
 - **`/api`:** `api/cloudbuild.yaml` builds from `api/Dockerfile` (build context `api/`), pushes to Artifact Registry, deploys to the `/api` Cloud Run service. Trigger: push to `main`, `filename = api/cloudbuild.yaml`, `includedFiles = api/**`. No `--set-env-vars` — `/api/health` needs no environment; real DB config lands with M3.
 - **Promotion gate (L1, ADR-020).** No standalone staging *service* exists. Instead `app/cloudbuild.yaml` Step 3 deploys the PWA with `--no-traffic --tag sha-$SHORT_SHA`, so each push lands a 0%-traffic, sha-tagged revision and the live revision keeps serving until the owner smoke-tests and promotes. See **Promotion + rollback** below.
 
-> **Build-config relocation (M2-P3) — trigger continuity.** The build-config moved out of the repository root into `/app` + `/api`. The pre-existing PWA trigger had `filename = cloudbuild.yaml` (repo root); it MUST be repointed to `filename = app/cloudbuild.yaml` (and gain `includedFiles = app/**`) **before or atomically with** the merge that removes the root `cloudbuild.yaml`. The live Cloud Run revision keeps serving throughout — a transitional failed build does not take the site down (worst case is a build re-run after the trigger is fixed). See the M2-P3 owner checklist / `M2-DL-002`.
-
 ### Promotion + rollback (L1 deploy-safety gate)
 
 > **Owner GCP action.** Every `gcloud` command below is run by the owner against the live project — Claude Code does not run them. The PWA Cloud Run service `child-tracker-service` and region `europe-west1` are the live-infra identifiers carried in this RUNBOOK (see "Live-infra divergence"); the contract files do not name them.
