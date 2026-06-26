@@ -23,9 +23,30 @@ The deploy is fully driven by Cloud Build. There are **two self-contained per-ap
 
 - **PWA:** `app/cloudbuild.yaml` builds the container from `app/Dockerfile` (build context `app/`), pushes to Artifact Registry, deploys to the PWA Cloud Run service. Trigger: push to `main`, `filename = app/cloudbuild.yaml`, `includedFiles = app/**`.
 - **`/api`:** `api/cloudbuild.yaml` builds from `api/Dockerfile` (build context `api/`), pushes to Artifact Registry, deploys to the `/api` Cloud Run service. Trigger: push to `main`, `filename = api/cloudbuild.yaml`, `includedFiles = api/**`. No `--set-env-vars` — `/api/health` needs no environment; real DB config lands with M3.
-- No environment-specific staging step exists today.
+- **Promotion gate (L1, ADR-020).** No standalone staging *service* exists. Instead `app/cloudbuild.yaml` Step 3 deploys the PWA with `--no-traffic --tag sha-$SHORT_SHA`, so each push lands a 0%-traffic, sha-tagged revision and the live revision keeps serving until the owner smoke-tests and promotes. See **Promotion + rollback** below.
 
 > **Build-config relocation (M2-P3) — trigger continuity.** The build-config moved out of the repository root into `/app` + `/api`. The pre-existing PWA trigger had `filename = cloudbuild.yaml` (repo root); it MUST be repointed to `filename = app/cloudbuild.yaml` (and gain `includedFiles = app/**`) **before or atomically with** the merge that removes the root `cloudbuild.yaml`. The live Cloud Run revision keeps serving throughout — a transitional failed build does not take the site down (worst case is a build re-run after the trigger is fixed). See the M2-P3 owner checklist / `M2-DL-002`.
+
+### Promotion + rollback (L1 deploy-safety gate)
+
+> **Owner GCP action.** Every `gcloud` command below is run by the owner against the live project — Claude Code does not run them. The PWA Cloud Run service `child-tracker-service` and region `europe-west1` are the live-infra identifiers carried in this RUNBOOK (see "Live-infra divergence"); the contract files do not name them.
+
+1. **What the deploy does.** `app/cloudbuild.yaml` Step 3 deploys `child-tracker-service` with `--no-traffic --tag sha-$SHORT_SHA`. Each push lands a fresh revision at **0% traffic**, reachable only via its **per-revision** `sha-<SHORT_SHA>` tagged URL. The live revision is untouched until promotion.
+2. **Get the tagged URL.** The tag is per-revision (sha-specific), so smoke the *just-deployed* revision — not a persistent URL. Read the tagged URL from the Cloud Build deploy log, or:
+   `gcloud run services describe child-tracker-service --region europe-west1 --format 'value(status.traffic)'`
+   (the tagged URL has the form `https://sha-<SHORT_SHA>---child-tracker-service-<hash>.europe-west1.run.app`).
+3. **Smoke the tagged revision** (owner/manual, no JS toolchain) — against the tagged URL `$TAG_URL`:
+   - Health: `curl -fsS "$TAG_URL/" -o /dev/null -w '%{http_code}\n'` → `200`.
+   - Live-DOM (app shell served): `curl -fsS "$TAG_URL/" | grep -q '<title>Child Dev Tracker</title>'` → exit 0.
+   - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
+   - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
+4. **Promote.** Shift 100% traffic to the just-smoked revision:
+   `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
+5. **Rollback / abort.**
+   - **Abort (no promotion):** do nothing — withholding promotion leaves prod on the prior revision (the no-traffic revision serves no users).
+   - **Roll back after promotion:** pin traffic to the previous good revision:
+     `gcloud run services update-traffic child-tracker-service --to-revisions <prev-revision>=100 --region europe-west1`.
+6. **Tag accumulation.** Promotion does **not** remove the `sha-` tag, so tags accumulate across deploys. They are harmless (each just routes 0% traffic to an old revision) and are pruned **out-of-band** by the owner when desired — e.g. `gcloud run services update-traffic child-tracker-service --remove-tags sha-<old> --region europe-west1`, or delete the stale revision outright (`gcloud run revisions delete <rev> --region europe-west1`). No automated pruning this packet.
 
 ## Local dev
 
