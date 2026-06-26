@@ -23,6 +23,9 @@ steps:
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
+      - '--no-traffic'
+      - '--tag'
+      - 'sha-$SHORT_SHA'
 
 images:
   - 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/child-tracker-repo/web-app:$COMMIT_SHA'
