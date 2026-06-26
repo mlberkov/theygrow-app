@@ -8,7 +8,9 @@ The product in production is a **static PWA** served by nginx and deployed on GC
 
 - Entry point: `app/index.html` (single-file PWA).
 - PWA assets: `app/manifest.json`, `app/sw.js`, `app/offline.html`, `app/icons/`.
+- Update delivery: the service worker (`app/sw.js`) serves the app shell **network-first**, so an installed client picks up the freshly deployed `app/index.html` on its next navigation (no hard-refresh); a newly installed worker parks in `waiting` and the page surfaces an in-app "Обновить" banner (`app/index.html`) — the user drives activation rather than the worker auto-applying. See `PWA-DL-001`.
 - Web server: nginx (configured by `app/nginx.conf`) inside the container.
+- Cache surface: the per-path `Cache-Control` headers — including `/sw.js` `no-cache, must-revalidate` (so a redeployed worker is always re-fetched) — live in `app/nginx.conf`. `app/cloudbuild.yaml` carries **no** cache directives; cache behaviour is entirely an nginx concern.
 - Container: `app/Dockerfile` (nginx-based).
 - CI / CD: GCP Cloud Build — `app/cloudbuild.yaml` builds/deploys the PWA; `api/cloudbuild.yaml` builds/deploys the `/api` service.
 - Hosting: GCP Cloud Run (two services: the PWA, and `/api`).

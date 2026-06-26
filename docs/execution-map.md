@@ -37,6 +37,10 @@ This file is the living "where are we / what's next" state map. It is the index,
   - **P3** — Honest empty-state for the empty ready-zone: a message, not an empty table, when the ZPD filter is on and no skill is ready (ADR-018 / контракт §2). **Done** @ 51cc9e2.
   - **P4** — Onboarding copy reconciled to the ZPD filter. **Done** @ 79b6b28.
   - **B1-CLOSE** — decision-log (`B1-DL-018`, = vault ADR-018) + execution-map reconciliation; the frozen P1–P4 ladder recorded in the repo ledger. **Landed this packet.**
+- **PWA Update-Delivery — Done.** Network-first SW delivery + prompt-driven update UX in the PWA (`/app`), frontend-only. Cross-cutting front delivery track (roadmap v3 §5 contour 7) — sits alongside Б1, **outside** the M1–M5 engine spine; not naively "next" in that ladder.
+  - **P1** — Network-first SW delivery engine: versioned cache (`CACHE_VERSION`) + `activate()` purge of non-current caches + the `SKIP_WAITING` message handler; network-first navigation / app-shell + `/api/`, cache-first for static assets. Decision `PWA-DL-001` (cross-refs vault ADR-019). **Done** @ 107de2a.
+  - **P2** — Prompt-driven update UX: the `#updateBanner` "Обновить" prompt drives `skipWaiting`; first-install-silent (`clients.claim()`), reload double-gated (`updateAccepted` + one-shot `refreshing`). **Done** @ 273c9ab.
+  - **PWA-CLOSE** — decision-log (`PWA-DL-001`, cross-refs vault ADR-019) + execution-map reconciliation; the frozen P1–P2 ladder recorded in the repo ledger. The `app/sw.js` `changed_in` placeholder is authoritatively resolved to `PWA-DL-001` here (physical comment backfill deferred to the next `CACHE_VERSION` bump). **Landed this packet.**
 - **M5** — Closed-corpus family-memory chat. **Deferred** (ADR-017 — Б1 was sequenced ahead of M5; M5 is not naively "next"). The post-Б1 next-milestone choice is an open owner decision (contract §5/§6), to be made in the next planning pass.
 
 ## How to update this file
