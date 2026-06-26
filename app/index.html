@@ -1509,6 +1509,86 @@
                 font-size: 13px;
             }
         }
+
+        /* ─────────────────────────────────────────────────────────────────────────── */
+        /* PWA UPDATE-AVAILABLE BANNER                                                  */
+        /* ─────────────────────────────────────────────────────────────────────────── */
+
+        #updateBanner {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-white);
+            border-top: 2px solid var(--primary-purple);
+            padding: 16px 20px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 9999;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        #updateBanner.visible {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        #updateBanner span {
+            flex: 1;
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        #updateReloadBtn {
+            background: var(--primary-purple);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+
+        #updateReloadBtn:hover {
+            background: var(--primary-purple-light);
+        }
+
+        #updateDismiss {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 28px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 8px;
+            margin-left: 8px;
+            transition: color 0.2s;
+        }
+
+        #updateDismiss:hover {
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 480px) {
+            #updateBanner {
+                padding: 14px 16px;
+            }
+
+            #updateBanner span {
+                font-size: 13px;
+            }
+
+            #updateReloadBtn {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1522,6 +1602,13 @@
     <div id="iosBanner">
         <p>Чтобы установить приложение, нажмите <strong>Поделиться</strong> (Share) и выберите <strong>«На экран Домой»</strong> (Add to Home Screen).</p>
         <button id="iosDismiss">Понятно</button>
+    </div>
+
+    <!-- PWA Update Available Banner -->
+    <div id="updateBanner" role="alert">
+        <span>Новая версия доступна — обновить</span>
+        <button id="updateReloadBtn">Обновить</button>
+        <button id="updateDismiss" aria-label="Закрыть">&times;</button>
     </div>
 
     <!-- Новый заголовок с профилем -->
@@ -2991,13 +3078,60 @@
         })();
     </script>
 
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration + update-available prompt -->
     <script>
         if ('serviceWorker' in navigator) {
+            // Block-local update state — drives P1's neutral SKIP_WAITING handler.
+            // updateAccepted: set only when the user taps "Обновить", so the
+            //   controllerchange from P1's clients.claim() on first install does NOT reload.
+            // refreshing: one-shot guard — exactly one reload, no loop.
+            let updateAccepted = false;
+            let refreshing = false;
+
+            const showUpdateBanner = (worker) => {
+                const banner = document.getElementById('updateBanner');
+                const reloadBtn = document.getElementById('updateReloadBtn');
+                const dismissBtn = document.getElementById('updateDismiss');
+                if (!banner || !reloadBtn || !dismissBtn || !worker) return;
+                banner.classList.add('visible');
+                reloadBtn.onclick = () => {
+                    updateAccepted = true;
+                    worker.postMessage({ type: 'SKIP_WAITING' });
+                };
+                dismissBtn.onclick = () => {
+                    // Non-blocking: hide only — the update lands on the next natural visit.
+                    banner.classList.remove('visible');
+                };
+            };
+
+            // Reload exactly once, and only for a user-accepted update.
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!updateAccepted || refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
+
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
                     .then((registration) => {
                         console.log('Service Worker registered:', registration.scope);
+
+                        // Path A: a new worker is already waiting at load time.
+                        if (registration.waiting && navigator.serviceWorker.controller) {
+                            showUpdateBanner(registration.waiting);
+                        }
+
+                        // Path B: an update is found while the page is open.
+                        registration.addEventListener('updatefound', () => {
+                            const installing = registration.installing;
+                            if (!installing) return;
+                            installing.addEventListener('statechange', () => {
+                                // controller present ⇒ this is an update, not a first install.
+                                if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                                    showUpdateBanner(installing);
+                                }
+                            });
+                        });
                     })
                     .catch((error) => {
                         console.log('Service Worker registration failed:', error);
