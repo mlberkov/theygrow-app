@@ -1664,7 +1664,7 @@
             Показать готовые к освоению
         </button>
         <button class="filter-toggle-btn" id="activitiesBtn">
-            Развивающие активности месяца
+            Подходящие активности
         </button>
     </footer>
 
@@ -1703,7 +1703,7 @@
         <div class="activities-modal-content">
             <span class="activities-modal-close" id="activitiesModalClose">&times;</span>
             <div class="activities-modal-header">
-                <h2>Развивающие активности месяца</h2>
+                <h2>Подходящие активности</h2>
             </div>
             <div class="activities-grid" id="activitiesGrid">
                 <!-- Карточки будут добавлены динамически -->
@@ -1719,7 +1719,7 @@
                 <h2>Привет!</h2>
             </div>
             <div class="onboarding-modal-body">
-                <p>Это приложение позволяет отслеживать прогресс твоего ребёнка и видеть список развивающих активностей, актуальных для его возраста. Все персональные данные сейчас хранятся в твоём браузере, что обеспечивает полную приватность. Позже функционал расширится, и потребуется регистрация, но сейчас всё работает без регистрации прямо на твоём устройстве.</p>
+                <p>Это приложение позволяет отслеживать прогресс твоего ребёнка и видеть список подходящих развивающих активностей. Все персональные данные сейчас хранятся в твоём браузере, что обеспечивает полную приватность. Позже функционал расширится, и потребуется регистрация, но сейчас всё работает без регистрации прямо на твоём устройстве.</p>
                 <p>Чтобы весь функционал работал в полном объёме, нужно:</p>
                 <ol>
                     <li>создать профиль ребёнка (кнопка наверху) и указать его дату рождения;</li>
@@ -1731,7 +1731,7 @@
                 <ol>
                     <li>"Скрыть освоенные навыки" - оставляет только навыки, которые ребёнку ещё предстоит освоить до 7 лет.</li>
                     <li>"Показать готовые к освоению" - оставляет только навыки, которые ребёнок уже готов осваивать прямо сейчас: те, для которых всё необходимое уже освоено.</li>
-                    <li>"Развивающие активности месяца" - выводит на экран наборы игр и других активностей, которые могут помочь упростить и ускорить освоение навыков, которые для данного ребёнка актуальны по возрасту, но ещё не освоены.</li>
+                    <li>"Подходящие активности" - выводит на экран наборы игр и других активностей, которые могут помочь упростить и ускорить освоение навыков, которые ребёнку ещё предстоит освоить.</li>
                 </ol>
             </div>
             <div class="onboarding-modal-footer">
@@ -2551,7 +2551,7 @@
             const relevantSkills = getRelevantUncompletedSkills();
 
             if (relevantSkills.length === 0) {
-                grid.innerHTML = '<div class="no-activities-message">Нет неосвоенных навыков, соответствующих текущему возрасту ребёнка</div>';
+                grid.innerHTML = '<div class="no-activities-message">Все навыки освоены — подходящих активностей сейчас нет</div>';
             } else {
                 // Создаём карточки
                 grid.innerHTML = relevantSkills.map(skill => `
@@ -2595,30 +2595,42 @@
                 return [];
             }
 
-            const currentLifeMonth = calculateCurrentLifeMonth(profile.birthdate);
             const completedSkills = getCompletedSkills();
             const relevantSkills = [];
 
-            // Проходим по всем категориям и навыкам
+            // Проходим по всем категориям и навыкам.
+            // Показываем ВСЕ неосвоенные навыки независимо от возраста ребёнка.
             for (const category in DATA.milestones) {
                 DATA.milestones[category].forEach(skill => {
                     const isCompleted = completedSkills.has(skill.id);
-                    const isRelevantAge = skill.age_start_months <= currentLifeMonth;
 
-                    // Навык должен быть неосвоенным и соответствовать возрасту
-                    if (!isCompleted && isRelevantAge) {
+                    if (!isCompleted) {
                         relevantSkills.push(skill);
                     }
                 });
             }
 
-            // Сортируем навыки по разнице между максимальным нормативным возрастом и текущим месяцем жизни
-            // (от минимального N к максимальному, где N = age_end_months - currentLifeMonth)
-            // Это обеспечивает приоритет "просроченных" навыков
+            // Карта влияния: для каждого навыка считаем число его ПРЯМЫХ неосвоенных
+            // зависимых (навыков, перечисляющих его id в prerequisites). Карта строится
+            // заново при каждом открытии модалки из текущего набора данных, ничего не
+            // записывая обратно в DATA / _skillsMap / milestonesData.
+            const impactById = {};
+            for (const category in DATA.milestones) {
+                DATA.milestones[category].forEach(dependent => {
+                    if (completedSkills.has(dependent.id)) {
+                        return;
+                    }
+                    (dependent.prerequisites || []).forEach(prereqId => {
+                        impactById[prereqId] = (impactById[prereqId] || 0) + 1;
+                    });
+                });
+            }
+
+            // Сортируем по влиянию: по убыванию числа прямых неосвоенных зависимых.
+            // Стабильная сортировка сохраняет исходный порядок данных для навыков с
+            // равным влиянием (тай-брейк = порядок milestonesData, без новой нормы).
             relevantSkills.sort((a, b) => {
-                const nA = a.age_end_months - currentLifeMonth;
-                const nB = b.age_end_months - currentLifeMonth;
-                return nA - nB;
+                return (impactById[b.id] || 0) - (impactById[a.id] || 0);
             });
 
             return relevantSkills;
