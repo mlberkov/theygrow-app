@@ -436,6 +436,14 @@
             background-color: #FBBF24;
         }
 
+        .activity-card.activity-window-sensitive {
+            background-color: #FEF3C7;
+        }
+
+        .activity-card.activity-window-critical {
+            background-color: #FBBF24;
+        }
+
         .cell-completed {
             background-color: #D1FAE5;
         }
@@ -1705,6 +1713,7 @@
             <div class="activities-modal-header">
                 <h2>Подходящие активности</h2>
             </div>
+            <p class="activities-top-note" id="activitiesTopNote" style="margin:0 0 12px;color:#555;font-size:0.95em;" hidden></p>
             <div class="activities-grid" id="activitiesGrid">
                 <!-- Карточки будут добавлены динамически -->
             </div>
@@ -1778,6 +1787,150 @@
                 _skillsMap: skillsMap
             };
         }
+
+        // Биологические окна (ADR-021 / ADR-022, амендмент 2026-06-28). Курируемый
+        // популяционный каталог сензитивных/критических окон. Источник: vault
+        // «Сензитивные и критические периоды развития (популяционный каталог)»
+        // (Deep Research 2026-06-27). Привязка window-side через applies_to:[skill_ids] —
+        // milestonesData (строка ~1748) НЕ открывается, byte-for-byte цел.
+        // Окна НЕ гейтят готовность (предикат-гейт отозван владельцем 2026-06-28);
+        // питают только Tier-1 ранжирования в модалке «Подходящие активности» (этот пакет)
+        // и минимальный critical-display (P3). Окно с applies_to:[] — чистая популяционная
+        // справка: ранжирует/гейтит ноль.
+        // shape в месяцах жизни; peak — диапазон [peak_start, peak_end].
+        // evidence_strength (★) и copy/medical_boundary/area/source — display/провенанс,
+        // НЕ читаются логикой ранжирования (★ исключён из метрики). Рендерятся в P3.
+        const bioWindowsData = [
+            // — Окна с привязкой (питают Tier-1) —
+            {
+                id: 'BW_PHONEME_L1', name: 'Фонематика L1', type: 'critical',
+                area: 'Различение фонем L1',
+                shape: { open: 0, peak_start: 6, peak_end: 8, close: 12 }, decline_shape: 'sharp',
+                evidence_strength: 5,
+                copy: 'В первый год ребёнок — универсальный "слушатель" всех языков; живое общение помогает освоить звуки родного языка.',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: ['L_005', 'L_006', 'L_009', 'L_010']
+            },
+            {
+                id: 'BW_SYNTAX_L1', name: 'Синтаксис L1', type: 'sensitive',
+                area: 'Синтаксис/грамматика L1',
+                shape: { open: 0, peak_start: 12, peak_end: 60, close: 144 }, decline_shape: 'gentle',
+                evidence_strength: 4,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: ['L_016', 'L_017', 'L_018', 'L_021', 'L_022', 'L_023', 'L_025']
+            },
+            {
+                id: 'BW_ATTACHMENT_HPA', name: 'Привязанность/HPA', type: 'sensitive',
+                area: 'Привязанность / HPA-ось',
+                shape: { open: 0, peak_start: 0, peak_end: 24, close: 60 }, decline_shape: 'front_loaded',
+                evidence_strength: 4,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: ['SE_003', 'SE_006', 'SE_011', 'SE_012', 'SE_018']
+            },
+            {
+                id: 'BW_EMO_COREG', name: 'Эмоц. ко-регуляция', type: 'sensitive',
+                area: 'Эмоциональная ко-регуляция / гиппокамп',
+                shape: { open: 0, peak_start: 12, peak_end: 60, close: 72 }, decline_shape: 'gentle',
+                evidence_strength: 3,
+                copy: 'В первые годы именно наше спокойствие становится "тренажёром" для развивающейся системы стресс-регуляции ребёнка.',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: ['SE_005', 'SE_015', 'SE_018', 'SE_024']
+            },
+            // — Чистые популяционные справки (applies_to:[] — метрикой не потребляются) —
+            {
+                id: 'BW_AMBLYOPIA', name: 'Амблиопия', type: 'critical',
+                area: 'Бинокулярное зрение / острота (амблиопия)',
+                shape: { open: 0, peak_start: 1, peak_end: 3, close: 96 }, decline_shape: 'sharp',
+                evidence_strength: 5,
+                copy: 'Если врач замечает проблему с одним глазом, важно не откладывать лечение — мозг в первые годы активнее всего налаживает совместную работу глаз.',
+                medical_boundary: 'Единственное окно с реально необратимым клиническим исходом — повод к врачу, не к педагогике; «не откладывайте осмотр».',
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_L2_ACCENT', name: 'Акцент L2', type: 'sensitive',
+                area: 'Акцент/фонология L2',
+                shape: { open: 0, peak_start: 0, peak_end: 84, close: 120 }, decline_shape: 'stepped',
+                evidence_strength: 4,
+                copy: 'Начало второго языка до 7–10 лет облегчает — но не гарантирует — нативное произношение. Позже — не провал: вдумчивое обучение работает в любом возрасте.',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_EF', name: 'EF', type: 'sensitive',
+                area: 'Исполнительные функции (EF)',
+                shape: { open: 12, peak_start: 36, peak_end: 72, close: 144 }, decline_shape: 'very_gentle',
+                evidence_strength: 3,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_ABS_PITCH', name: 'Абс. слух', type: 'sensitive',
+                area: 'Абсолютный (высотный) слух',
+                shape: { open: 0, peak_start: 24, peak_end: 48, close: 108 }, decline_shape: 'stepped',
+                evidence_strength: 3,
+                copy: 'Раннее знакомство с музыкой обогащает слуховой мир; абсолютный слух — редкий бонус, а не цель.',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_MUSICALITY', name: 'Музыкальность', type: 'sensitive',
+                area: 'Музыкальность / мелодика',
+                shape: { open: 0, peak_start: 0, peak_end: 72, close: null }, decline_shape: 'gentle',
+                evidence_strength: 4,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_ORE', name: 'ORE', type: 'sensitive',
+                area: 'Лицевое восприятие / эффект другой расы (ORE)',
+                shape: { open: 0, peak_start: 0, peak_end: 6, close: 12 }, decline_shape: 'sharp',
+                evidence_strength: 4,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_GROSS_MOTOR', name: 'Грубая моторика', type: 'sensitive',
+                area: 'Грубая моторика',
+                shape: { open: 0, peak_start: 0, peak_end: 18, close: null }, decline_shape: 'very_gentle',
+                evidence_strength: 3,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            },
+            {
+                id: 'BW_FINE_MOTOR', name: 'Тонкая моторика', type: 'sensitive',
+                area: 'Тонкая моторика',
+                shape: { open: 4, peak_start: 12, peak_end: 48, close: 144 }, decline_shape: 'very_gentle',
+                evidence_strength: 3,
+                copy: 'TODO(P3-copy): нет дословной родительской формулировки в каталоге',
+                medical_boundary: null,
+                source: 'Популяционный каталог сенз./крит. периодов (Deep Research, 2026-06-27)',
+                applies_to: []
+            }
+        ];
+
+        // Инвертированный индекс skill_id -> [окна]. Строится один раз; только чтение,
+        // ничего не пишется обратно в DATA / _skillsMap / milestonesData.
+        const windowsBySkillId = {};
+        bioWindowsData.forEach(w => (w.applies_to || []).forEach(id => {
+            (windowsBySkillId[id] = windowsBySkillId[id] || []).push(w);
+        }));
 
         // Вспомогательная функция: преобразование prerequisites в HTML
         function getPrerequisitesHtml(prerequisites) {
@@ -2550,16 +2703,33 @@
             // Получаем неосвоенные навыки, соответствующие возрасту
             const relevantSkills = getRelevantUncompletedSkills();
 
+            // Верхняя копия (не-алармистская, популяционная) — видна только когда
+            // в списке есть хотя бы один навык в окне (Tier-1 непуст); иначе скрыта.
+            const topNote = document.getElementById('activitiesTopNote');
+            const hasWindowed = relevantSkills.some(s => windowsBySkillId[s.id]);
+            if (hasWindowed) {
+                topNote.textContent = 'Для развития части навыков с биологической точки зрения время сейчас наиболее благоприятно — они в начале списка.';
+                topNote.hidden = false;
+            } else {
+                topNote.hidden = true;
+            }
+
             if (relevantSkills.length === 0) {
                 grid.innerHTML = '<div class="no-activities-message">Все навыки освоены — подходящих активностей сейчас нет</div>';
             } else {
                 // Создаём карточки
-                grid.innerHTML = relevantSkills.map(skill => `
-                    <div class="activity-card">
+                grid.innerHTML = relevantSkills.map(skill => {
+                    const wins = windowsBySkillId[skill.id];
+                    const winClass = wins
+                        ? (wins.some(w => w.type === 'critical') ? ' activity-window-critical' : ' activity-window-sensitive')
+                        : '';
+                    return `
+                    <div class="activity-card${winClass}">
                         <div class="activity-card-title">${skill.name}</div>
                         <div class="activity-card-content">${formatParentActivities(skill.additional_info.parent_activities)}</div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             }
 
             modal.classList.add('show');
@@ -2589,6 +2759,44 @@
             }
         }
 
+        // — Urgency-метрика Tier-1 (ADR-022 §3; модалка активностей ТОЛЬКО) —
+        // urgency = f(peak_fraction × criticality_weight(type, decline_shape)); f = identity (линейная).
+        // peak_fraction cap'ается; сензитивные cap'аются ниже критических; ★ (evidence_strength)
+        // НЕ читается; pre-peak → низкий тир. front_loaded инвертирует наклон внутри пика
+        // (раньше = максимум; биология привязанности: вред 0–6 мес ≫ после 2 лет).
+        // Значения — именованные константы для owner-tuning (ADR-022 OQ#1, envelope-деталь).
+        const CRITICAL_WEIGHT = 1.0, SENSITIVE_WEIGHT = 0.5;
+        const DECLINE_FACTORS = { sharp: 1.0, stepped: 0.8, front_loaded: 0.9, gentle: 0.6, very_gentle: 0.4 };
+        const CRIT_FRACTION_CAP = 1.5, SENS_FRACTION_CAP = 1.0;
+        const PRE_PEAK_URGENCY = 0.05;
+
+        function criticalityWeight(type, decline) {
+            const typeW = type === 'critical' ? CRITICAL_WEIGHT : SENSITIVE_WEIGHT;
+            return typeW * (DECLINE_FACTORS[decline] ?? DECLINE_FACTORS.gentle);
+        }
+
+        function windowUrgency(w, lifeMonth) {
+            const span = Math.max(1, w.shape.peak_end - w.shape.peak_start);
+            let frac;
+            if (w.decline_shape === 'front_loaded') {
+                // ранний = максимум (вред front-loaded); cap внутри [0,1]
+                frac = Math.min(1, Math.max(0, 1 - (lifeMonth - w.shape.peak_start) / span));
+            } else {
+                if (lifeMonth < w.shape.peak_start) return PRE_PEAK_URGENCY; // pre-peak = низкий тир
+                const cap = w.type === 'critical' ? CRIT_FRACTION_CAP : SENS_FRACTION_CAP;
+                frac = Math.min(cap, (lifeMonth - w.shape.peak_start) / span);
+            }
+            return frac * criticalityWeight(w.type, w.decline_shape); // f = identity
+        }
+
+        // urgency навыка = максимум по покрывающим окнам (∃-семантика покрытия).
+        // null → навык не покрыт ни одним окном (уходит в Tier-2).
+        function skillUrgency(skillId, lifeMonth) {
+            const ws = windowsBySkillId[skillId];
+            if (!ws || ws.length === 0) return null;
+            return Math.max(...ws.map(w => windowUrgency(w, lifeMonth)));
+        }
+
         function getRelevantUncompletedSkills() {
             const profile = getCurrentProfile();
             if (!profile || !profile.birthdate) {
@@ -2598,13 +2806,12 @@
             const completedSkills = getCompletedSkills();
             const relevantSkills = [];
 
-            // Проходим по всем категориям и навыкам.
-            // Показываем ВСЕ неосвоенные навыки независимо от возраста ребёнка.
+            // Берём только готовые к освоению навыки — тот же предикат, что и фильтр
+            // «Показать готовые к освоению»: не освоены И все prerequisites освоены.
+            // Сужение по графу готовности (ADR-018), без возраста и без окон.
             for (const category in DATA.milestones) {
                 DATA.milestones[category].forEach(skill => {
-                    const isCompleted = completedSkills.has(skill.id);
-
-                    if (!isCompleted) {
+                    if (isSkillReady(skill, completedSkills)) {
                         relevantSkills.push(skill);
                     }
                 });
@@ -2626,14 +2833,17 @@
                 });
             }
 
-            // Сортируем по влиянию: по убыванию числа прямых неосвоенных зависимых.
-            // Стабильная сортировка сохраняет исходный порядок данных для навыков с
-            // равным влиянием (тай-брейк = порядок milestonesData, без новой нормы).
-            relevantSkills.sort((a, b) => {
-                return (impactById[b.id] || 0) - (impactById[a.id] || 0);
-            });
+            // Двухтировый сорт (ADR-022 §3, окна > граф). Окна НИКОГО не удаляют —
+            // только переупорядочивают. Tier-1 = навыки в окне, по urgency; Tier-2 =
+            // навыки без окна, по существующей graph-impact метрике (Б2, дословно).
+            // Стабильная сортировка → тай-брейк внутри тира = порядок датасета.
+            const lifeMonth = calculateCurrentLifeMonth(profile.birthdate);
+            const tier1 = [], tier2 = [];
+            relevantSkills.forEach(s => (windowsBySkillId[s.id] ? tier1 : tier2).push(s));
+            tier1.sort((a, b) => skillUrgency(b.id, lifeMonth) - skillUrgency(a.id, lifeMonth));
+            tier2.sort((a, b) => (impactById[b.id] || 0) - (impactById[a.id] || 0));
 
-            return relevantSkills;
+            return tier1.concat(tier2);
         }
 
         // Функция для расчета и установки фиксированной ширины колонки навыков
