@@ -1665,11 +1665,8 @@
 
     <!-- Нижняя панель управления -->
     <footer class="control-footer">
-        <button class="filter-toggle-btn" id="filterToggleBtn">
-            Скрыть освоенные навыки
-        </button>
         <button class="filter-toggle-btn" id="zpdFilterToggleBtn">
-            Показать готовые к освоению
+            Показать навыки, готовые к освоению
         </button>
         <button class="filter-toggle-btn" id="activitiesBtn">
             Подходящие активности
@@ -1738,8 +1735,7 @@
                 <p>Чтобы развернуть группу навыков (крупная моторика, мелкая моторика и т.п.), нужно нажать на название группы.</p>
                 <p>Кнопки, которые будут для тебя максимально полезными:</p>
                 <ol>
-                    <li>"Скрыть освоенные навыки" - оставляет только навыки, которые ребёнку ещё предстоит освоить до 7 лет.</li>
-                    <li>"Показать готовые к освоению" - оставляет только навыки, которые ребёнок уже готов осваивать прямо сейчас: те, для которых всё необходимое уже освоено.</li>
+                    <li>"Показать навыки, готовые к освоению" - оставляет только навыки, которые ребёнок уже готов осваивать прямо сейчас: те, для которых всё необходимое уже освоено.</li>
                     <li>"Подходящие активности" - выводит на экран наборы игр и других активностей, которые могут помочь упростить и ускорить освоение навыков, которые ребёнку ещё предстоит освоить.</li>
                 </ol>
             </div>
@@ -1972,7 +1968,6 @@
         const STORAGE_KEY_CURRENT = 'childDevTracker_currentProfile';
         const STORAGE_KEY_LEGACY = 'childDevTracker_completed'; // Для миграции
         const STORAGE_KEY_ACCORDION = 'milestones_accordion_states';
-        const STORAGE_KEY_FILTER_COMPLETED = 'milestones_filter_completed';
         const STORAGE_KEY_FILTER_ZPD = 'milestones_filter_zpd';
         const STORAGE_KEY_ONBOARDING_DISMISSED = 'onboarding_dismissed';
 
@@ -2465,21 +2460,14 @@
         }
 
         // Применение фильтра
-        let isFilterActive = false;
         let isZpdFilterActive = false;
 
         function applyFilter() {
             const tbody = document.getElementById('tableBody');
-            const filterBtn = document.getElementById('filterToggleBtn');
             const zpdFilterBtn = document.getElementById('zpdFilterToggleBtn');
 
             tbody.querySelectorAll('tr:not(.category-row)').forEach(row => {
                 let shouldHide = false;
-
-                // Фильтр по освоенным навыкам
-                if (isFilterActive && row.classList.contains('skill-completed')) {
-                    shouldHide = true;
-                }
 
                 // Фильтр ЗБР: показывать только готовые к освоению (data-zpd-ready === "true")
                 if (isZpdFilterActive && row.dataset.zpdReady !== 'true') {
@@ -2499,22 +2487,13 @@
             const visibleSkillCount = tbody.querySelectorAll('tr:not(.category-row):not(.hidden)').length;
             document.getElementById('zpdEmptyState').hidden = !(isZpdFilterActive && visibleSkillCount === 0);
 
-            // Обновляем кнопку фильтра освоенных навыков
-            if (isFilterActive) {
-                filterBtn.classList.add('active');
-                filterBtn.textContent = 'Показать все навыки';
-            } else {
-                filterBtn.classList.remove('active');
-                filterBtn.textContent = 'Скрыть освоенные навыки';
-            }
-
             // Обновляем кнопку фильтра ЗБР
             if (isZpdFilterActive) {
                 zpdFilterBtn.classList.add('active');
-                zpdFilterBtn.textContent = 'Не фильтровать по готовности';
+                zpdFilterBtn.textContent = 'Показать все навыки';
             } else {
                 zpdFilterBtn.classList.remove('active');
-                zpdFilterBtn.textContent = 'Показать готовые к освоению';
+                zpdFilterBtn.textContent = 'Показать навыки, готовые к освоению';
             }
 
             hideEmptyCategories();
@@ -2527,7 +2506,7 @@
             const tbody = document.getElementById('tableBody');
 
             // Если фильтр не активен, показываем все колонки
-            if (!isFilterActive && !isZpdFilterActive) {
+            if (!isZpdFilterActive) {
                 // Показываем все колонки месяцев в заголовке
                 thead.querySelectorAll('th.col-month').forEach(th => {
                     th.classList.remove('hidden-column');
@@ -2577,18 +2556,6 @@
                     }
                 });
             }
-        }
-
-        function toggleFilter() {
-            isFilterActive = !isFilterActive;
-
-            // Сохранить состояние фильтра в localStorage
-            localStorage.setItem(STORAGE_KEY_FILTER_COMPLETED, JSON.stringify(isFilterActive));
-
-            applyFilter();
-
-            // Google Analytics event
-            trackEvent('filter_completed_toggle', { filter_state: isFilterActive ? 'enabled' : 'disabled' });
         }
 
         function toggleZpdFilter() {
@@ -2891,15 +2858,6 @@
             loadCategoryStates();
 
             // Загрузить состояния фильтров
-            const savedFilterCompleted = localStorage.getItem(STORAGE_KEY_FILTER_COMPLETED);
-            if (savedFilterCompleted !== null) {
-                try {
-                    isFilterActive = JSON.parse(savedFilterCompleted);
-                } catch (e) {
-                    console.warn('[Mobile] Ошибка при загрузке состояния фильтра освоенных навыков:', e);
-                }
-            }
-
             const savedFilterZpd = localStorage.getItem(STORAGE_KEY_FILTER_ZPD);
             if (savedFilterZpd !== null) {
                 try {
@@ -2954,9 +2912,6 @@
                     trackEvent('profile_create', { profile_name: name });
                 }
             });
-
-            // Обработчик кнопки фильтра освоенных навыков
-            document.getElementById('filterToggleBtn').addEventListener('click', toggleFilter);
 
             // Обработчик кнопки ЗБР-фильтра
             document.getElementById('zpdFilterToggleBtn').addEventListener('click', toggleZpdFilter);
