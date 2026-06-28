@@ -2,13 +2,13 @@
 // Pattern from TheyGrow MVP Blueprint
 
 // --- Delivery knob (front-side) ---------------------------------------------
-// changed_in: <Б-DL-NNN, assigned in P3> — single source of truth for the cache
+// changed_in: PWA-DL-001 — single source of truth for the cache
 // generation. Bump CACHE_VERSION to ship a fresh app shell to existing installed
 // users: a changed sw.js is re-fetched (nginx serves /sw.js no-cache), the new
 // worker activates, and activate() purges every non-current cache (one-time
 // migration off theygrow-v1). Typed-config home (api parameters.py) is in /api,
 // not touched this milestone, so a typed knob is justifiably deferred.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
