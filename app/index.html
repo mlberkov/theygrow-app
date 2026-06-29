@@ -1966,7 +1966,7 @@
                 const done = completedSkills.has(id);
                 const marker = `<span class="prereq-marker ${done ? 'prereq-marker-done' : 'prereq-marker-todo'}">${done ? '✓' : '○'}</span>`;
                 if (skill) {
-                    return `${marker} <span class="prerequisite-skill" data-skill-id="${id}">${skill.name}</span>`;
+                    return `${marker} <span class="prerequisite-skill" data-skill-id="${id}" data-relation="prerequisite">${skill.name}</span>`;
                 }
                 return `${marker} ${id}`;
             });
@@ -1999,7 +1999,7 @@
                 return '';
             }
             const skillSpans = downstream.map(skill => {
-                return `<span class="prerequisite-skill" data-skill-id="${skill.id}">${skill.name}</span>`;
+                return `<span class="prerequisite-skill" data-skill-id="${skill.id}" data-relation="downstream">${skill.name}</span>`;
             });
             return `<h3>Открывает дальше</h3><p>${skillSpans.join(', ')}</p>`;
         }
@@ -2024,7 +2024,7 @@
             const missing = (skill.prerequisites || []).filter(p => !completedSkills.has(p));
             const spans = missing.map(id => {
                 const s = DATA._skillsMap[id];
-                return s ? `<span class="prerequisite-skill" data-skill-id="${id}">${s.name}</span>` : id;
+                return s ? `<span class="prerequisite-skill" data-skill-id="${id}" data-relation="readiness">${s.name}</span>` : id;
             });
             return `<h3>Почему сейчас</h3><p class="readiness readiness-blocked">Откроется, когда будут освоены: ${spans.join(', ')}.</p>`;
         }
@@ -3021,6 +3021,15 @@
                     const skillId = e.target.getAttribute('data-skill-id');
                     const skill = DATA._skillsMap[skillId];
                     if (skill) {
+                        // GA: навигация по графу (до openSkillModal — иначе h2 источника затрётся)
+                        const fromId = document.getElementById('skillModalBody')
+                            .querySelector('h2')?.getAttribute('data-skill-id');
+                        const fromSkill = fromId ? DATA._skillsMap[fromId] : null;
+                        trackEvent('graph_navigate', {
+                            from_skill: fromSkill ? fromSkill.name : null,
+                            to_skill: skill.name,
+                            relation: e.target.getAttribute('data-relation') || 'unknown'
+                        });
                         openSkillModal(skill);
                     }
                 }
