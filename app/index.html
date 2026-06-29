@@ -1946,6 +1946,37 @@
             return `<h3>Требуемые навыки</h3><p>${skillSpans.join(', ')}</p>`;
         }
 
+        // Pure read: обратные пререквизиты. Возвращает навыки, перечисляющие skillId
+        // в своём prerequisites (прямые зависимые, порядок датасета — стабильно).
+        // Источник рёбер — поля prerequisites (тот же, что impactById/isSkillReady);
+        // top-level milestonesData.edges НЕ используется (адаптер его в DATA не переносит).
+        // Ничего не пишет обратно в DATA / _skillsMap / milestonesData.
+        function getDownstreamSkills(skillId) {
+            const downstream = [];
+            for (const category in DATA.milestones) {
+                DATA.milestones[category].forEach(skill => {
+                    if ((skill.prerequisites || []).includes(skillId)) {
+                        downstream.push(skill);
+                    }
+                });
+            }
+            return downstream;
+        }
+
+        // Рендер секции «Открывает дальше», зеркало getPrerequisitesHtml. Навыки
+        // берутся из DATA.milestones — id всегда валиден (fallback не нужен).
+        // Лист графа (нет зависимых) → '' (честная пустота через отсутствие).
+        function getDownstreamHtml(skillId) {
+            const downstream = getDownstreamSkills(skillId);
+            if (downstream.length === 0) {
+                return '';
+            }
+            const skillSpans = downstream.map(skill => {
+                return `<span class="prerequisite-skill" data-skill-id="${skill.id}">${skill.name}</span>`;
+            });
+            return `<h3>Открывает дальше</h3><p>${skillSpans.join(', ')}</p>`;
+        }
+
         // Вспомогательная функция: преобразование массива активностей в маркированный список
         function formatParentActivities(activities) {
             if (!activities || activities.length === 0) {
@@ -2622,6 +2653,8 @@
                 <p>${skill.assessment_criteria}</p>
 
                 ${getPrerequisitesHtml(skill.prerequisites)}
+
+                ${getDownstreamHtml(skill.id)}
 
                 <h3>Естественное освоение</h3>
                 <p>${skill.additional_info.natural_acquisition}</p>
