@@ -572,7 +572,7 @@
         .skill-modal {
             display: none;
             position: fixed;
-            z-index: 100;
+            z-index: 120; /* над .activities-modal (100), под .onboarding-modal (150) */
             left: 0;
             top: 0;
             width: 100%;
@@ -790,6 +790,18 @@
             margin-bottom: 12px;
             line-height: 1.4;
             min-height: 40px;
+            cursor: pointer;
+        }
+
+        /* Только не-раскладочные свойства — сетка не должна смещаться */
+        .activity-card-title:hover {
+            color: #7C3AED;
+            text-decoration: underline;
+        }
+
+        .activity-card-title:focus-visible {
+            outline: 2px solid #7C3AED;
+            outline-offset: 2px;
         }
 
         .activity-card-content {
@@ -2783,7 +2795,7 @@
                         : '';
                     return `
                     <div class="activity-card${winClass}">
-                        <div class="activity-card-title">${skill.name}</div>
+                        <div class="activity-card-title" data-skill-id="${skill.id}" role="button" tabindex="0" aria-label="Открыть навык: ${skill.name}">${skill.name}</div>
                         <div class="activity-card-content">${formatParentActivities(skill.additional_info.parent_activities)}</div>
                     </div>
                 `;
@@ -3042,6 +3054,27 @@
                 if (e.target.id === 'activitiesModal') {
                     closeActivitiesModal();
                 }
+            });
+
+            // Deep-link: открыть модалку навыка из карточки активности.
+            // Click и keydown резолвят ОДИН и тот же элемент → расхождение активации исключено.
+            const activateActivitySkill = (el) => {
+                if (!el) return;
+                const skill = DATA._skillsMap[el.getAttribute('data-skill-id')];
+                if (!skill) return;
+                // GA до openSkillModal (как в graph_navigate)
+                trackEvent('activity_skill_open', { skill_name: skill.name });
+                openSkillModal(skill);
+            };
+            document.getElementById('activitiesGrid').addEventListener('click', (e) => {
+                activateActivitySkill(e.target.closest('.activity-card-title[data-skill-id]'));
+            });
+            document.getElementById('activitiesGrid').addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const el = e.target.closest('.activity-card-title[data-skill-id]');
+                if (!el) return;
+                e.preventDefault(); // Space не должен прокручивать страницу
+                activateActivitySkill(el);
             });
 
             // Обработчики модального окна онбординга
