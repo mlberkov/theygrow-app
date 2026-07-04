@@ -8,13 +8,14 @@
 // worker activates, and activate() purges every non-current cache (one-time
 // migration off theygrow-v1). Typed-config home (api parameters.py) is in /api,
 // not touched this milestone, so a typed knob is justifiably deferred.
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
   '/',
   '/offline.html',
   '/manifest.json',
+  '/kb-v1.json',
   '/icons/icon-logo-192.png',
   '/icons/icon-logo-512.png',
   '/icons/maskable-192.png',

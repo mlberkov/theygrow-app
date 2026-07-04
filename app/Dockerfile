@@ -8,6 +8,9 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Копируем файл index.html в папку, откуда Nginx раздает файлы
 COPY index.html /usr/share/nginx/html/index.html
 
+# Копируем kb-артефакт (VDK-P3: данные приложения — immutable static)
+COPY kb-v1.json /usr/share/nginx/html/kb-v1.json
+
 # Копируем PWA manifest и иконки
 COPY manifest.json /usr/share/nginx/html/manifest.json
 COPY icons/ /usr/share/nginx/html/icons/
