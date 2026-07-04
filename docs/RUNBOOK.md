@@ -8,7 +8,8 @@ The product in production is a **static PWA** served by nginx and deployed on GC
 
 - Entry point: `app/index.html` (single-file PWA).
 - PWA assets: `app/manifest.json`, `app/sw.js`, `app/offline.html`, `app/icons/`.
-- App icons (install surface): the brand logo/favicon set under `app/icons/` — manifest `purpose: "any"` 192/512 (`icon-logo-192/512.png`) + `purpose: "maskable"` 192/512 (`maskable-192/512.png`), the `<head>` `rel="icon"` PNGs `favicon-16/32.png` + `rel="apple-touch-icon"` `apple-touch-icon.png` (180×180) — all precached by `app/sw.js` (`CACHE_VERSION v6`, which also delivers them to installed clients via the network-first SW + `#updateBanner` path). A discrete `favicon.ico` is intentionally **absent** (PNG-only): the PNG `rel="icon"` links cover the browser tab and the bare `/favicon.ico` probe 404s harmlessly. The assets use a new-filename scheme (`icon-logo-`, `maskable-`, `apple-touch-icon`, `favicon-*`) replacing the old placeholders, so a `CACHE_VERSION` bump re-fetches them fresh (versioning-by-filename, vault ADR-024). See `ICON-DL-001`.
+- KB artifact: `app/kb-v1.json` — the vendored, versioned domain-KB artifact (vault ADR-026; curation home is the separate `theygrow-domain-kb` repo). The app is a pure READER: it boots by fetching `/kb-v1.json` (no inline data copy since VDK-P3). Served immutable by nginx (versioning-by-filename, vault ADR-024) and precached by the SW. Consumed byte-as-published (`VDK-P3-INV-001`); re-vendoring and version bumps are owner-run — see **KB artifact** below. See `VDK-DL-001`.
+- App icons (install surface): the brand logo/favicon set under `app/icons/` — manifest `purpose: "any"` 192/512 (`icon-logo-192/512.png`) + `purpose: "maskable"` 192/512 (`maskable-192/512.png`), the `<head>` `rel="icon"` PNGs `favicon-16/32.png` + `rel="apple-touch-icon"` `apple-touch-icon.png` (180×180) — all precached by `app/sw.js` (`CACHE_VERSION v7`, which also delivers them to installed clients via the network-first SW + `#updateBanner` path). A discrete `favicon.ico` is intentionally **absent** (PNG-only): the PNG `rel="icon"` links cover the browser tab and the bare `/favicon.ico` probe 404s harmlessly. The assets use a new-filename scheme (`icon-logo-`, `maskable-`, `apple-touch-icon`, `favicon-*`) replacing the old placeholders, so a `CACHE_VERSION` bump re-fetches them fresh (versioning-by-filename, vault ADR-024). See `ICON-DL-001`.
 - Update delivery: the service worker (`app/sw.js`) serves the app shell **network-first**, so an installed client picks up the freshly deployed `app/index.html` on its next navigation (no hard-refresh); a newly installed worker parks in `waiting` and the page surfaces an in-app "Обновить" banner (`app/index.html`) — the user drives activation rather than the worker auto-applying. See `PWA-DL-001`.
 - Web server: nginx (configured by `app/nginx.conf`) inside the container.
 - Cache surface: the per-path `Cache-Control` headers — including `/sw.js` `no-cache, must-revalidate` (so a redeployed worker is always re-fetched) — live in `app/nginx.conf`. `app/cloudbuild.yaml` carries **no** cache directives; cache behaviour is entirely an nginx concern.
@@ -39,6 +40,8 @@ The deploy is fully driven by Cloud Build. There are **two self-contained per-ap
    - Live-DOM (app shell served): `curl -fsS "$TAG_URL/" | grep -q '<title>Child Dev Tracker</title>'` → exit 0.
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
+   - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
+   - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
 4. **Promote.** Shift 100% traffic to the just-smoked revision:
    `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
 5. **Rollback / abort.**
@@ -46,6 +49,21 @@ The deploy is fully driven by Cloud Build. There are **two self-contained per-ap
    - **Roll back after promotion:** pin traffic to the previous good revision:
      `gcloud run services update-traffic child-tracker-service --to-revisions <prev-revision>=100 --region europe-west1`.
 6. **Tag accumulation.** Promotion does **not** remove the `sha-` tag, so tags accumulate across deploys. They are harmless (each just routes 0% traffic to an old revision) and are pruned **out-of-band** by the owner when desired — e.g. `gcloud run services update-traffic child-tracker-service --remove-tags sha-<old> --region europe-west1`, or delete the stale revision outright (`gcloud run revisions delete <rev> --region europe-west1`). No automated pruning this packet.
+
+## KB artifact (owner-run sync + version bump)
+
+> **Owner action.** The sync is owner-run, RUNBOOK-style — deliberately **not** wired into pre-commit/CI (`scripts/sync-kb-artifact.sh` header records the design). The app consumes the artifact **byte-as-published** (`VDK-P3-INV-001`): never hand-edit `app/kb-v{N}.json`; data fixes happen producer-side in `theygrow-domain-kb` and arrive as a new artifact version.
+
+1. **Sync / re-vendor a version.** `scripts/sync-kb-artifact.sh <N> [kb-repo-url-or-path]` vendors `compiled/kb-v{N}.json` from the `theygrow-domain-kb` **release tag** `kb-v{N}` (vault ADR-026 §2 tag-anchor annotation) into `app/kb-v{N}.json`, byte-identical — never floating `main` (`compiled/` holds only the current version, so the tag is the only reproducible anchor for a frozen version). Idempotent: a re-run overwrites with identical bytes. The script verifies the artifact exists in the tag and `"kb_version"` equals the filename `N`; deeper schema validation stays producer-side.
+2. **Bump to a new artifact version (new `kb-v{N}.json`)** — the full consumer-side checklist (each step is required; the nginx location `^/kb-v[0-9]+\.json$` and the sync script are N-generic and need no change):
+   1. Run the sync for the new `N` (step 1) — lands `app/kb-v{N}.json`.
+   2. `app/index.html` — update the fetch-URL literal (`kbReady = fetch('/kb-v{N}.json')`); filename-versioning, not a runtime knob.
+   3. `app/sw.js` — replace the `OFFLINE_URLS` entry with `'/kb-v{N}.json'`.
+   4. `app/Dockerfile` — update the `COPY kb-v{N}.json` line.
+   5. `app/sw.js` — bump `CACHE_VERSION` (delivers the new shell + artifact to installed users via the network-first SW + `#updateBanner` path, `PWA-DL-001`; `activate()` purges the old cache with the old artifact).
+   6. `.pre-commit-config.yaml` — update the excluded filename (`kb-v{N}\.json`) in **both** rewriting-hook excludes (`trailing-whitespace`, `end-of-file-fixer`) so the new artifact stays byte-as-published.
+   7. Decide the old `app/kb-v{M}.json`'s fate in the same packet (owner call at bump time — the app references exactly one version, and the old bytes stay reproducible via the domain-kb tag `kb-v{M}`, so retiring it is the natural default; no policy is pre-fixed here).
+3. **Promotion.** The no-traffic revision smoke (step 3 of **Promotion + rollback** above) includes the two kb checks — immutable `Cache-Control` and served-sha256 == vendored.
 
 ## Local dev
 

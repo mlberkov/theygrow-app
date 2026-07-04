@@ -6,7 +6,8 @@
 # live-deploy paths (AGENTS.md §7 guardrail) and data/ (the frozen masterplan) so
 # the harness never churns or touches those files. The build-config relocated
 # into the owning subtrees in M2-P3, so the excludes track app/ (PWA:
-# index.html/sw.js/manifest.json/offline.html/nginx.conf/Dockerfile/cloudbuild.yaml/icons)
+# index.html/sw.js/manifest.json/offline.html/nginx.conf/Dockerfile/cloudbuild.yaml/icons,
+# plus kb-v1.json — the vendored KB artifact is consumed byte-as-published, VDK-P2)
 # and api/ (Dockerfile/cloudbuild.yaml). Read-only validators (check-yaml,
 # check-json) run repo-wide.
 
@@ -42,9 +43,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: end-of-file-fixer
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 
