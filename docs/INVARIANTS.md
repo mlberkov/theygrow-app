@@ -116,6 +116,13 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 - **Landed in.** M4-P4.
 - **Scope.** Family episodic memory is the only grounded source at M4 (canon/KB is M5, out of perimeter), so provenance is family-observation lineage only. Grounded-but-uncertain answers are RETURNED with an honesty flag (ADR-015), not suppressed — they remain closed-corpus (cited retrieved context). These are deterministic seam-mechanics guarantees with injected fakes; real retrieval recall / grounding QUALITY is the M4-CLOSE eval, not enforced here.
 
+### VDK-P3-INV-001 — App consumes the KB only via the vendored versioned artifact
+
+- **Statement.** The app consumes the domain KB exclusively via the vendored, versioned artifact `app/kb-v{N}.json` under the KB-artifact contract: the in-memory shape is produced by the app-side adapter (`adaptNewDataFormat`) with additive-evolution tolerance, there is no code import from `theygrow-domain-kb`, and the artifact is **byte-as-published** — the app never edits KB data (fixes are producer-side and arrive as a new artifact version). *(Namespace note: id mirrors the `VDK-P{k}` packet namespace of the M(В)-1 vendor-domain-kb-artifact track, owner-decided 2026-07-04 — first non-`M{N}` INV namespace; the "Entry format" footer below is intentionally left unedited, matching how the decision-log treats its non-spine namespaces.)*
+- **Enforced by.** `scripts/sync-kb-artifact.sh` (tag-anchored vendoring from the domain-kb release tag `kb-v{N}`, byte-identical; verifies the artifact exists in the tag and `"kb_version"` equals the filename `N`) + `.pre-commit-config.yaml` (`trailing-whitespace` / `end-of-file-fixer` excludes for `app/kb-v1\.json` — the rewriting hooks never touch the artifact, while `check-json` validates it read-only on every commit).
+- **Landed in.** VDK-P2 (vendoring mechanism + byte-as-published excludes); VDK-P3 (exclusivity — the inline data source was deleted from `app/index.html`).
+- **Scope.** Covers the vendoring-seam **mechanics**: byte-identity to the published artifact, the version-tag anchor, `kb_version`-matches-filename, and hooks-never-rewrite. The *exclusivity* half is structural since VDK-P3 (no inline data source remains to silently regress to) but not machine-gated — no CI check greps `index.html` for re-inlined data. KB data **quality** (including the two frozen-174 curation defects riding along byte-as-published) is producer-side (`theygrow-domain-kb`), explicitly not covered.
+
 ## Entry format (for future entries)
 
 - **Id.** `M{N}-P{k}-INV-{NNN}` — `N` is the milestone number, `k` is the packet number within the milestone, `NNN` is zero-padded sequence within the packet (`001`, `002`, …).
