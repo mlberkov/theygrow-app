@@ -2306,7 +2306,7 @@
             const tdSkill = document.createElement('td');
             tdSkill.className = 'col-skill';
             tdSkill.textContent = skill.name;
-            tdSkill.onclick = () => openSkillModal(skill);
+            tdSkill.onclick = () => openSkillModal(skill, true, 'table_row');
             tr.appendChild(tdSkill);
 
             const isCompleted = completedSkills.has(skill.id);
@@ -2466,7 +2466,13 @@
             // ни один навык не готов к освоению, показываем сообщение вместо пустой таблицы.
             // Считаем видимые строки навыков по тому же механизму скрытия (класс .hidden).
             const visibleSkillCount = tbody.querySelectorAll('tr:not(.category-row):not(.hidden)').length;
-            document.getElementById('zpdEmptyState').hidden = !(isZpdFilterActive && visibleSkillCount === 0);
+            const zpdEmptyState = document.getElementById('zpdEmptyState');
+            const showZpdEmptyState = isZpdFilterActive && visibleSkillCount === 0;
+            // GA: только на переходе скрыто→показано (applyFilter вызывается многократно)
+            if (showZpdEmptyState && zpdEmptyState.hidden) {
+                trackEvent('zpd_empty_state_shown');
+            }
+            zpdEmptyState.hidden = !showZpdEmptyState;
 
             // Обновляем кнопку фильтра ЗБР
             if (isZpdFilterActive) {
@@ -2577,7 +2583,7 @@
         }
 
         // Модальное окно деталей навыка
-        function openSkillModal(skill, addToHistory = true) {
+        function openSkillModal(skill, addToHistory = true, source = 'unknown') {
             const modal = document.getElementById('skillModal');
             const modalBody = document.getElementById('skillModalBody');
             const completedSkills = getCompletedSkills();
@@ -2623,14 +2629,28 @@
 
             // Google Analytics event
             trackEvent('skill_view', {
+                skill_id: skill.id,
                 skill_name: skill.name,
                 skill_category: skill.category,
-                skill_period: `${skill.age_start_months}-${skill.age_end_months}`
+                skill_period: `${skill.age_start_months}-${skill.age_end_months}`,
+                source: source
             });
         }
 
-        function closeSkillModal() {
-            document.getElementById('skillModal').style.display = 'none';
+        function closeSkillModal(action = 'backdrop') {
+            const modal = document.getElementById('skillModal');
+            // GA: конец навигационной цепочки — только при реально открытом окне
+            // (back-переходы видны отдельно через skill_view source=back_navigation)
+            if (modal.style.display === 'block') {
+                const currentSkillId = document.getElementById('skillModalBody')
+                    .querySelector('h2')?.getAttribute('data-skill-id') || null;
+                trackEvent('skill_modal_close', {
+                    action: action, // 'close_button' | 'backdrop'
+                    nav_depth: skillModalHistory.length, // брошенная глубина; 0 = без навигации
+                    skill_id: currentSkillId
+                });
+            }
+            modal.style.display = 'none';
             skillModalHistory = []; // Очистить историю при закрытии
         }
 
@@ -2638,28 +2658,33 @@
             if (skillModalHistory.length > 0) {
                 // Есть история — вернуться к предыдущему навыку
                 const previousSkill = skillModalHistory.pop();
-                openSkillModal(previousSkill, false);
+                openSkillModal(previousSkill, false, 'back_navigation');
             } else {
                 // История пуста — закрыть модальное окно
-                closeSkillModal();
+                closeSkillModal('close_button');
             }
         }
 
         // Модальное окно развивающих активностей месяца
         function openActivitiesModal() {
-            // Google Analytics event
-            trackEvent('activities_open');
-
             const modal = document.getElementById('activitiesModal');
             const grid = document.getElementById('activitiesGrid');
 
             // Получаем неосвоенные навыки, соответствующие возрасту
             const relevantSkills = getRelevantUncompletedSkills();
 
+            // Google Analytics event: только счётчики, без имён навыков
+            const tier1Count = relevantSkills.filter(s => windowsBySkillId[s.id]).length;
+            trackEvent('activities_open', {
+                relevant_count: relevantSkills.length,
+                tier1_count: tier1Count,
+                tier2_count: relevantSkills.length - tier1Count
+            });
+
             // Верхняя копия (не-алармистская, популяционная) — видна только когда
             // в списке есть хотя бы один навык в окне (Tier-1 непуст); иначе скрыта.
             const topNote = document.getElementById('activitiesTopNote');
-            const hasWindowed = relevantSkills.some(s => windowsBySkillId[s.id]);
+            const hasWindowed = tier1Count > 0;
             if (hasWindowed) {
                 topNote.textContent = 'Для развития части навыков с биологической точки зрения время сейчас наиболее благоприятно — они в начале списка.';
                 topNote.hidden = false;
@@ -2695,6 +2720,9 @@
         // Модальное окно онбординга
         function openOnboardingModal() {
             document.getElementById('onboardingModal').classList.add('show');
+
+            // Google Analytics event
+            trackEvent('onboarding_shown');
         }
 
         function closeOnboardingModal() {
@@ -2703,6 +2731,11 @@
                 localStorage.setItem(STORAGE_KEY_ONBOARDING_DISMISSED, 'true');
             }
             document.getElementById('onboardingModal').classList.remove('show');
+
+            // Google Analytics event
+            trackEvent('onboarding_dismissed', {
+                action: checkbox.checked ? 'dont_show_again' : 'closed'
+            });
         }
 
         function checkAndShowOnboarding() {
@@ -2894,8 +2927,9 @@
                     createNewProfile(name, birthdate);
                     closeCreateProfileModal();
 
-                    // Google Analytics event
-                    trackEvent('profile_create', { profile_name: name });
+                    // Google Analytics event — без параметров: имя ребёнка — PII,
+                    // в телеметрию не передаётся (AGENTS.md §4)
+                    trackEvent('profile_create');
                 }
             });
 
@@ -2920,12 +2954,17 @@
                         const fromId = document.getElementById('skillModalBody')
                             .querySelector('h2')?.getAttribute('data-skill-id');
                         const fromSkill = fromId ? DATA._skillsMap[fromId] : null;
+                        const relation = e.target.getAttribute('data-relation') || 'unknown';
                         trackEvent('graph_navigate', {
                             from_skill: fromSkill ? fromSkill.name : null,
+                            from_skill_id: fromId || null,
                             to_skill: skill.name,
-                            relation: e.target.getAttribute('data-relation') || 'unknown'
+                            to_skill_id: skill.id,
+                            relation: relation,
+                            // 1-based номер перехода в цепочке: push происходит позже, в openSkillModal
+                            nav_depth: skillModalHistory.length + 1
                         });
-                        openSkillModal(skill);
+                        openSkillModal(skill, true, `${relation}_chip`);
                     }
                 }
             });
@@ -2946,8 +2985,8 @@
                 const skill = DATA._skillsMap[el.getAttribute('data-skill-id')];
                 if (!skill) return;
                 // GA до openSkillModal (как в graph_navigate)
-                trackEvent('activity_skill_open', { skill_name: skill.name });
-                openSkillModal(skill);
+                trackEvent('activity_skill_open', { skill_id: skill.id, skill_name: skill.name });
+                openSkillModal(skill, true, 'activity_card');
             };
             document.getElementById('activitiesGrid').addEventListener('click', (e) => {
                 activateActivitySkill(e.target.closest('.activity-card-title[data-skill-id]'));
