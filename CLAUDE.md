@@ -12,6 +12,52 @@ This file extends `AGENTS.md` with operational rules specific to **Claude Code**
 - Any non-trivial change starts with a written plan in Plan Mode.
 - Execute only after explicit owner go-ahead. Implicit approval is not approval.
 - Plans are bounded to one packet. Do not pre-plan the next packet inside the current one.
+- A plan is complete only if it follows the **Plan shape** section below.
+
+## Decision authority in planning
+
+Specifications and decision records for this project live in the owner's
+knowledge vault, **outside this repository**. You cannot read them, and no
+per-milestone spec files exist in the repo. Do not ask the owner to recite
+vault content during planning.
+
+- Your sources of truth, in order: `AGENTS.md` → this file → the actual
+  state of the code → your own engineering judgment.
+- During planning, do **not** interrupt the owner with clarifying
+  architectural questions. Make the call yourself and record it in the
+  plan's **Decisions & assumptions** block (see Plan shape).
+- When a decision plausibly depends on vault content you cannot see, pick
+  the most conservative reasonable option and tag that entry
+  `[verify vs vault]`. The owner reviews the finished plan against the
+  vault before go-ahead; that review — not mid-planning Q&A — is where
+  spec conformance is checked. Your job is to make every decision explicit
+  enough to be checkable.
+- **Escalation list — ask the owner always**, even when an answer seems
+  derivable:
+  - personal/family data and any **new network egress** carrying it;
+  - irreversible data migrations, transformations, or deletions;
+  - anything that shifts the **free/paid boundary**;
+  - deviation from `AGENTS.md` invariants or the declared packet scope;
+  - changes to public contracts (knowledge-base format `kb-v{N}`,
+    external APIs).
+- Escalation questions are **batched** into the plan's Escalations
+  section and asked once, at the end of planning — not streamed one by
+  one — unless a question genuinely blocks all further planning.
+
+## Plan shape
+
+Every plan contains exactly these sections:
+
+- **Scope** — the packet boundary: what is in, what is explicitly out.
+- **Approach** — the intended change, in the order of execution.
+- **Decisions & assumptions** — every architectural or design call made
+  during planning: decision, one-line rationale, alternative considered
+  (if any), `[verify vs vault]` tag where applicable. An empty block
+  means "no decisions were needed", not "decisions were left implicit".
+- **Escalations** — batched owner questions from the escalation list.
+  Omit the section if there are none.
+- **Validation** — how the result will be checked (commands, diff scope,
+  manual checks).
 
 ## No autonomous git
 
@@ -23,7 +69,9 @@ This file extends `AGENTS.md` with operational rules specific to **Claude Code**
 
 - Work exactly one bounded packet at a time.
 - Do not chain packets. When the current packet's scope is satisfied, stop — even if the next packet's work looks small.
-- Forks that touch scope, contracts, naming, or owner-level decisions surface as questions rather than guesses.
+- Forks that touch the **escalation list** above surface as questions in
+  the plan's Escalations section. All other architectural forks are
+  **decided by you** and logged in Decisions & assumptions — not asked.
 - Gated-out items (`AGENTS.md` §5) stay gated.
 
 ## Tool boundaries
