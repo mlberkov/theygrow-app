@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#21808D">
+    <meta name="theme-color" content="#000000">
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-v2.png">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W"></script>
@@ -81,7 +81,14 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 14px;
             background: #ffffff;
+            /* Оболочка приложения по высоте видимой области. 100vh на Chrome/Android
+               разрешается в БОЛЬШОЙ вьюпорт (адресная строка убрана), из-за чего
+               нижняя панель управления уезжает за экран, а прокрутить оболочку
+               нельзя (overflow: hidden, скроллится только .table-wrapper).
+               100dvh отслеживает фактически видимую высоту; строка с 100vh —
+               запасной вариант для браузеров без поддержки динамических единиц. */
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -1363,11 +1370,15 @@
           /* 6. MODAL - fullscreen на мобильных                                      */
           /* ─────────────────────────────────────────────────────────────────────── */
 
+          /* Высота — по видимой области (та же причина, что и у body):
+             иначе на Chrome/Android низ полноэкранной модалки уходит под тулбар. */
           .modal-content {
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             max-width: 100vw;
             max-height: 100vh;
+            max-height: 100dvh;
             border-radius: 0;
             margin: 0;
             padding: 20px;
@@ -2024,12 +2035,15 @@
             return profile ? new Set(profile.completedSkills || []) : new Set();
         }
 
+        // Возвращает true, если состояние действительно записано в профиль.
+        // Без текущего профиля записывать некуда — вызывающая сторона обязана
+        // отработать отказ честно (ADR-015), а не считать запись состоявшейся.
         function saveCompletedSkills(completedSet) {
             const profile = getCurrentProfile();
-            if (profile) {
-                profile.completedSkills = [...completedSet];
-                saveProfiles();
-            }
+            if (!profile) return false;
+            profile.completedSkills = [...completedSet];
+            saveProfiles();
+            return true;
         }
 
         // ZPD readiness (ADR-018): навык готов к освоению, если он ещё не освоен
@@ -2385,6 +2399,19 @@
 
         // Переключение состояния навыка
         function toggleSkillCompletion(skillId, isCompleted) {
+            // Честная деградация (ADR-015): без профиля отметку сохранять некуда.
+            // Раньше запись молча терялась, а чекбокс оставался отмеченным — DOM
+            // расходился с состоянием, и ЗБР-фильтр показывал уже отмеченные навыки.
+            // Теперь отметка откатывается, а пользователю предлагается создать профиль.
+            // GA-событие не отправляется: действие не состоялось.
+            if (!getCurrentProfile()) {
+                const rejectedRow = document.querySelector(`tr[data-skill-id="${skillId}"]`);
+                const rejectedCheckbox = rejectedRow && rejectedRow.querySelector('input[type="checkbox"]');
+                if (rejectedCheckbox) rejectedCheckbox.checked = !isCompleted;
+                openCreateProfileModal();
+                return;
+            }
+
             const completedSkills = getCompletedSkills();
 
             if (isCompleted) {
@@ -2446,6 +2473,12 @@
         function applyFilter() {
             const tbody = document.getElementById('tableBody');
             const zpdFilterBtn = document.getElementById('zpdFilterToggleBtn');
+
+            // Готовность пересчитывается от сохранённого состояния перед каждым
+            // применением фильтра: фильтр не может опереться на устаревший маркер
+            // строки, кем бы он ни был проставлен. Идемпотентно для вызовов,
+            // которые уже пересчитали (buildTableBody / toggleSkillCompletion).
+            refreshAllZpdReadiness(getCompletedSkills());
 
             tbody.querySelectorAll('tr:not(.category-row)').forEach(row => {
                 let shouldHide = false;
