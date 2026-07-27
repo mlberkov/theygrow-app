@@ -25,7 +25,7 @@ The Python / FastAPI backend (`/api`) skeleton landed in M2-P2; in M2-P3 it gain
 The deploy is fully driven by Cloud Build. There are **two self-contained per-app build-configs**, each driven by its **own** Cloud Build trigger with an `includedFiles` path filter, so a change in one subtree never rebuilds the other. See the build-config files for the canonical build steps; do not duplicate them here.
 
 - **PWA:** `app/cloudbuild.yaml` builds the container from `app/Dockerfile` (build context `app/`), pushes to Artifact Registry, deploys to the PWA Cloud Run service. Trigger: push to `main`, `filename = app/cloudbuild.yaml`, `includedFiles = app/**`.
-- **`/api`:** `api/cloudbuild.yaml` builds from `api/Dockerfile` (build context `api/`), pushes to Artifact Registry, deploys to the `/api` Cloud Run service. Trigger: push to `main`, `filename = api/cloudbuild.yaml`, `includedFiles = api/**`. No `--set-env-vars` — `/api/health` needs no environment; real DB config lands with M3.
+- **`/api`:** `api/cloudbuild.yaml` builds from `api/Dockerfile` (build context `api/`), pushes to Artifact Registry, deploys to the `/api` Cloud Run service. Trigger: push to `main`, `filename = api/cloudbuild.yaml`, `includedFiles = api/**`. The deploy passes **no** `--set-env-vars`, **no** `--set-secrets` and **no** `--add-cloudsql-instances`: the deployed HTTP surface is still only `/api/health`, which needs no environment. The M3/M4 database consumers are owner-run offline CLIs, not the deployed service — so the service is **not** wired to Cloud SQL, and any environment it does carry was set out-of-band (see **Restore / disaster recovery**, step 5).
 - **Promotion gate (L1, ADR-020).** No standalone staging *service* exists. Instead `app/cloudbuild.yaml` Step 3 deploys the PWA with `--no-traffic --tag sha-$SHORT_SHA`, so each push lands a 0%-traffic, sha-tagged revision and the live revision keeps serving until the owner smoke-tests and promotes. See **Promotion + rollback** below.
 
 ### Promotion + rollback (L1 deploy-safety gate)
@@ -66,6 +66,68 @@ The deploy is fully driven by Cloud Build. There are **two self-contained per-ap
    7. Decide the old `app/kb-v{M}.json`'s fate in the same packet (owner call at bump time — the app references exactly one version, and the old bytes stay reproducible via the domain-kb tag `kb-v{M}`, so retiring it is the natural default; no policy is pre-fixed here).
 3. **Promotion.** The no-traffic revision smoke (step 3 of **Promotion + rollback** above) includes the two kb checks — immutable `Cache-Control` and served-sha256 == vendored.
 
+## Restore / disaster recovery
+
+The production episodic store is **managed Cloud SQL PostgreSQL + pgvector** (ADR-008). This section is the recovery path for it: point-in-time restore → stand up → validate → switch the connection → return traffic → review. It is written to be executable end-to-end from this document alone, under stress, without reading anything else.
+
+**The likelier disaster here is logical, not physical.** Cloud SQL manages the hardware; what this project can do to itself is a bad Alembic migration or a bad backfill run — schema and data damage that replicates faithfully into every backup taken after it. Migrations are run **by hand** against the target database (there is no deploy-time release step: `api/cloudbuild.yaml` carries no migration step and no `scripts/` runner exists), so the pre-migration backup below is the single most load-bearing habit in this section.
+
+> **Owner GCP action.** Every `gcloud` command and console step below is run by the owner against the live project — Claude Code does not run `gcloud` and does not touch GCP. The Cloud SQL identifiers are **not recorded in this repo yet** (see "Live-infra divergence"); read them from the console before starting and substitute them for `<instance>` throughout.
+
+### Targets (adopted, `A1-DL-003`)
+
+- **RPO — 5–15 minutes**, *conditional on PITR being enabled on the live instance.* Cloud SQL point-in-time recovery replays archived write-ahead logs, which is what buys minutes instead of hours. This repo carries **no** infrastructure-as-code and no Cloud SQL configuration of any kind, so PITR status is **not derivable here — verify it, do not assume it**: `gcloud sql instances describe <instance> --format 'value(settings.backupConfiguration)'` (look for point-in-time recovery enabled, plus the transaction-log retention). **If PITR is off, the real RPO is the age of the last automated backup — up to 24 hours, not 5–15 minutes.** Discovering that mid-incident is the failure mode this line exists to prevent.
+- **Retention window.** PITR reaches back only as far as transaction-log retention (Cloud SQL default: 7 days; configurable 1–35). A recovery point outside the window is unreachable at any price, and the newest automated backup taken before the damage becomes the only anchor. Read the live value from the same `describe` output, and record it here once known.
+- **RTO — 2–4 hours**, with the caveat that matters more than the number: **an untested RTO is an assumption, not an RTO.** No restore drill has been run on this project. Until one has been run end-to-end and timed (see **Drill cadence** below), treat 2–4 h as a target, not a commitment, and do not quote it as a guarantee.
+
+### Before every migration (standing pre-step)
+
+Migrations are run manually — `alembic upgrade head` from `api/` with `DATABASE_URL` pointed at the target database. Three revisions have landed (`0001` `source_messages`; `0002` `notes` + `event_chunks`; `0003` per-chunk `vector(1536)` embedding). Before every such run against production:
+
+1. **Take an on-demand backup and keep its id.** `gcloud sql backups create --instance <instance>`, then `gcloud sql backups list --instance <instance>` to capture the id.
+2. **Record the from-revision.** `alembic current` (from `api/`, `DATABASE_URL` set) — the revision you are upgrading *from* is the one you will want back.
+3. **Record the wall-clock start time (UTC).** PITR takes a timestamp, not a revision; the moment immediately before the migration started is the recovery point for step 1 below.
+
+Those three facts — backup id, from-revision, start timestamp — are what a targeted restore needs. Taking the backup and not writing down the timestamp discards most of its value.
+
+### Restore procedure
+
+1. **Stop the writers, then pick the recovery point.**
+   - Today the only processes that write to the store are the owner-run offline CLIs (`theygrow-import-export`, `theygrow-rederive`, `theygrow-embed`) — stop them. The deployed `/api` service exposes only `/api/health` and opens no connection, so there is nothing to cut there yet; once the service *is* DB-wired, withhold or roll back its traffic first (**Promotion + rollback** above) so the restore is not racing live writes.
+   - Pick the target timestamp (UTC, RFC 3339). For a bad migration it is the moment immediately **before** the migration started (recorded in the pre-step above); for corruption found later, the last moment the data can be positively asserted good. Round *earlier*, never later — losing ten good minutes beats restoring ten poisoned ones.
+   - Confirm the timestamp falls inside the retention window. If it does not, the newest automated backup taken before the damage is the only remaining option (`gcloud sql backups list --instance <instance>`, then `gcloud sql backups restore <backup-id> --restore-instance <instance>`) — and the RPO for this incident is whatever that backup's age turns out to be.
+2. **PITR restore into a NEW instance** (owner). Cloud SQL point-in-time recovery **clones**; it never rewinds in place: `gcloud sql instances clone <instance> <restored-instance> --point-in-time <RFC3339-UTC>`. That is useful, not a limitation — the damaged instance stays untouched as evidence and as the fallback if the chosen recovery point proves wrong. Name the clone so it is obviously temporary and dated. This clone is the long pole in the RTO budget.
+3. **Stand up the restored instance** (owner).
+   - Wait for `RUNNABLE`: `gcloud sql instances describe <restored-instance> --format 'value(state)'`.
+   - The clone inherits region, tier, flags and databases from the source — confirm rather than assume, the region especially (a cross-region clone adds latency to every subsequent query).
+   - Confirm the extension: `SELECT extname, extversion FROM pg_extension;` → `vector` must be listed (ADR-008; migration `0001` also creates it).
+   - Confirm the application role can connect. A clone carries its users, but a restore that lands with no usable login burns the switch window.
+4. **Validate BEFORE switching anything.** Three tiers, in this order — do not jump to the smoke test.
+   1. **Migration state.** From `api/` with `DATABASE_URL` pointed at the restored instance: `alembic current` must equal the **intended** revision — after a bad-migration incident that is the from-revision recorded in the pre-step, *not* `head`. A restored database sitting at `head` after you restored to escape `head` means the recovery point was too late.
+   2. **Structure and integrity.** Row counts per table against last-known-good — `source_messages`, `notes`, `event_chunks` — plus a check that `event_chunks.embedding` is populated where it should be and that the HNSW index on it survived. That index is built by the offline backfill *after* bulk population rather than by a migration, so it is the most plausible thing to go silently missing; retrieval still returns results without it, just slowly and without complaining. Where **physical** damage is suspected rather than logical, run a `pg_amcheck --heapallindexed`-class check against the restored instance before trusting it.
+   3. **Application-level smoke.** Point a local process at the restored instance (`DATABASE_URL` in the environment — never in a file, never committed) and exercise a real read path through the offline retrieval CLI. Note what this is **not**: `pytest api` runs against an ephemeral CI database and proves nothing whatsoever about the restored data.
+5. **Switch the connection** (owner, Cloud Run). The application's single connection knob is the environment variable `DATABASE_URL` — bound and validated by `theygrow_api.config.Settings`, normalized to the `postgresql+psycopg` driver in `theygrow_api.db.engine`. Switching means updating that variable, and the Cloud SQL attachment, on the Cloud Run service.
+   - **Read the live state first:** `gcloud run services describe theygrow-api --region europe-west1`. As of this packet `api/cloudbuild.yaml` sets **no** `--set-env-vars`, **no** `--set-secrets` and **no** `--add-cloudsql-instances`, so anything the live service carries was set out-of-band and is **not** reproducible from this repo. Do not assume a later redeploy preserves it — verify after every deploy until the wiring lives in the build-config.
+   - **Never write the connection string into this repository or this file.** This file names the *variable* and the *location* (the Cloud Run service config, or a Secret Manager secret referenced by `--set-secrets`) — never a value, host, user or password.
+   - Update the connection first and traffic second. They are two decisions; one command that does both removes the only chance to inspect.
+6. **Return traffic** (owner). Use the existing promotion mechanics rather than a bespoke path: land the new configuration on a fresh revision at **0% traffic**, smoke it on its per-revision tagged URL, then shift traffic — the full procedure, rollback included, is **Promotion + rollback** above. If the smoke fails, withholding promotion costs nothing; the previous revision is still serving.
+7. **Erasure-suppression reconciliation — N/A until accounts.** A restore rewinds the database past deletions as well as past damage: any erasure a family requested between the recovery point and now is silently resurrected by step 2. Once accounts and deletion semantics exist (vault ADR-010 / PDR-010, arriving with the authenticated spine), re-applying every such erasure against the restored instance becomes a **mandatory** gate before step 6 returns traffic. Today there are no accounts, no deletion semantics and no suppression ledger, so this step is a **no-op** — it sits in the sequence now so that it is inherited rather than rediscovered.
+8. **Post-incident review.** Same day, while it is still accurate:
+   - **Time it honestly.** Wall-clock from detection to restored traffic is the achieved RTO; the gap between the recovery point and the last good write is the achieved RPO. Compare both against the targets above, and correct the targets if reality disagrees — a target no incident has ever met is a wish.
+   - **Decide the damaged instance's fate deliberately** (keep it as evidence for a defined number of days, then delete), and prune the temporary restored/drill instances — they bill by the hour.
+   - **Record it.** If the incident changes a target, a step or a habit here, that is a `docs/decision-log.md` entry, not a memory.
+
+### Drill cadence (owner action)
+
+- **After each migration — light drill.** PITR-clone to a throwaway instance at the pre-migration timestamp, run validations 4.1 and 4.2 against it, delete it. This proves the recovery point and the backup are real while finding out otherwise is still cheap.
+- **Periodically — full drill.** Run the whole sequence through step 6 against a non-production target, and **time it**. This is the only thing that converts the 2–4 h RTO from an assumption into an RTO.
+
+Neither drill is automated, and nothing in CI runs any part of this section.
+
+### Future state — AlloyDB (not today)
+
+Nothing in this repo targets AlloyDB; the production store is Cloud SQL (ADR-008 names AlloyDB as a by-load successor). If that migration happens the sequence above holds, but steps 2 and 3 change shape: AlloyDB point-in-time recovery restores to a **new cluster**, not a new instance, and a restored cluster has no serving endpoint until a **primary instance is created manually** inside it. The connection switch therefore becomes two-step (create the primary, then switch the connection string), and the RTO budget must absorb cluster-plus-instance provisioning rather than a single clone. Revisit this section deliberately when the store moves; do not improvise it during an incident.
+
 ## Local dev
 
 The current PWA is single-file. Two minimal options:
@@ -100,7 +162,7 @@ The `/api` service runs as a standalone ASGI app on its own Cloud Run service �
 - **Check**: `curl http://localhost:8000/api/health` → `{"status":"ok","service":"theygrow-api"}`.
 - **Types / tests**: `mypy api` and `pytest api`.
 
-The config module (`theygrow_api.config.Settings`) requires `DATABASE_URL` (no default) **when constructed**, but no route constructs it yet and it opens no connection; real DB use lands in M3.
+The config module (`theygrow_api.config.Settings`) requires `DATABASE_URL` (no default) **when constructed**, but no HTTP route constructs it and the served surface opens no connection — `/api/health` is still the only route. The M3/M4 database consumers are the offline CLIs (`theygrow-import-export`, `theygrow-rederive`, `theygrow-embed`), run out-of-band with `DATABASE_URL` set.
 
 ### Dev stack (docker-compose — dev only)
 
@@ -108,7 +170,7 @@ A dev-only `docker-compose.yml` (repo root) brings up `/api` alongside a local P
 
 - **Up**: `docker compose up --build`. Brings up `db` (`pgvector/pgvector:pg16`, pgvector extension enabled via `scripts/dev/init-pgvector.sql`) and `api` (built from `api/Dockerfile`).
 - **Check**: `curl http://localhost:8080/api/health` → `{"status":"ok","service":"theygrow-api"}`.
-- The `db` service only enables the pgvector extension; M2-P3 creates **no** episodic schema/tables (those land in M3), and product code opens **no** DB connection — `DATABASE_URL` is bound + validated but never dialed.
+- The `db` service only enables the pgvector extension; the episodic schema comes from Alembic — `alembic upgrade head` from `api/` with `DATABASE_URL` set (three revisions have landed: `source_messages`; `notes` + `event_chunks`; the per-chunk `vector(1536)` embedding). The served `/api` surface still opens **no** DB connection; the offline CLIs do.
 
 ## Live-infra divergence
 
@@ -128,6 +190,14 @@ The PWA's live GCP infrastructure was created before the project was renamed to 
 - **Cloud Run service:** `theygrow-api`.
 - **Artifact Registry repository:** `theygrow-api-repo`.
 - **Image path:** `europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api`.
+
+**Cloud SQL (production episodic store, ADR-008) — not recorded yet:**
+
+- **Instance id:** *not recorded yet — owner to fill in.*
+- **Instance connection name:** *not recorded yet — owner to fill in.*
+- **Database name:** *not recorded yet — owner to fill in.*
+
+Recording those three values is a **deliberate owner action, not a documentation default**: this repository is temporarily public, so a live identifier lands here only when the owner decides it should. Until then **Restore / disaster recovery** reads them from the GCP console at restore time — a real cost under stress, and the reason the placeholders are named here rather than omitted. This file remains their only sanctioned home (`M1-P3-INV-002`).
 
 Renaming the **legacy** PWA infra is a **separate owner-approved change**, **out of scope here**. Until that change is approved and executed, the contract files keep guardrails as unnamed file paths (`app/cloudbuild.yaml`, `app/Dockerfile`, `app/nginx.conf`, `app/index.html`, `app/sw.js`, `app/manifest.json`, `app/offline.html`, `app/icons/`, `api/cloudbuild.yaml`, `api/Dockerfile`) and the divergence narrative stays in this RUNBOOK. The contract-integrity gate confines `child-tracker-service` / `child-tracker-repo` / `theygrow-api-repo` to this file.
 
