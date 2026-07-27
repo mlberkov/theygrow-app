@@ -50,6 +50,42 @@
 
     <title>Child Dev Tracker</title>
     <link rel="stylesheet" href="/m/v1/app.css">
+
+    <!-- Module delivery hints (A1-P6, A1-DL-007). The fifteen NON-ENTRY modules
+         of the /m/v1/ graph. Without these the browser discovers them only after
+         app.js parses, and their own imports only after that — the boot-order
+         cost A1-DL-004/005/006 each recorded and declined to pay.
+
+         modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
+         evaluation root, so the graph is still evaluated in post-order from the
+         deferred <script type="module" src="/m/v1/app.js"> below, in exactly the
+         order it was before. Nothing here changes behaviour.
+
+         The two entries (app.js, sw-register.js) are deliberately NOT hinted:
+         the preload scanner already finds their src= attributes while parsing,
+         and excluding them makes this list exactly the walked import graph —
+         which the ship-list guard asserts in both directions (A1-P6-INV-001).
+         No crossorigin attribute: module scripts are fetched in CORS mode and
+         these are same-origin, so hint and module request match (a mismatch
+         would double-fetch).
+
+         Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
+         On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
+    <link rel="modulepreload" href="/m/v1/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v1/core/state.js">
+    <link rel="modulepreload" href="/m/v1/core/storage.js">
+    <link rel="modulepreload" href="/m/v1/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v1/core/format.js">
+    <link rel="modulepreload" href="/m/v1/core/zpd.js">
+    <link rel="modulepreload" href="/m/v1/core/urgency.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/accordion.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->

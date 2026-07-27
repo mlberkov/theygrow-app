@@ -163,20 +163,35 @@ test.describe('delivery contract — live responses', () => {
 // production — a green-CI outage. app/Dockerfile has no wildcard COPY, so that
 // is a live hazard on every extraction packet, not a hypothetical one.
 //
-// Three directions are asserted, and each later one closes a hole the earlier
+// Four directions are asserted, and each later one closes a hole the earlier
 // ones leave open:
 //   1. everything the shell references is shipped by the image AND exists;
 //   2. everything the shell references is also precached by name;
-//   3. everything those references IMPORT, transitively, satisfies both.
+//   3. everything the shell EXECUTES imports, transitively, satisfies both;
+//   4. the modulepreload hint set equals that transitive import graph, exactly.
 // (2) exists because a mount bump is copy-forward: both /m/v1/ and /m/v2/ stay
 // shipped, so (1) alone would stay green while index.html points at v2 and
 // OFFLINE_URLS still lists v1 — installed clients precaching the wrong asset,
 // silently, for as long as the install lives.
-// (3) exists because A1-P4 made the shell reference exactly one JS entry: every
-// core/ module is reachable only through an `import` statement, which no HTML
-// attribute mentions. Without the walk, a core module missing from the COPY list
+// (3) exists because A1-P4 moved the graph behind `import` statements that no
+// HTML attribute mentions. Without the walk, a module missing from the COPY list
 // or from OFFLINE_URLS passes (1) and (2) untouched and then 404s in production
 // or on the first offline boot.
+//
+// (4), and the reason (3) is rooted where it is, are A1-P6. The delivery hints
+// added there are href= attributes, so htmlAssetRefs() sees them: left alone,
+// every hinted module would be promoted into SHELL_REFS, and since
+// moduleDependencies() deletes its own entry URLs from the result, a fully
+// hinted graph would leave MODULE_DEPS EMPTY — direction (3) would quietly
+// degenerate to zero test cases while CI stayed green (A1-DL-006 (g),
+// A1-DL-007 (d)). So the walk is rooted at what the shell EXECUTES — its
+// <script type="module"> entries — and not at every .js the shell happens to
+// name. Hints stay inside SHELL_REFS, because a hint pointing at an unshipped
+// path is a real defect that (1) and (2) should catch; they are simply not
+// evaluation roots. (4) then keeps the hint list honest in both directions: a
+// stale hint is dead weight after a mount bump, and an unhinted module is the
+// silent one — a future extraction that adds a module and forgets its hint
+// would otherwise cost a round trip nothing in this repo would ever notice.
 // ---------------------------------------------------------------------------
 
 const WEB_ROOT = '/usr/share/nginx/html';
@@ -249,19 +264,87 @@ function htmlAssetRefs(html) {
     .filter((v) => v.startsWith('/'));
 }
 
+// The shell's EXECUTION roots: same-origin `<script type="module" src>` values.
+// This is what direction (3) walks from — deliberately narrower than "every .js
+// the shell names", which since A1-P6 also includes delivery hints.
+// Fails CLOSED like every other parser here: a same-origin classic <script src>
+// would be an evaluation root this walker does not model, so it throws rather
+// than being silently dropped from (3) or silently promoted into it.
+function htmlModuleEntries(html, where) {
+  const out = [];
+  for (const tag of html.matchAll(/<script\b([^>]*)>/gi)) {
+    const src = /\bsrc\s*=\s*["']([^"']+)["']/.exec(tag[1]);
+    if (!src) continue; // inline script — no delivery surface of its own
+    if (!src[1].startsWith('/')) continue; // cross-origin (the gtag loader)
+    const type = /\btype\s*=\s*["']([^"']+)["']/.exec(tag[1]);
+    if (!type || type[1].trim().toLowerCase() !== 'module') {
+      throw new Error(
+        `${where}: same-origin <script src="${src[1]}"> is not type="module" — the ship-list walker models module entries only`
+      );
+    }
+    out.push(src[1]);
+  }
+  return out;
+}
+
+// The shell's DELIVERY hints: `<link rel="modulepreload" href>` values (A1-P6).
+// A hint is not an evaluation root — modulepreload fetches and compiles, it
+// never evaluates — so these are kept out of the walk's roots and asserted
+// against its result instead, by direction (4).
+function htmlPreloadHints(html, where) {
+  const out = [];
+  for (const tag of html.matchAll(/<link\b([^>]*)>/gi)) {
+    const rel = /\brel\s*=\s*["']([^"']+)["']/.exec(tag[1]);
+    if (!rel || rel[1].trim().toLowerCase() !== 'modulepreload') continue;
+    const href = /\bhref\s*=\s*["']([^"']+)["']/.exec(tag[1]);
+    if (!href) throw new Error(`${where}: <link rel="modulepreload"> carries no href`);
+    if (!href[1].startsWith('/')) {
+      throw new Error(
+        `${where}: modulepreload href "${href[1]}" is not a same-origin absolute path — the mount is version-in-path and hints must track it`
+      );
+    }
+    out.push(href[1]);
+  }
+  return out;
+}
+
 const APP_ROOT = path.resolve(__dirname, '..');
 const SHIP = shippedPaths(fs.readFileSync(path.join(APP_ROOT, 'Dockerfile'), 'utf8'));
 const PRECACHED = offlineUrls(fs.readFileSync(path.join(APP_ROOT, 'sw.js'), 'utf8'));
+const HTML_SOURCES = SHIPPED_HTML.map((file) => ({
+  where: `app/${file}`,
+  source: fs.readFileSync(path.join(APP_ROOT, file), 'utf8'),
+}));
 
 const SHELL_REFS = Array.from(
   new Set([
-    ...SHIPPED_HTML.flatMap((f) => htmlAssetRefs(fs.readFileSync(path.join(APP_ROOT, f), 'utf8'))),
+    ...HTML_SOURCES.flatMap(({ source }) => htmlAssetRefs(source)),
     // manifest.json icon sources: a 404 here breaks the install prompt silently.
     ...JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'manifest.json'), 'utf8'))
       .icons.map((icon) => icon.src)
       .filter((src) => src.startsWith('/')),
   ])
 );
+
+const EXEC_ENTRIES = Array.from(
+  new Set(HTML_SOURCES.flatMap(({ where, source }) => htmlModuleEntries(source, where)))
+);
+const PRELOAD_HINTS = Array.from(
+  new Set(HTML_SOURCES.flatMap(({ where, source }) => htmlPreloadHints(source, where)))
+);
+
+// Every same-origin .js the shell names must be one or the other. A third kind
+// would be a delivery surface with no direction covering it — exactly the shape
+// of hole this guard exists to close, so it throws instead of being ignored.
+{
+  const classified = new Set([...EXEC_ENTRIES, ...PRELOAD_HINTS]);
+  const unclassified = SHELL_REFS.filter((ref) => ref.endsWith('.js') && !classified.has(ref));
+  if (unclassified.length) {
+    throw new Error(
+      `ship-list: shell references JavaScript that is neither a module entry nor a modulepreload hint: ${unclassified.join(', ')}`
+    );
+  }
+}
 
 // Static module specifiers of one shipped module. Fails CLOSED, like the COPY
 // parser above: any form this walker does not fully understand throws, because a
@@ -293,7 +376,7 @@ function resolveSpecifier(spec, importerUrl) {
   return path.posix.normalize(importerUrl.slice(0, importerUrl.lastIndexOf('/') + 1) + spec);
 }
 
-// Transitive imports of the shell's module entry points, entries themselves
+// Transitive imports of the shell's EXECUTION entry points, entries themselves
 // excluded (they are already covered as shell references).
 function moduleDependencies(entryUrls) {
   const seen = new Set();
@@ -314,7 +397,10 @@ function moduleDependencies(entryUrls) {
   return Array.from(seen);
 }
 
-const MODULE_DEPS = moduleDependencies(SHELL_REFS.filter((ref) => ref.endsWith('.js')));
+// Rooted at EXEC_ENTRIES, NOT at every .js in SHELL_REFS: since A1-P6 the shell
+// also names each non-entry module in a modulepreload hint, and rooting the walk
+// there would make moduleDependencies() delete the whole graph as "entries".
+const MODULE_DEPS = moduleDependencies(EXEC_ENTRIES);
 
 function isShipped(urlPath) {
   const target = urlPath === '/' ? '/index.html' : urlPath;
@@ -353,6 +439,31 @@ test.describe('ship list — app/Dockerfile ships everything the shell needs', (
       expect(
         PRECACHED.has(dep),
         `"${dep}" is imported by a shipped module but is absent from OFFLINE_URLS in app/sw.js — installed clients would boot offline with a broken import graph`
+      ).toBe(true);
+    });
+  }
+
+  // Direction (4): the delivery hints and the walked graph are the same set.
+  // Not a subset check in either direction alone — a stale hint is dead weight
+  // after a mount bump or a module removal, and an unhinted module silently
+  // costs the round trip A1-P6 exists to remove.
+  const HINTED = new Set(PRELOAD_HINTS);
+  const WALKED = new Set(MODULE_DEPS);
+
+  for (const hint of PRELOAD_HINTS) {
+    test(`modulepreload hint "${hint}" names a module in the walked graph`, () => {
+      expect(
+        WALKED.has(hint),
+        `"${hint}" is preloaded by the shell but is not reached by walking the imports of ${EXEC_ENTRIES.join(', ')} — a hint the graph no longer contains is a fetch nothing evaluates`
+      ).toBe(true);
+    });
+  }
+
+  for (const dep of MODULE_DEPS) {
+    test(`module dependency "${dep}" is preloaded by the shell`, () => {
+      expect(
+        HINTED.has(dep),
+        `"${dep}" is in the shell's import graph but carries no <link rel="modulepreload"> in app/index.html — it would be discovered only after its importer parses, costing the round trip A1-P6 removed (A1-P6-INV-001)`
       ).toBe(true);
     });
   }
