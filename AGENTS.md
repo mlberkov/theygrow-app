@@ -54,7 +54,7 @@ This is the map, not the spec. Roadmap v2 is the spec.
 ## §7 M1 scope guardrails
 
 - M1 is **docs / refactor / config only**. No product behavior. No backend code. No schema.
-- **Do not touch live deploy paths** in any M1 packet: `cloudbuild.yaml`, `Dockerfile`, `nginx.conf`, `index.html`, `sw.js`, `manifest.json`, `offline.html`, `icons/`, `kb-v1.json`, `m/` (the versioned module mount, A1-P3). The live Cloud Run deploy must remain unaffected by every M1 packet.
+- **Do not touch live deploy paths** in any M1 packet: `cloudbuild.yaml`, `cloudbuild.staging.yaml` (the `/api` staging build-config, A2-P1), `Dockerfile`, `nginx.conf`, `index.html`, `sw.js`, `manifest.json`, `offline.html`, `icons/`, `kb-v1.json`, `m/` (the versioned module mount, A1-P3). The live Cloud Run deploy must remain unaffected by every M1 packet.
 - One branch per milestone; the branch prefix matches the milestone's nature (M1 is enablement / config / docs with no product behavior, so the current milestone branch is `chore/m1-harness`). Packets are commit-checkpoints on that branch. **A PR opens once per milestone, at close** — not per packet.
 - M1 packets: P1 contract redirect; P2 docs spine; P3 quality harness; P4 naming / gitignore / README cleanup.
 
