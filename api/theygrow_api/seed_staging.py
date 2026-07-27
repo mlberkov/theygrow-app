@@ -108,23 +108,27 @@ class SeedSummary:
     embedded: int
 
 
-def ensure_staging_target(database_url: str) -> None:
+def ensure_staging_target(database_url: str, *, action: str = "seed") -> None:
     """Layer 1: refuse unless ``DATABASE_URL``'s database name is the staging marker.
 
     A pure function over the parsed URL — opens no connection, so the refusal costs
     nothing and happens before the wrong server is ever dialed. The connection string is
     never echoed (it carries a password); only the database name reaches the message.
+
+    ``action`` names what is being refused. The A2-P3 eval reuses this guard for a
+    read-only pass (``L2-DL-003``), where a message hardcoding "seed" would be false; one
+    guard with an accurate verb beats a second drifting copy.
     """
     name = engine_url(database_url).database
     if name != STAGING_DATABASE_NAME:
         raise NotStagingTarget(
-            f"refusing to seed: DATABASE_URL targets database {name!r}, not "
-            f"{STAGING_DATABASE_NAME!r}. The staging seed writes synthetic data and must "
-            "never reach a real database (ADR-020). Nothing was connected, nothing written."
+            f"refusing to {action}: DATABASE_URL targets database {name!r}, not "
+            f"{STAGING_DATABASE_NAME!r}. The staging contour carries synthetic data only and "
+            "must never be confused with a real database (ADR-020). Nothing was connected."
         )
 
 
-def ensure_staging_server(connection: Connection) -> None:
+def ensure_staging_server(connection: Connection, *, action: str = "seed") -> None:
     """Layer 2: refuse unless the CONNECTED server agrees it is the staging database.
 
     Asks the server rather than the string, so a socket/pooler override that lands the
@@ -133,9 +137,8 @@ def ensure_staging_server(connection: Connection) -> None:
     actual = connection.execute(text("SELECT current_database()")).scalar_one()
     if actual != STAGING_DATABASE_NAME:
         raise NotStagingTarget(
-            f"refusing to seed: connected database is {actual!r}, not "
-            f"{STAGING_DATABASE_NAME!r} — the URL and the server disagree. "
-            "Nothing written."
+            f"refusing to {action}: connected database is {actual!r}, not "
+            f"{STAGING_DATABASE_NAME!r} — the URL and the server disagree. No work was done."
         )
 
 

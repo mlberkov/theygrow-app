@@ -20,7 +20,9 @@ one: the real provider, and any injected provider that does not declare zero egr
 IN-PERIMETER provider (``performs_no_egress = True``, e.g. the staging seed's
 deterministic local embedder) removes that boundary rather than satisfying it, so it runs
 with clearance unset. The check is fail-closed — an absent or non-``True`` declaration
-reads as egressing — so the narrowing cannot become a bypass by omission.
+reads as egressing — so the narrowing cannot become a bypass by omission. The predicate
+itself is ``ports.provider.performs_no_egress``; it moved there in A2-P3 (``L2-DL-003``)
+when the read path and the answers surface became its second and third call sites.
 
 Idempotency (status-driven, NOT delete-then-insert): only ``pending`` (and, unless
 ``--no-retry-failed``, ``failed``) rows are selected; ``ready`` rows are skipped, so a
@@ -51,7 +53,7 @@ from theygrow_api.db.engine import get_engine
 from theygrow_api.db.models import EMBEDDING_DIMENSION, EventChunk
 from theygrow_api.logging import install_pii_redaction
 from theygrow_api.parameters import RuntimeParameters
-from theygrow_api.ports.provider import EmbeddingProvider
+from theygrow_api.ports.provider import EmbeddingProvider, performs_no_egress
 from theygrow_api.signals import EmbeddingCounters, SignalSink, default_sink
 
 logger = logging.getLogger(__name__)
@@ -100,21 +102,6 @@ def _ensure_embedder_cleared(settings: Settings) -> None:
             "embedder_privacy_cleared is not set; refusing to send chunk_text "
             "(ADR-011 §1 ZDR+DPA+EU-residency gate). Nothing embedded, nothing written."
         )
-
-
-def _performs_no_egress(provider: EmbeddingProvider) -> bool:
-    """Whether ``provider`` structurally declares that it never leaves the perimeter.
-
-    Privacy clearance is per-EGRESS-SURFACE (ADR-014): it authorizes child text to cross
-    a specific third-party boundary. A provider that computes in-perimeter does not
-    satisfy that gate — it removes the surface the gate exists to guard, so there is
-    nothing left to clear (A2-P2 / ``L2-DL-002``).
-
-    Fail-closed by construction: the declaration must be present AND exactly ``True``.
-    Anything else — a missing attribute, a truthy stand-in, the real OpenAI adapter —
-    reads as egressing and stays gated exactly as before.
-    """
-    return getattr(provider, "performs_no_egress", False) is True
 
 
 def _build_provider(settings: Settings) -> EmbeddingProvider:
@@ -248,7 +235,7 @@ def embed_backfill(
     if provider is None:
         _ensure_embedder_cleared(settings)
         provider = _build_provider(settings)
-    elif not _performs_no_egress(provider):
+    elif not performs_no_egress(provider):
         _ensure_embedder_cleared(settings)
 
     started = time.perf_counter()

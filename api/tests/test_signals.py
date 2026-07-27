@@ -16,6 +16,7 @@ from theygrow_api.signals import (
     DegradationEvent,
     DerivationCounters,
     EmbeddingCounters,
+    EvalScorecard,
     GroundingCoverage,
     LoggingSignalSink,
     RetrievalLatency,
@@ -27,27 +28,31 @@ from theygrow_api.signals import (
 _FORBIDDEN = {"raw_text", "chunk_text", "community_id", "author_user_id"}
 
 #: Bounded enum-style label keys (counts/ids class, §4-safe) whose values are short labels
-#: rather than numeric counts/timings — e.g. the retrieval ``leg`` discriminator and the
-#: degradation ``mode`` label (M4-P4).
-_LABEL_KEYS = {"leg", "mode"}
+#: rather than numeric counts/timings — e.g. the retrieval ``leg`` discriminator, the
+#: degradation ``mode`` label (M4-P4) and the eval ``case_class`` label (A2-P3).
+_LABEL_KEYS = {"leg", "mode", "case_class"}
 
 
 def test_taxonomy_defines_every_kind() -> None:
     assert set(SIGNAL_TAXONOMY) == set(SignalKind)
     for kind, desc in SIGNAL_TAXONOMY.items():
         assert desc.kind == kind
-        assert desc.producing_stage in {"P1", "P2", "P3", "P4"}
+        # M4 packet ids for the engine spine; milestone-qualified for non-spine tracks,
+        # which do not share M4's packet numbering (A2-P3 is the eval pipeline).
+        assert desc.producing_stage in {"P1", "P2", "P3", "P4", "A2-P3"}
 
 
 def test_all_kinds_are_emitted_now_as_of_p4() -> None:
     # As of M4-P4 every declared kind has a live producer (the two P4 kinds — GROUNDING_COVERAGE
-    # and DEGRADATION_EVENT — were activated when query_service landed). INV-003
-    # (test_signal_emitters) is the producer-coupling guarantee; here we just pin the taxonomy.
+    # and DEGRADATION_EVENT — were activated when query_service landed); A2-P3 added
+    # EVAL_SCORECARD with its emitter in the same packet. INV-003 (test_signal_emitters) is
+    # the producer-coupling guarantee; here we just pin the taxonomy.
     for kind, desc in SIGNAL_TAXONOMY.items():
-        assert desc.emitted_now is True, f"{kind} should be emitted as of P4"
+        assert desc.emitted_now is True, f"{kind} should be emitted as of A2-P3"
     assert SIGNAL_TAXONOMY[SignalKind.GROUNDING_COVERAGE].producing_stage == "P4"
     assert SIGNAL_TAXONOMY[SignalKind.DEGRADATION_EVENT].producing_stage == "P4"
     assert SIGNAL_TAXONOMY[SignalKind.EMBEDDING_COUNTERS].producing_stage == "P2"
+    assert SIGNAL_TAXONOMY[SignalKind.EVAL_SCORECARD].producing_stage == "A2-P3"
 
 
 def test_signal_payloads_are_safe_counts_and_timings() -> None:
@@ -70,6 +75,17 @@ def test_signal_payloads_are_safe_counts_and_timings() -> None:
         ),
         GroundingCoverage(covered=1, total=3),
         DegradationEvent(mode="no_evidence"),
+        EvalScorecard(
+            case_class="lexical-hit",
+            cases=4,
+            passed=4,
+            failed=0,
+            holdout_cases=1,
+            holdout_passed=1,
+            scope_violations=0,
+            route_violations=0,
+            duration_ms=12.5,
+        ),
     ):
         payload = sig.fields()
         assert not (_FORBIDDEN & set(payload)), "signal payload must carry no §4 fields"

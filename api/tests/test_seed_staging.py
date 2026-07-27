@@ -79,9 +79,7 @@ class _RecordingLocalProvider:
     def embed_texts(self, texts: Sequence[str]) -> EmbeddingBatch:
         batch = list(texts)
         self.calls.append(batch)
-        return EmbeddingBatch(
-            vectors=[[0.1] * EMBEDDING_DIMENSION for _ in batch], total_tokens=0
-        )
+        return EmbeddingBatch(vectors=[[0.1] * EMBEDDING_DIMENSION for _ in batch], total_tokens=0)
 
 
 class _EgressingProvider:
@@ -223,9 +221,7 @@ def test_seed_populates_the_contour_with_zero_third_party_calls(
     assert ready == summary.chunks
 
 
-def test_seed_is_idempotent(
-    connection: Connection, staging_marker: str, tmp_path: Path
-) -> None:
+def test_seed_is_idempotent(connection: Connection, staging_marker: str, tmp_path: Path) -> None:
     """Re-seeding converges: the second run inserts nothing new and re-embeds nothing."""
     settings = _settings(f"postgresql://user:pw@localhost:5432/{staging_marker}")
     first = seed_staging(
@@ -422,3 +418,16 @@ def test_a_distinctive_line_is_shared_across_two_communities() -> None:
     for community, _, text in _corpus_chunks():
         counts.setdefault(text, set()).add(community)
     assert any(len(communities) > 1 for communities in counts.values())
+
+
+def test_corpus_created_at_is_unique_per_source_message() -> None:
+    """Run-to-run ordering stability depends on this, so it is asserted, not assumed.
+
+    Both legs order by ``(rank, created_at, event_index)`` — there is NO ``chunk_id``
+    fallback in the SQL — so the ``LIMIT`` cut is deterministic only while ``created_at``
+    distinguishes source messages. It does today; the corpus is recorded revisitable
+    (`L2-DL-002`), and a duplicate added later would make the A2-P3 eval flap for a reason
+    no failure message would explain.
+    """
+    stamps = [str(record["created_at"]) for record in _corpus_records()]
+    assert len(stamps) == len(set(stamps))

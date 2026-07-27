@@ -5,6 +5,10 @@ no DB), and the :func:`retrieve` orchestrator against a real Postgres with an IN
 provider — leg fan-out, top_k truncation, the §4-safe ``leg="fused"`` emission, the
 end-to-end note-only guarantee (draft never surfaces through the fused path), and the
 fail-closed ZDR gate (uncleared -> zero provider calls, no embed, raises before egress).
+
+Since A2-P3 that gate is scoped to EGRESS on this path too: an undeclared provider stays
+gated (the fail-closed default — that is the invariant), a truthy-but-not-``True``
+declaration stays gated, and only an in-perimeter provider runs with clearance unset.
 """
 
 from __future__ import annotations
@@ -98,6 +102,12 @@ class _FakeProvider:
     def embed_texts(self, texts: Sequence[str]) -> EmbeddingBatch:
         self.calls.append(list(texts))
         return EmbeddingBatch(vectors=[self._vector for _ in texts], total_tokens=1)
+
+
+class _InPerimeterProvider(_FakeProvider):
+    """Same fake, but structurally declaring zero egress (the A2-P3 exemption carrier)."""
+
+    performs_no_egress = True
 
 
 class _RecordingSink:
@@ -226,7 +236,8 @@ def test_retrieve_fail_closed_when_uncleared(connection: Connection) -> None:
     _set_ready_embedding(connection, chunk_text="alpha", vector=_unit_vec(1.0))
     provider = _FakeProvider(_unit_vec(1.0))
 
-    # §4 gate runs FIRST — even with a provider in hand, an uncleared process cannot embed.
+    # §4 gate runs FIRST. _FakeProvider declares nothing, so it reads as egressing and an
+    # uncleared process cannot embed through it — the A2-P3 narrowing's fail-closed default.
     with pytest.raises(EmbedderNotReady):
         retrieve(
             connection,
@@ -237,6 +248,50 @@ def test_retrieve_fail_closed_when_uncleared(connection: Connection) -> None:
         )
 
     assert provider.calls == []  # zero provider calls, no query text left the perimeter
+
+
+def test_retrieve_in_perimeter_provider_runs_with_clearance_unset(connection: Connection) -> None:
+    """A2-P3: the read-path gate is scoped to egress, so an in-perimeter provider runs.
+
+    An in-perimeter embedder does not SATISFY the clearance — it removes the third-party
+    surface the clearance exists to authorize, so there is nothing left to clear.
+    """
+    _insert_source(connection, raw_text="2026-03-15\nalpha")
+    rederive(connection=connection)
+    _set_ready_embedding(connection, chunk_text="alpha", vector=_unit_vec(1.0))
+    provider = _InPerimeterProvider(_unit_vec(1.0))
+
+    fused = retrieve(
+        connection,
+        "comm-1",
+        "alpha",
+        provider=provider,
+        settings=_cleared_settings(cleared=False),
+    )
+
+    assert [f.candidate.chunk_text for f in fused] == ["alpha"]
+    assert provider.calls == [["alpha"]]
+
+
+def test_retrieve_truthy_declaration_is_not_enough(connection: Connection) -> None:
+    """Fail-closed by identity: the declaration must be exactly ``True``, not merely truthy.
+
+    A stand-in like ``"yes"`` must not buy the exemption, or the narrowing becomes a bypass
+    anyone can acquire by accident.
+    """
+    provider = _InPerimeterProvider(_unit_vec(1.0))
+    provider.performs_no_egress = "yes"  # type: ignore[assignment]
+
+    with pytest.raises(EmbedderNotReady):
+        retrieve(
+            connection,
+            "comm-1",
+            "alpha",
+            provider=provider,
+            settings=_cleared_settings(cleared=False),
+        )
+
+    assert provider.calls == []
 
 
 def test_retrieve_empty_query_short_circuits_before_embedding(connection: Connection) -> None:

@@ -17,6 +17,15 @@ ZDR + DPA + EU-residency clearance gate as the offline backfill runs FIRST, so a
 process makes ZERO provider calls and embeds nothing. The gate and provider construction are
 REUSED from ``embeddings_backfill`` (one fail-closed gate, never a second drifting copy).
 
+Since A2-P3 (``L2-DL-003``) that gate is scoped to EGRESS here too, the way the backfill's
+already was: it is asked of the real provider path and of any injected provider that does
+not structurally declare ``performs_no_egress is True``, and is skipped only for an
+in-perimeter provider — which removes the third-party surface instead of crossing it. The
+declaration check is fail-closed (absent or non-``True`` reads as egressing), so the
+narrowing cannot become a bypass by omission. Before A2-P3 the gate ran unconditionally,
+which made the read path unreachable for the in-perimeter staging embedder and would have
+forced the eval pipeline to set a clearance flag nobody granted.
+
 Privacy (AGENTS.md §4): this module logs nothing beyond the §4-safe ``RETRIEVAL_LATENCY``
 signals (a leg label + counts + timings); ``chunk_text`` and ``query_text`` never enter
 telemetry. ``query_text`` leaves the perimeter to the cleared embedder alone.
@@ -37,7 +46,7 @@ from theygrow_api.embeddings_backfill import (
     _ensure_embedder_cleared,
 )
 from theygrow_api.parameters import RuntimeParameters
-from theygrow_api.ports.provider import EmbeddingProvider
+from theygrow_api.ports.provider import EmbeddingProvider, performs_no_egress
 from theygrow_api.retrieval.search_repository import (
     Candidate,
     DateRange,
@@ -132,9 +141,11 @@ def retrieve(
     """Embed the query, run both legs at ``candidate_k``, RRF-fuse, return the top ``top_k``.
 
     Fail-closed (ADR-011 §1): the ZDR+DPA+EU clearance gate runs FIRST — if unset this raises
-    ``EmbedderNotReady`` before any provider call or text egress (zero provider calls). When a
-    ``provider`` is injected (tests / P4) the gate still runs first, so an uncleared process
-    cannot embed even with a provider in hand. ``candidate_k`` / ``top_k`` / the RRF knobs
+    ``EmbedderNotReady`` before any provider call or text egress (zero provider calls). The
+    gate is scoped to EGRESS (A2-P3): an injected provider that does not declare
+    ``performs_no_egress is True`` is gated exactly as the real path is, so an uncleared
+    process cannot embed through an undeclared provider it happens to hold; only an
+    in-perimeter provider skips it. ``candidate_k`` / ``top_k`` / the RRF knobs
     default to the config surface (``RuntimeParameters``). Empty / whitespace query
     short-circuits to ``[]`` (no embed, no DB round-trip). Emits three §4-safe
     ``RETRIEVAL_LATENCY`` signals: ``leg="sparse"`` and ``leg="dense"`` from the legs, plus a
@@ -151,9 +162,13 @@ def retrieve(
     if not query_text.strip():
         return []
 
-    # §4 gate, BEFORE any text is embedded or sent — even with an injected provider.
-    _ensure_embedder_cleared(settings)
-    provider = provider if provider is not None else _build_provider(settings)
+    # §4 gate, BEFORE any text is embedded or sent. The real path is gated then built; an
+    # injected provider is gated unless it declares no egress (default: gated).
+    if provider is None:
+        _ensure_embedder_cleared(settings)
+        provider = _build_provider(settings)
+    elif not performs_no_egress(provider):
+        _ensure_embedder_cleared(settings)
 
     started = time.perf_counter()
     query_vector: Sequence[float] = provider.embed_texts([query_text]).vectors[0]
