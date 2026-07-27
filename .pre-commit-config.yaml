@@ -10,8 +10,9 @@
 # plus kb-v1.json — the vendored KB artifact is consumed byte-as-published, VDK-P2 —
 # and m/, the versioned module mount, A1-P3: every shipped app/ file is excluded,
 # and the version-agnostic m/ prefix means a future /m/v{N}/ inherits it)
-# and api/ (Dockerfile/cloudbuild.yaml). Read-only validators (check-yaml,
-# check-json) run repo-wide.
+# and api/ (Dockerfile/cloudbuild.yaml, plus cloudbuild.staging.yaml — the A2-P1
+# staging build-config is a live-deploy path on the same footing). Read-only
+# validators (check-yaml, check-json) run repo-wide.
 #
 # A1-P1 adds app/tests/__baselines__/ to the same excludes, for the kb-v1.json
 # reason: those files are byte-exact comparands. trailing-whitespace would strip
@@ -51,9 +52,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild(\.staging)?\.yaml)|data/)'
       - id: end-of-file-fixer
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild(\.staging)?\.yaml)|data/)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 

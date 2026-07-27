@@ -1,0 +1,104 @@
+# theygrow-api STAGING build-config (A2-P1 — the L2 staging contour, vault ADR-020).
+#
+# Deploys the /api image to a DEDICATED staging Cloud Run service backed by a
+# separate database on the SAME Cloud SQL instance as production. Sibling of
+# api/cloudbuild.yaml, driven by its OWN trigger (filename = this file), so the
+# two services never rebuild each other — see docs/RUNBOOK.md "Staging contour".
+#
+# Two shape differences from the production config, both deliberate:
+#   * NO --no-traffic / --tag. Production gets the promotion gate; staging IS the
+#     smoke contour, so it takes traffic on deploy.
+#   * --no-allow-unauthenticated. A pre-production contour never needs anonymous
+#     access; every staging check carries an identity token (RUNBOOK).
+#
+# The live Cloud SQL / secret / service-account identifiers are NOT in this repo:
+# they arrive as trigger substitutions (empty defaults below), which keeps the
+# repo free of them while this repository is public. Cloud Build's default
+# MUST_MATCH substitution option is kept deliberately — it fails the build when a
+# trigger supplies a key this file does not declare, catching a substitution typo
+# that ALLOW_LOOSE would silently resolve to empty.
+#
+# STAGING NEVER CONTAINS REAL FAMILY DATA (ADR-020 / ADR-011 / ADR-014). The
+# database is seeded from a synthetic corpus only (A2-P2), and no third-party
+# provider is cleared here: embedder_privacy_cleared / answers_privacy_cleared
+# stay unset, so both egress gates are fail-closed.
+substitutions:
+  # Cloud SQL instance connection name (project:region:instance).
+  _CLOUDSQL_INSTANCE: ''
+  # Secret Manager secret holding the staging DATABASE_URL (socket form — RUNBOOK).
+  _DB_SECRET_NAME: ''
+  # Runtime service account the staging service runs as (least-privilege).
+  _STAGING_RUNTIME_SA: ''
+
+steps:
+  # Step 0: fail fast on an unconfigured trigger. This guard is load-bearing, not
+  # decorative: an empty --add-cloudsql-instances parses to an EMPTY LIST, so the
+  # deploy SUCCEEDS with no Cloud SQL attachment and /api/health stays green — a
+  # silent misconfiguration that would only surface a packet or two later. Values
+  # travel through env: and are dereferenced with $$VAR, because Cloud Build
+  # substitutes $VAR textually before this container ever runs.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    env:
+      - 'CLOUDSQL_INSTANCE=${_CLOUDSQL_INSTANCE}'
+      - 'DB_SECRET_NAME=${_DB_SECRET_NAME}'
+      - 'STAGING_RUNTIME_SA=${_STAGING_RUNTIME_SA}'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        missing=0
+        [ -n "$$CLOUDSQL_INSTANCE" ]  || { echo "FATAL: trigger substitution _CLOUDSQL_INSTANCE is empty"  >&2; missing=1; }
+        [ -n "$$DB_SECRET_NAME" ]     || { echo "FATAL: trigger substitution _DB_SECRET_NAME is empty"     >&2; missing=1; }
+        [ -n "$$STAGING_RUNTIME_SA" ] || { echo "FATAL: trigger substitution _STAGING_RUNTIME_SA is empty" >&2; missing=1; }
+        [ "$$missing" -eq 0 ] || { echo "FATAL: staging trigger is not configured — see docs/RUNBOOK.md 'Staging contour'" >&2; exit 1; }
+        echo "staging trigger substitutions present"
+
+  # Step 1: build the /api image (build context = ./api — the same Dockerfile and
+  # context production builds; only the image NAME differs, see Step 2).
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api-staging:$COMMIT_SHA', 'api']
+
+  # Step 2: push to Artifact Registry. Same repository as production, DISTINCT
+  # image name: a second push to the production `api:$COMMIT_SHA` tag would
+  # rewrite the tag production's own build-config points at.
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api-staging:$COMMIT_SHA']
+
+  # Step 3: deploy the staging service. Unlike production this deploy IS wired to
+  # the database — Cloud SQL socket + DATABASE_URL from Secret Manager — but note
+  # that NOTHING in the served surface exercises that wiring: /api/health is still
+  # the only route and it constructs no Settings and opens no connection. The
+  # wiring is proved by the owner's isolation check and migration run (RUNBOOK),
+  # not by a green deploy. --max-instances is a production-safety cap, not tidiness:
+  # staging and production share one Cloud SQL instance, so an unbounded staging
+  # service could exhaust max_connections and lock PRODUCTION out.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'theygrow-api-staging'
+      - '--image'
+      - 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api-staging:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--no-allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--service-account'
+      - '${_STAGING_RUNTIME_SA}'
+      - '--add-cloudsql-instances'
+      - '${_CLOUDSQL_INSTANCE}'
+      - '--set-secrets'
+      - 'DATABASE_URL=${_DB_SECRET_NAME}:latest'
+      - '--max-instances'
+      - '2'
+
+images:
+  - 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api-staging:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

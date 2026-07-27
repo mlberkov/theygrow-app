@@ -8,7 +8,15 @@ steps:
     args: ['push', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA']
 
   # Step 3: deploy to its OWN Cloud Run service (own URL; no nginx proxy — that is M5).
-  # No --set-env-vars: /api/health needs no environment. Real DB config lands with M3.
+  # No --set-env-vars / --set-secrets / --add-cloudsql-instances: /api/health is still
+  # the whole served surface and needs no environment. M3/M4 landed the database
+  # consumers as owner-run offline CLIs, not as routes, so production stays unwired
+  # deliberately; the DB-wired sibling is api/cloudbuild.staging.yaml.
+  #
+  # --no-traffic --tag lands each push as a 0%-traffic, per-revision sha-tagged
+  # revision: deploy stops meaning release, and promotion becomes an explicit owner
+  # act gated on the staging eval (A2-P1; the L1 gate app/cloudbuild.yaml already
+  # carries). See docs/RUNBOOK.md "Promotion + rollback (/api)".
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -24,6 +32,9 @@ steps:
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
+      - '--no-traffic'
+      - '--tag'
+      - 'sha-$SHORT_SHA'
 
 images:
   - 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA'
