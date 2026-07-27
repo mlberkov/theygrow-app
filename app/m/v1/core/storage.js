@@ -10,8 +10,11 @@
 // refactor packet is not allowed to make.
 //
 // Two further keys exist in the shell and are NOT owned here: `ga_debug` (the
-// inline <head> gtag shim) and `iosInstallDismissed` (the install-prompt IIFE,
-// still inline — A1-P5).
+// inline <head> gtag shim, which the inline onclick still needs as a global)
+// and `iosInstallDismissed` (the install-prompt IIFE). A1-P5 left the IIFE
+// inline on purpose: it registers `beforeinstallprompt` at parse time, and no
+// level of the parity suite can observe that event, so the move to a deferred
+// module could not be proven equivalent. See A1-DL-006 (f).
 
 // LocalStorage ключи
 const STORAGE_KEY_PROFILES = 'childDevTracker_profiles';
