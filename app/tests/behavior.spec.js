@@ -19,6 +19,7 @@ const {
   CHAIN,
 } = require('./support/seed');
 const { SW_TEST_VERSION, SW_BUMP_COOKIE } = require('./server');
+const { appModule } = require('./support/app-module');
 
 const rowFor = (page, id) => page.locator(`#tableBody tr[data-skill-id="${id}"]`);
 const checkboxFor = (page, id) => rowFor(page, id).locator('input[type="checkbox"]');
@@ -167,7 +168,10 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
   test('graph chips push history and the close glyph walks back', async ({ page }) => {
     await gotoApp(page, { state: STATES.seeded });
 
-    await page.evaluate((id) => openSkillModal(DATA._skillsMap[id], true, 'parity'), CHAIN.blocked);
+    await page.evaluate(
+      ({ app, id }) => app.openSkillModal(app.DATA._skillsMap[id], true, 'parity'),
+      { app: await appModule(page), id: CHAIN.blocked }
+    );
     await expect(page.locator('#skillModalBody h2')).toHaveAttribute(
       'data-skill-id',
       CHAIN.blocked

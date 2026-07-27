@@ -13,6 +13,8 @@
 // Month cells are run-length encoded so 73 columns collapse to a handful of
 // entries.
 
+const { ENTRY_URL } = require('./app-module');
+
 // Serialized in the browser; must stay self-contained.
 function tableDigestInPage() {
   const rle = (values) => {
@@ -80,16 +82,18 @@ async function captureTableDigest(page) {
 // automation of the VDK-P3 method (docs/decision-log.md:617): "all 174
 // skill-modal bodies". One line per skill keeps the diff pinpoint-able.
 async function captureAllSkillModalBodies(page) {
-  const hashes = await page.evaluate(async () => {
-    // NOTE: the app's bindings are declared with let/const in a classic inline
-    // script, so they live in the global LEXICAL scope and are NOT properties of
-    // window. Bare identifiers resolve; `window.DATA` would be undefined.
+  const hashes = await page.evaluate(async (entryUrl) => {
+    // NOTE: the app's bindings are module-scoped since A1-P4 — neither global
+    // lexical identifiers nor window properties. They are reached through the
+    // entry module's parity seam; import() of the already-loaded URL returns the
+    // instance the page booted (see support/app-module.js).
     // Reuse the app's own opener so the captured markup is what users see.
-    const ids = Object.keys(DATA._skillsMap).sort();
+    const app = await import(entryUrl);
+    const ids = Object.keys(app.DATA._skillsMap).sort();
     const enc = new TextEncoder();
     const out = [];
     for (const id of ids) {
-      openSkillModal(DATA._skillsMap[id], false, 'parity_capture');
+      app.openSkillModal(app.DATA._skillsMap[id], false, 'parity_capture');
       const html = document.getElementById('skillModalBody').innerHTML;
       const buf = await crypto.subtle.digest('SHA-256', enc.encode(html));
       const hex = Array.from(new Uint8Array(buf))
@@ -97,9 +101,9 @@ async function captureAllSkillModalBodies(page) {
         .join('');
       out.push(`${id}  ${hex}`);
     }
-    closeSkillModal('parity_capture');
+    app.closeSkillModal('parity_capture');
     return out;
-  });
+  }, ENTRY_URL);
   return hashes.join('\n') + '\n';
 }
 

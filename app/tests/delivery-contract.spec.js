@@ -163,13 +163,20 @@ test.describe('delivery contract — live responses', () => {
 // production — a green-CI outage. app/Dockerfile has no wildcard COPY, so that
 // is a live hazard on every extraction packet, not a hypothetical one.
 //
-// Two directions are asserted, and the second is the one with teeth:
+// Three directions are asserted, and each later one closes a hole the earlier
+// ones leave open:
 //   1. everything the shell references is shipped by the image AND exists;
-//   2. everything the shell references is also precached by name.
+//   2. everything the shell references is also precached by name;
+//   3. everything those references IMPORT, transitively, satisfies both.
 // (2) exists because a mount bump is copy-forward: both /m/v1/ and /m/v2/ stay
 // shipped, so (1) alone would stay green while index.html points at v2 and
 // OFFLINE_URLS still lists v1 — installed clients precaching the wrong asset,
 // silently, for as long as the install lives.
+// (3) exists because A1-P4 made the shell reference exactly one JS entry: every
+// core/ module is reachable only through an `import` statement, which no HTML
+// attribute mentions. Without the walk, a core module missing from the COPY list
+// or from OFFLINE_URLS passes (1) and (2) untouched and then 404s in production
+// or on the first offline boot.
 // ---------------------------------------------------------------------------
 
 const WEB_ROOT = '/usr/share/nginx/html';
@@ -256,6 +263,59 @@ const SHELL_REFS = Array.from(
   ])
 );
 
+// Static module specifiers of one shipped module. Fails CLOSED, like the COPY
+// parser above: any form this walker does not fully understand throws, because a
+// silently skipped import is exactly the invisible file this direction exists to
+// catch. `[^;]*?` cannot span a statement boundary, so a multi-line
+// `import { … } from '…'` is read whole while an `export { … };` block with no
+// `from` cannot borrow the next statement's specifier.
+function moduleSpecifiers(source, where) {
+  if (/\bimport\s*\(/.test(source)) {
+    throw new Error(`${where}: dynamic import() is not understood by the ship-list walker`);
+  }
+  if (/^[ \t]+(?:import|export)\b[^\n]*\bfrom\b/m.test(source)) {
+    throw new Error(`${where}: indented module statement is not understood`);
+  }
+  return Array.from(source.matchAll(/^(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/gm)).map(
+    (m) => m[1]
+  );
+}
+
+// Resolve a specifier against its importer's URL. The app is buildless: there is
+// no import map and no bundler, so a bare specifier could never resolve at all.
+function resolveSpecifier(spec, importerUrl) {
+  if (spec.startsWith('/')) return spec;
+  if (!spec.startsWith('./') && !spec.startsWith('../')) {
+    throw new Error(
+      `${importerUrl}: bare module specifier "${spec}" — buildless delivery has no import map`
+    );
+  }
+  return path.posix.normalize(importerUrl.slice(0, importerUrl.lastIndexOf('/') + 1) + spec);
+}
+
+// Transitive imports of the shell's module entry points, entries themselves
+// excluded (they are already covered as shell references).
+function moduleDependencies(entryUrls) {
+  const seen = new Set();
+  const queue = [...entryUrls];
+  while (queue.length) {
+    const url = queue.shift();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const onDisk = path.join(APP_ROOT, url.replace(/^\//, ''));
+    // A missing entry is reported by the shipped/exists assertions below; the
+    // walk must not crash before they run.
+    if (!fs.existsSync(onDisk)) continue;
+    for (const spec of moduleSpecifiers(fs.readFileSync(onDisk, 'utf8'), url)) {
+      queue.push(resolveSpecifier(spec, url));
+    }
+  }
+  entryUrls.forEach((url) => seen.delete(url));
+  return Array.from(seen);
+}
+
+const MODULE_DEPS = moduleDependencies(SHELL_REFS.filter((ref) => ref.endsWith('.js')));
+
 function isShipped(urlPath) {
   const target = urlPath === '/' ? '/index.html' : urlPath;
   if (!SHIP.files.has(target) && !SHIP.dirs.some((d) => target.startsWith(d))) return false;
@@ -277,6 +337,22 @@ test.describe('ship list — app/Dockerfile ships everything the shell needs', (
       expect(
         PRECACHED.has(ref),
         `"${ref}" is referenced by the shipped shell but is absent from OFFLINE_URLS in app/sw.js — installed clients would boot offline without it`
+      ).toBe(true);
+    });
+  }
+
+  for (const dep of MODULE_DEPS) {
+    test(`module dependency "${dep}" is shipped by the image`, () => {
+      expect(
+        isShipped(dep),
+        `"${dep}" is imported by a shipped module but app/Dockerfile does not COPY it (or it is missing on disk) — the module graph would fail to load in production while this suite stays green`
+      ).toBe(true);
+    });
+
+    test(`module dependency "${dep}" is precached by name`, () => {
+      expect(
+        PRECACHED.has(dep),
+        `"${dep}" is imported by a shipped module but is absent from OFFLINE_URLS in app/sw.js — installed clients would boot offline with a broken import graph`
       ).toBe(true);
     });
   }

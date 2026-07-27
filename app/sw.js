@@ -22,6 +22,17 @@ const OFFLINE_URLS = [
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
   '/m/v1/app.css',
   '/m/v1/sw-register.js',
+  // A1-P4: the app entry and the core/ graph it imports. The shell references
+  // only the entry — the core files are reachable solely through `import`
+  // statements, so the ship-list guard walks the import graph to keep this list
+  // and the graph in agreement (A1-P4-INV-001). cache.addAll is atomic: a path
+  // that is wrong here fails SW install outright.
+  '/m/v1/app.js',
+  '/m/v1/core/kb-boot.js',
+  '/m/v1/core/state.js',
+  '/m/v1/core/storage.js',
+  '/m/v1/core/dom-utils.js',
+  '/m/v1/core/format.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

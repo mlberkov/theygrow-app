@@ -18,6 +18,7 @@ const { test, expect, STATES, CHAIN } = require('./support/seed');
 const { gotoApp } = require('./support/seed');
 const { captureHtml, captureHash } = require('./support/normalize');
 const { captureTableDigest, captureAllSkillModalBodies } = require('./support/digest');
+const { appModule } = require('./support/app-module');
 
 test.describe('DOM parity — booted with a seeded profile', () => {
   test.beforeEach(async ({ page }) => {
@@ -63,24 +64,27 @@ test.describe('DOM parity — modals', () => {
   });
 
   test('create-profile modal markup', async ({ page }) => {
-    await page.evaluate(() => openCreateProfileModal());
+    await page.evaluate((app) => app.openCreateProfileModal(), await appModule(page));
     expect(await captureHtml(page, '#createProfileModal')).toMatchSnapshot(
       'modal-create-profile.html'
     );
   });
 
   test('skill modal markup', async ({ page }) => {
-    await page.evaluate((id) => openSkillModal(DATA._skillsMap[id], false, 'parity'), CHAIN.ready);
+    await page.evaluate(
+      ({ app, id }) => app.openSkillModal(app.DATA._skillsMap[id], false, 'parity'),
+      { app: await appModule(page), id: CHAIN.ready }
+    );
     expect(await captureHtml(page, '#skillModal')).toMatchSnapshot('modal-skill.html');
   });
 
   test('activities modal markup', async ({ page }) => {
-    await page.evaluate(() => openActivitiesModal());
+    await page.evaluate((app) => app.openActivitiesModal(), await appModule(page));
     expect(await captureHtml(page, '#activitiesModal')).toMatchSnapshot('modal-activities.html');
   });
 
   test('onboarding modal markup', async ({ page }) => {
-    await page.evaluate(() => openOnboardingModal());
+    await page.evaluate((app) => app.openOnboardingModal(), await appModule(page));
     expect(await captureHtml(page, '#onboardingModal')).toMatchSnapshot('modal-onboarding.html');
   });
 });
