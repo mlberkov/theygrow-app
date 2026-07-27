@@ -6,7 +6,7 @@ For the delivery order, see `BuildPlan.md`. For runtime behavioral contract, see
 
 ## Monorepo
 
-- `/app` — the PWA. The static PWA served assets live here (`app/index.html` + PWA assets), migrated from repo root in M2-P1; its build-config (`app/Dockerfile`/`app/nginx.conf`/`app/cloudbuild.yaml`) relocated into the subtree in M2-P3.
+- `/app` — the PWA. The static PWA served assets live here, migrated from repo root in M2-P1; its build-config (`app/Dockerfile`/`app/nginx.conf`/`app/cloudbuild.yaml`) relocated into the subtree in M2-P3. The shell is `app/index.html`; since the A1 `spa-split` milestone its stylesheet and its native ES-module graph live under the versioned mount `app/m/v{N}/`, served at `/m/v{N}/` (version-in-path, copy-forward bumps — `A1-DL-004`). Delivery stays **buildless**: no bundler, no transpiler; the files execute as they lie. Playwright and Node are dev/CI only and ship in neither the image nor the build context.
 - `/api` — Python / FastAPI backend. Lands in M2; from M2-P3 it deploys as **its own Cloud Run service** with its own build-config (`api/Dockerfile`/`api/cloudbuild.yaml`). Origin unification (the same-origin `/api` proxy, no CORS) is M5.
 - `/docs` — operating contract, decision log, invariants, runbook, execution map, product specs (this file).
 - `/scripts` — ops + dev scripts (lands as needed).

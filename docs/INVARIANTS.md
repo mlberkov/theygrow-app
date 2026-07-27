@@ -16,7 +16,7 @@ Keeping this file enforced-only prevents it from drifting into a wish list.
 - **Statement.** No secret or credential material is committed to the repository.
 - **Enforced by.** `.pre-commit-config.yaml` (gitleaks hook) and `.github/workflows/ci.yml` (runs the gitleaks hook via `pre-commit run --all-files`, with full history fetched).
 - **Landed in.** M1-P3.
-- **Scope.** Covers tracked content and commit history reachable in CI. Public, non-secret identifiers (e.g. the GA4 Measurement ID, the GCP project id / region) are not secrets; if the scanner flags one, it is allowlisted in `.gitleaks.toml` as an exact non-secret. Genuine secrets are never allowlisted.
+- **Scope.** Covers tracked content and commit history reachable in CI. Public, non-secret identifiers (e.g. the GA4 Measurement ID, the GCP project id / region) are not secrets; should the scanner ever flag one, the remedy is an exact non-secret allowlist entry in a `.gitleaks.toml` at the repository root. No such file exists today and nothing has been allowlisted — the hook runs on its stock ruleset. Genuine secrets are never allowlisted.
 
 ### M1-P3-INV-002 — Contract integrity
 

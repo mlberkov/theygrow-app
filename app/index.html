@@ -237,8 +237,11 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4): the module graph under /m/v1/ (entry + core/).
-         Deferred like every module script — see m/v1/app.js for boot order. -->
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v1/ — this entry
+         over surfaces/ (one module per UI surface) over core/ (shared state,
+         I/O and pure helpers). Deferred like every module script — see
+         m/v1/app.js for boot order, and the modulepreload block in the head
+         for how the graph is delivered. -->
     <script type="module" src="/m/v1/app.js"></script>
 
     <!-- PWA Install Prompt -->

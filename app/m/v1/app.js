@@ -15,10 +15,13 @@
 //
 // BOOT ORDER. <script type="module"> is deferred, so this file executes after
 // the document is parsed and before DOMContentLoaded fires — the listener at
-// the foot of this file is therefore still registered in time. core/* is now
-// one level deeper in the fetch waterfall than in A1-P4 (entry -> surfaces ->
-// core), which costs one same-origin round trip on a cold first visit only;
-// modulepreload hints for the finished graph are P6. See A1-DL-006.
+// the foot of this file is therefore still registered in time. core/* sits one
+// level deeper in the fetch waterfall than in A1-P4 (entry -> surfaces ->
+// core); A1-P6 paid that cost by giving the shell a modulepreload hint for
+// every non-entry module, which collapsed cold-boot discovery from four waves
+// to one. A hint fetches and compiles but never evaluates, so this file is
+// still the only evaluation root and boot order is unchanged.
+// See A1-DL-006, A1-DL-007.
 
 import { kbReady, initData, showKbLoadError } from './core/kb-boot.js';
 import { removeOrphanedAgeFilter } from './core/storage.js';

@@ -24,9 +24,12 @@ const OFFLINE_URLS = [
   '/m/v1/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
-  // shell references only the entry; everything else is reachable solely through
+  // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
+  // in a <link rel=modulepreload> delivery hint, which fetches and compiles but
+  // never evaluates. Everything past the entry is reachable solely through
   // `import` statements, so the ship-list guard walks the import graph to keep
-  // this list and the graph in agreement (A1-P4-INV-001). cache.addAll is
+  // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
+  // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
   '/m/v1/app.js',
   '/m/v1/core/kb-boot.js',
