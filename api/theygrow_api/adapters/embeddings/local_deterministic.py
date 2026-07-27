@@ -4,10 +4,10 @@ An ``EmbeddingProvider`` that computes vectors **inside the perimeter**: no netw
 client, no clock, no filesystem. It exists so the staging contour can carry a populated
 dense leg while both clearance flags stay unset and the contour makes ZERO third-party
 provider calls (ADR-020 / ADR-011 §1). It declares that property structurally via
-``performs_no_egress = True``, which is what
-``embeddings_backfill._performs_no_egress`` reads to decide whether the per-egress
-clearance gate applies at all: privacy clearance is a property of an egress surface, and
-an in-perimeter embedder removes that surface rather than satisfying it.
+``performs_no_egress = True``, which is what ``ports.provider.performs_no_egress`` reads
+to decide whether the per-egress clearance gate applies at all: privacy clearance is a
+property of an egress surface, and an in-perimeter embedder removes that surface rather
+than satisfying it.
 
 **This is not an embedder.** It is a deterministic stand-in whose similarity structure is
 supplied by the corpus, not learned. Two texts are close when they share tokens the
@@ -57,9 +57,7 @@ def _basis_vector(seed: str) -> list[float]:
     components: list[float] = []
     counter = 0
     while len(components) < EMBEDDING_DIMENSION:
-        block = hashlib.blake2b(
-            f"{seed}:{counter}".encode(), digest_size=_DIGEST_SIZE
-        ).digest()
+        block = hashlib.blake2b(f"{seed}:{counter}".encode(), digest_size=_DIGEST_SIZE).digest()
         for offset in range(0, _DIGEST_SIZE, 2):
             components.append(int.from_bytes(block[offset : offset + 2], "big") / 32767.5 - 1.0)
         counter += 1
@@ -81,7 +79,7 @@ class LocalDeterministicEmbeddingProvider:
     corpus DATA (``concepts.json``), never hardcoded here, so this module carries no
     staging vocabulary and the shipped package stays corpus-agnostic.
 
-    ``performs_no_egress`` is the structural declaration the backfill reads. It is a
+    ``performs_no_egress`` is the structural declaration the clearance gates read. It is a
     plain class attribute rather than a method so it cannot be made conditional at call
     time: a provider either never leaves the perimeter or it does not get to claim this.
     """
