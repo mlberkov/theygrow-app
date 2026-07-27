@@ -2518,6 +2518,10 @@
 
             hideEmptyCategories();
             hideEmptyMonthColumns();
+
+            // A1-P0: аккордеон синхронизируется последним — учёт видимости выше
+            // строится на классе .hidden и от свёрнутости не зависит.
+            applyAccordionVisibility();
         }
 
         // Скрытие пустых колонок месяцев
@@ -3049,18 +3053,39 @@
         // Глобальная переменная для хранения состояний категорий
         let categoryCollapsedStates = {};
 
-        // Сохранить текущие состояния категорий (свёрнуты/развёрнуты)
-        function saveCategoryStates() {
+        // A1-P0: последнее значение isZpdFilterActive, применённое к аккордеону.
+        // null — аккордеон ещё не синхронизирован ни с одним состоянием фильтра.
+        let accordionSyncedForFilter = null;
+
+        // A1-P0: ключ категории в categoryCollapsedStates. Счётчик рисуется CSS
+        // (content: attr(data-skills-count)) и в textContent не попадает; strip
+        // сохранён для совместимости с ранее сохранёнными ключами. Один источник —
+        // чтобы ключ записи и ключ чтения не могли разойтись.
+        function categoryKey(categoryRow) {
+            return categoryRow.textContent.trim().replace(/\s*\[.*?\]\s*$/, ''); // Убираем счётчик
+        }
+
+        // A1-P0: намерение пользователя — должна ли категория быть свёрнута.
+        // Отделено от presentation-слоя (см. applyAccordionVisibility).
+        function isCategoryCollapsedByIntent(categoryName, index) {
+            // Если есть сохранённое состояние, использовать его
+            if (categoryCollapsedStates.hasOwnProperty(categoryName)) {
+                return categoryCollapsedStates[categoryName];
+            }
+            // По умолчанию: первая категория открыта, остальные закрыты
+            return index > 0;
+        }
+
+        // Сохранить состояние одной категории (свёрнута/развёрнута).
+        // A1-P0: раньше функция обходила DOM и выводила намерение из класса
+        // .collapsed. Теперь presentation может законно расходиться с намерением
+        // (активный фильтр разворачивает категории), и такой обход стал бы
+        // разрушительным: один ручной toggle при активном фильтре записал бы
+        // «развёрнута» для всех категорий, стерев настройки семьи.
+        function saveCategoryState(categoryRow, isCollapsed) {
             if (window.innerWidth > 767) return; // Только для мобильной версии
 
-            const table = document.getElementById('mainTable');
-            if (!table) return;
-
-            const categoryRows = table.querySelectorAll('tr.category-row');
-            categoryRows.forEach((categoryRow) => {
-                const categoryName = categoryRow.textContent.trim().replace(/\s*\[.*?\]\s*$/, ''); // Убираем счётчик
-                categoryCollapsedStates[categoryName] = categoryRow.classList.contains('collapsed');
-            });
+            categoryCollapsedStates[categoryKey(categoryRow)] = isCollapsed;
 
             // Сохранить в localStorage
             localStorage.setItem(STORAGE_KEY_ACCORDION, JSON.stringify(categoryCollapsedStates));
@@ -3080,6 +3105,43 @@
                     categoryCollapsedStates = {};
                 }
             }
+        }
+
+        // A1-P0: единственный владелец presentation-слоя свёрнутости.
+        // Активный ЗБР-фильтр приостанавливает аккордеон: фильтр — только что
+        // выраженное намерение увидеть короткий список, и прятать его результаты
+        // за свёрнутыми заголовками бессмысленно (именно это давало визуально
+        // пустую таблицу без честного empty-state; провенанс A0-DL-001).
+        // Честный empty-state при этом остаётся честным: он считает .hidden, а не
+        // свёрнутость — иначе сообщение «нет готовых навыков» лгало бы, пока
+        // готовые навыки лежат в одном тапе по шеврону (ADR-018).
+        // Сохранённое намерение не мутируется: при выключении фильтра оно возвращается.
+        function applyAccordionVisibility(options) {
+            if (window.innerWidth > 767) return; // Только для мобильной версии
+
+            const table = document.getElementById('mainTable');
+            if (!table) return;
+
+            // Без force прогон пропускается, если состояние фильтра не менялось:
+            // иначе любой applyFilter() (например, отметка навыка) молча отменил бы
+            // ручное свёртывание, сделанное пользователем при активном фильтре.
+            const force = !!(options && options.force);
+            if (!force && accordionSyncedForFilter === isZpdFilterActive) return;
+            accordionSyncedForFilter = isZpdFilterActive;
+
+            table.querySelectorAll('tr.category-row').forEach((categoryRow, index) => {
+                const collapsed = isZpdFilterActive
+                    ? false
+                    : isCategoryCollapsedByIntent(categoryKey(categoryRow), index);
+
+                categoryRow.classList.toggle('collapsed', !!collapsed);
+
+                // display:'' безопасен для отфильтрованных строк: .hidden объявлен
+                // с !important и перебивает инлайновый стиль.
+                getSkillRowsForCategory(categoryRow).forEach(skillRow => {
+                    skillRow.style.display = collapsed ? 'none' : '';
+                });
+            });
         }
 
         function initMobileAccordion() {
@@ -3102,7 +3164,7 @@
                 return;
             }
 
-            categoryRows.forEach((categoryRow, index) => {
+            categoryRows.forEach((categoryRow) => {
                 // Получить навыки этой категории
                 const categoryName = categoryRow.textContent.trim();
                 const skillRows = getSkillRowsForCategory(categoryRow);
@@ -3142,31 +3204,16 @@
                     console.log(`[Mobile] Категория "${categoryName}" ${isCollapsed ? 'свёрнута' : 'развёрнута'}`);
 
                     // Сохранить состояние аккордеона
-                    saveCategoryStates();
+                    saveCategoryState(categoryRow, isCollapsed);
 
                     // Google Analytics event
                     trackEvent('category_toggle', { category_name: categoryName, action: isCollapsed ? 'collapsed' : 'expanded' });
                 });
-
-                // Определить начальное состояние категории
-                const categoryNameClean = categoryName.replace(/\s*\[.*?\]\s*$/, ''); // Убираем счётчик
-                let shouldBeCollapsed;
-
-                // Если есть сохранённое состояние, использовать его
-                if (categoryCollapsedStates.hasOwnProperty(categoryNameClean)) {
-                    shouldBeCollapsed = categoryCollapsedStates[categoryNameClean];
-                } else {
-                    // По умолчанию: первая категория открыта, остальные закрыты
-                    shouldBeCollapsed = index > 0;
-                }
-
-                if (shouldBeCollapsed) {
-                    categoryRow.classList.add('collapsed');
-                    skillRows.forEach(skillRow => {
-                        skillRow.style.display = 'none';
-                    });
-                }
             });
+
+            // A1-P0: начальное состояние категорий выставляет единственный владелец
+            // presentation-слоя. force — строки только что построены/перевешаны.
+            applyAccordionVisibility({ force: true });
 
             console.log(`[Mobile] Accordion инициализирован для ${categoryRows.length} категорий`);
         }
