@@ -42,6 +42,9 @@ theygrow-import-export = "theygrow_api.importer:main"
 theygrow-rederive = "theygrow_api.derivation:main"
 # M4-P2 offline embeddings backfill (also `python -m theygrow_api.embeddings_backfill`).
 theygrow-embed = "theygrow_api.embeddings_backfill:main"
+# A2-P2 staging seed: chains the three passes above against the STAGING database only,
+# behind a fail-closed contour guard (also `python -m theygrow_api.seed_staging`).
+theygrow-seed-staging = "theygrow_api.seed_staging:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["theygrow_api"]

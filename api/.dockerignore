@@ -7,6 +7,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 tests/
+# The synthetic staging corpus (A2-P2) is seed input for an offline CLI, never runtime
+# data. Defense-in-depth only: api/Dockerfile has no wildcard COPY, so nothing outside
+# pyproject.toml + theygrow_api/ reaches the image regardless of this file.
+corpus/
 .env
 .env.*
 .dockerignore
