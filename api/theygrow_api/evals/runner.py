@@ -137,8 +137,8 @@ def corpus_shape(corpus_root: Path) -> _CorpusShape:
         for record in document["records"]:
             communities.add(record["community_id"])
             parsed = parse_note(record["raw_text"])
-            events = parsed.events if parsed is not None else _split_non_empty_lines(
-                record["raw_text"]
+            events = (
+                parsed.events if parsed is not None else _split_non_empty_lines(record["raw_text"])
             )
             chunks += len(events)
     if not communities:

@@ -190,7 +190,9 @@ def test_cite_all_cites_only_what_the_prompt_offered() -> None:
 
 
 def test_fabricated_citation_is_absent_from_any_context() -> None:
-    payload = json.loads(ScriptedAnswersProvider("fabricate_citation").complete("s", _PROMPT).raw_text)
+    payload = json.loads(
+        ScriptedAnswersProvider("fabricate_citation").complete("s", _PROMPT).raw_text
+    )
     assert payload["cited_chunk_ids"] == ["not-a-chunk-id-from-any-context#0"]
 
 
@@ -203,7 +205,9 @@ def test_prompt_contract_drift_is_a_named_failure_not_a_silent_no_evidence() -> 
 
 def test_empty_chunks_placeholder_is_not_drift() -> None:
     empty = "Question: x\n\nDiary chunks (in retrieval rank order):\n(no chunks retrieved)"
-    payload = json.loads(ScriptedAnswersProvider("declare_no_evidence").complete("s", empty).raw_text)
+    payload = json.loads(
+        ScriptedAnswersProvider("declare_no_evidence").complete("s", empty).raw_text
+    )
     assert payload["cited_chunk_ids"] == []
 
 
