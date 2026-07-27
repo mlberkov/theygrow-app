@@ -7,7 +7,9 @@
 # the harness never churns or touches those files. The build-config relocated
 # into the owning subtrees in M2-P3, so the excludes track app/ (PWA:
 # index.html/sw.js/manifest.json/offline.html/nginx.conf/Dockerfile/cloudbuild.yaml/icons,
-# plus kb-v1.json — the vendored KB artifact is consumed byte-as-published, VDK-P2)
+# plus kb-v1.json — the vendored KB artifact is consumed byte-as-published, VDK-P2 —
+# and m/, the versioned module mount, A1-P3: every shipped app/ file is excluded,
+# and the version-agnostic m/ prefix means a future /m/v{N}/ inherits it)
 # and api/ (Dockerfile/cloudbuild.yaml). Read-only validators (check-yaml,
 # check-json) run repo-wide.
 #
@@ -49,9 +51,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: end-of-file-fixer
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 

@@ -244,7 +244,7 @@ test.describe('service worker: registration, offline boot, update flow', () => {
     await page.evaluate(() => navigator.serviceWorker.ready);
 
     // Ask the parity server for a CACHE_VERSION-mutated /sw.js on this context
-    // only. app/sw.js on disk is untouched; CACHE_VERSION stays v8.
+    // only. app/sw.js on disk is untouched; its CACHE_VERSION is unaffected.
     await context.addCookies([
       { name: SW_BUMP_COOKIE, value: '1', url: baseURL },
     ]);

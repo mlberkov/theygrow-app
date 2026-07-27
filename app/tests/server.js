@@ -75,8 +75,12 @@ const HEADER_RULES = [
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
+  // The base image's mime.types maps js -> application/javascript (verified
+  // against the built container, nginx 1.31.3), NOT text/javascript. Both are
+  // JavaScript MIME essences and either loads a module, but the mirror must
+  // claim what production actually sends.
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
@@ -100,8 +104,8 @@ function resolveHeaders(pathname) {
 
 // Serves a CACHE_VERSION-mutated copy of app/sw.js so the browser sees a
 // byte-different worker and runs the real update path. app/sw.js on disk is
-// never written to; CACHE_VERSION stays v8 in the shipped file.
-const SW_TEST_VERSION = 'v8-parity-next';
+// never written to; the shipped CACHE_VERSION is unaffected by this mutation.
+const SW_TEST_VERSION = 'v9-parity-next';
 
 function mutatedServiceWorker() {
   const source = fs.readFileSync(path.join(APP_ROOT, 'sw.js'), 'utf8');
