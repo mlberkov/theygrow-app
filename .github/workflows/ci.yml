@@ -9,11 +9,20 @@
 # With /api landed (M2-P2), the harness has teeth: Ruff lints the tree, and the
 # /api package is installed so mypy (strict) and pytest run against it.
 #
-# From M3-P1 the job also runs a pgvector Postgres service so the DB-backed
-# schema tests (PK / composite-key / route CHECK / pgvector column) execute
-# against a real engine. DATABASE_URL points at that service; the importer is
-# M3-P2, so no /export data is loaded here. The service is a container in the
-# runner — it touches no GCP and is independent of the Cloud Build deploy.
+# From M3-P1 the quality job also runs a pgvector Postgres service so the
+# DB-backed schema tests (PK / composite-key / route CHECK / pgvector column)
+# execute against a real engine. DATABASE_URL points at that service; the
+# importer is M3-P2, so no /export data is loaded here. The service is a
+# container in the runner — it touches no GCP and is independent of the Cloud
+# Build deploy.
+#
+# From A1-P1 a second job, `parity`, gates the /app PWA — the first non-Python
+# gate in this repo. It runs the three-level parity suite (DOM snapshot, visual
+# regression, behavioral smoke) that the A1 spa-split refactor is measured
+# against. It calls scripts/parity-suite.sh, the same entry point developers
+# run locally, so the gate cannot drift into a local shadow of itself; the
+# script pins the browser and font set by running inside a fixed Playwright
+# container. It builds and deploys nothing and touches no GCP.
 
 name: CI
 
@@ -73,3 +82,24 @@ jobs:
 
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure
+
+  # A1-P1 — the /app parity gate. Independent of `quality` (not `needs:`) so a
+  # Python lint failure never hides a frontend regression, and vice versa.
+  parity:
+    runs-on: ubuntu-24.04   # pinned; the browser itself is pinned by the container
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parity suite (DOM + visual + behavioral)
+        run: scripts/parity-suite.sh
+
+      - name: Upload report and diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-report
+          path: |
+            app/playwright-report/
+            app/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

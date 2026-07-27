@@ -54,7 +54,7 @@ This is the map, not the spec. Roadmap v2 is the spec.
 ## §7 M1 scope guardrails
 
 - M1 is **docs / refactor / config only**. No product behavior. No backend code. No schema.
-- **Do not touch live deploy paths** in any M1 packet: `cloudbuild.yaml`, `Dockerfile`, `nginx.conf`, `index.html`, `sw.js`, `manifest.json`, `offline.html`, `icons/`. The live Cloud Run deploy must remain unaffected by every M1 packet.
+- **Do not touch live deploy paths** in any M1 packet: `cloudbuild.yaml`, `Dockerfile`, `nginx.conf`, `index.html`, `sw.js`, `manifest.json`, `offline.html`, `icons/`, `kb-v1.json`, `m/` (the versioned module mount, A1-P3). The live Cloud Run deploy must remain unaffected by every M1 packet.
 - One branch per milestone; the branch prefix matches the milestone's nature (M1 is enablement / config / docs with no product behavior, so the current milestone branch is `chore/m1-harness`). Packets are commit-checkpoints on that branch. **A PR opens once per milestone, at close** — not per packet.
 - M1 packets: P1 contract redirect; P2 docs spine; P3 quality harness; P4 naming / gitignore / README cleanup.
 
@@ -64,14 +64,14 @@ This is the map, not the spec. Roadmap v2 is the spec.
 
 ```
 theygrow-app/
-├── app/        # PWA (lands in M2; today the PWA still lives at repo root)
+├── app/        # PWA (landed in M2-P1)
 ├── api/        # Python FastAPI (lands in M2)
 ├── docs/       # decision-log, invariants, runbook, execution-map, product specs
 ├── scripts/    # ops + dev scripts
 └── infra/      # IaC (post-M5)
 ```
 
-**Current.** Static PWA at repo root (single `index.html` + nginx + Docker + Cloud Run via Cloud Build). The monorepo split lands in M2+.
+**Current.** Static PWA under `/app` (nginx + Docker + Cloud Run via Cloud Build), alongside `/api`. The monorepo split landed in M2-P1. The PWA is no longer a single `index.html`: since the A1 `spa-split` milestone the shell loads its stylesheet and its ES-module graph from the versioned mount `app/m/v{N}/`, served buildless (no bundler, no transpiler).
 
 ## §9 Working conventions
 

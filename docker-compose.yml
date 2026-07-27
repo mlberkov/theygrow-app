@@ -6,10 +6,10 @@
 # prod(managed) is a config difference (the env-driven config from M2-P2), not a
 # code difference.
 #
-# At M2-P3 product code opens NO DB connection and creates NO episodic
-# schema/tables/migrations (those land in M3). The db service only makes the
-# pgvector extension available; DATABASE_URL is bound + validated by the config
-# guard but never dialed.
+# At M2-P3 product code opened NO DB connection and created NO episodic
+# schema/tables/migrations; those landed in M3 (Alembic migrations under /api).
+# The db service only makes the pgvector extension available — the schema is
+# applied by those migrations, never by this file.
 services:
   db:
     image: pgvector/pgvector:pg16

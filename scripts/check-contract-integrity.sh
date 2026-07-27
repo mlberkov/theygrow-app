@@ -13,7 +13,8 @@
 #
 # Out of scope by design (never scanned):
 #   - Live-deploy paths (app/{cloudbuild.yaml,Dockerfile,nginx.conf,index.html,
-#     sw.js,manifest.json,offline.html,icons/}, api/{cloudbuild.yaml,Dockerfile})
+#     sw.js,manifest.json,offline.html,icons/,kb-v1.json,m/},
+#     api/{cloudbuild.yaml,Dockerfile})
 #     — they legitimately carry the live-infra names as operational reality
 #     (docs/RUNBOOK.md "Live-infra divergence"). The build-config relocated into
 #     the owning subtrees in M2-P3.

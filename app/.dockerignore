@@ -1,0 +1,26 @@
+# Build context hygiene (A1-P1).
+#
+# app/ is the Docker build context (`docker build -t theygrow-app app`), and the
+# parity suite lives in this subtree. Without this file a local app/node_modules/
+# would be shipped to the Docker daemon on every build.
+#
+# This does NOT change the built image: app/Dockerfile COPYs an explicit file
+# list (nginx.conf, index.html, kb-v1.json, m/, manifest.json, icons/, sw.js,
+# offline.html) and none of the paths below are in it. The image is byte-identical
+# with or without this file; only the context transferred to the daemon shrinks.
+#
+# Never add a pattern matching m/ (the versioned module mount, A1-DL-004):
+# COPY m/ would then ship nothing while the ship-list guard in
+# app/tests/delivery-contract.spec.js stays green — it does not consult this file.
+
+node_modules/
+tests/
+package.json
+package-lock.json
+playwright.config.js
+.dockerignore
+
+# Playwright run output (also gitignored)
+test-results/
+playwright-report/
+blob-report/

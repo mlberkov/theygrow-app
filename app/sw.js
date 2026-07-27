@@ -8,7 +8,7 @@
 // worker activates, and activate() purges every non-current cache (one-time
 // migration off theygrow-v1). Typed-config home (api parameters.py) is in /api,
 // not touched this milestone, so a typed knob is justifiably deferred.
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v9';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -16,6 +16,37 @@ const OFFLINE_URLS = [
   '/offline.html',
   '/manifest.json',
   '/kb-v1.json',
+  // Versioned module mount (A1-DL-004): the shell references these by URL, so
+  // they are precached by name. Content changes ship as a NEW mount version
+  // (/m/v2/...), never as new bytes at these URLs — inside the 30-day immutable
+  // window addAll would otherwise refill the new cache from the stale HTTP copy.
+  '/m/v1/app.css',
+  '/m/v1/sw-register.js',
+  // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
+  // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
+  // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
+  // in a <link rel=modulepreload> delivery hint, which fetches and compiles but
+  // never evaluates. Everything past the entry is reachable solely through
+  // `import` statements, so the ship-list guard walks the import graph to keep
+  // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
+  // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
+  // atomic: a path that is wrong here fails SW install outright.
+  '/m/v1/app.js',
+  '/m/v1/core/kb-boot.js',
+  '/m/v1/core/state.js',
+  '/m/v1/core/storage.js',
+  '/m/v1/core/dom-utils.js',
+  '/m/v1/core/format.js',
+  '/m/v1/core/zpd.js',
+  '/m/v1/core/urgency.js',
+  '/m/v1/surfaces/table.js',
+  '/m/v1/surfaces/skill-completion.js',
+  '/m/v1/surfaces/zpd-filter.js',
+  '/m/v1/surfaces/skill-modal.js',
+  '/m/v1/surfaces/profile.js',
+  '/m/v1/surfaces/activities.js',
+  '/m/v1/surfaces/onboarding.js',
+  '/m/v1/surfaces/accordion.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',
