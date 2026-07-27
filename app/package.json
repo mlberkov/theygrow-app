@@ -1,0 +1,15 @@
+{
+  "name": "theygrow-app-parity",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev/CI-only parity suite for the theygrow PWA. Not part of the production delivery channel: the deployed artifact is built from app/Dockerfile, which COPYs an explicit file list and never touches this package.",
+  "scripts": {
+    "test": "playwright test",
+    "test:dom": "playwright test --project=dom",
+    "test:behavior": "playwright test --project=behavior",
+    "test:visual": "playwright test --project=visual-desktop --project=visual-mobile"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}

@@ -73,6 +73,24 @@ The current PWA is single-file. Two minimal options:
 - **Static server.** Serve the `app/` directory with any static file server (e.g. `python -m http.server 8080 --directory app`) and open `http://localhost:8080`.
 - **Container parity.** Build and run the production container locally via `docker build -t theygrow-app app && docker run --rm -p 8080:8080 theygrow-app` (build context `app/`). This matches the production nginx config.
 
+### Parity suite (`/app`) — the A1 spa-split gate
+
+The three-level parity suite (DOM snapshot + visual regression + behavioural smoke) is the acceptance gate for every `spa-split` packet, and the repo's only frontend CI gate. It is dev/CI-only: it is excluded from the production image (`app/Dockerfile` COPYs an explicit file list) and from the Docker build context (`app/.dockerignore`), so the delivery channel stays buildless.
+
+- **Run it**: `scripts/parity-suite.sh`. CI calls this same script, so the gate cannot drift into a local shadow of itself.
+- **A subset**: `scripts/parity-suite.sh --project=behavior` (projects: `contract`, `dom-desktop`, `dom-mobile`, `behavior`, `visual-desktop`, `visual-mobile`).
+- **Update baselines** — deliberate act, never implicit: `scripts/parity-suite.sh --update-snapshots`. `app/playwright.config.js` sets `updateSnapshots: 'none'`, so without this flag a missing or changed baseline **fails**. Review the resulting diff in `app/tests/__baselines__/` before committing; an unexplained baseline change is a product change.
+- **Requires Docker.** The script runs the suite inside a pinned browser container. Without a Docker daemon: `sudo service docker start` (or the platform equivalent).
+
+**Two pins hold the suite; change them only deliberately.**
+
+1. **Version pin.** `@playwright/test` in `app/package.json` and `PLAYWRIGHT_VERSION` in `scripts/parity-suite.sh` must be the same exact version (currently **1.61.1**, image `mcr.microsoft.com/playwright:v1.61.1-noble`). The script refuses to run on a mismatch. Bumping either re-baselines every screenshot.
+2. **Platform pin.** `app/index.html` sizes its skill column from measured text, so screenshots are font-metric dependent. Visual baselines are valid **only** inside that container. `PARITY_NO_DOCKER=1 scripts/parity-suite.sh --project=dom-desktop --project=behavior` runs the non-visual projects on the host (host browsers need Chromium's system libraries: `npx playwright install --with-deps chromium`); visual projects run that way will legitimately mismatch.
+
+**Time is pinned too.** The app derives age — and therefore the current-month column, ZPD readiness and the activities ranking — from `new Date()`. Every test freezes the clock (`app/tests/support/seed.js`), so baselines do not rot daily. A baseline diff that appears "just because time passed" means the pin broke, not that the app changed.
+
+**Delivery drift guard.** `app/tests/server.js` mirrors `app/nginx.conf` so the suite can serve a `CACHE_VERSION`-mutated `/sw.js` on the same origin (the PWA update flow is untestable otherwise; `app/sw.js` on disk is never modified). `app/tests/delivery-contract.spec.js` parses the real `nginx.conf` and **fails when the two diverge** — so editing `nginx.conf` cache/MIME rules without updating the mirror reds the gate on purpose.
+
 ### `/api` (FastAPI)
 
 The `/api` service runs as a standalone ASGI app on its own Cloud Run service — **not** behind the PWA's nginx (the same-origin `/api` proxy / origin unification lands in **M5**).

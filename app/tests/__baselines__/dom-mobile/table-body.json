@@ -1,0 +1,3852 @@
+{
+ "head": [
+  {
+   "text": "Навык",
+   "classes": "col-skill",
+   "month": null,
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "✓",
+   "classes": "col-done",
+   "month": null,
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "0",
+   "classes": "col-month",
+   "month": "0",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "1",
+   "classes": "col-month",
+   "month": "1",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "2",
+   "classes": "col-month",
+   "month": "2",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "3",
+   "classes": "col-month",
+   "month": "3",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "4",
+   "classes": "col-month",
+   "month": "4",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "5",
+   "classes": "col-month",
+   "month": "5",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "6",
+   "classes": "col-month",
+   "month": "6",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "7",
+   "classes": "col-month",
+   "month": "7",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "8",
+   "classes": "col-month",
+   "month": "8",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "9",
+   "classes": "col-month",
+   "month": "9",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "10",
+   "classes": "col-month",
+   "month": "10",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "11",
+   "classes": "col-month",
+   "month": "11",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "12",
+   "classes": "col-month",
+   "month": "12",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "13",
+   "classes": "col-month",
+   "month": "13",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "14",
+   "classes": "col-month",
+   "month": "14",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "15",
+   "classes": "col-month",
+   "month": "15",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "16",
+   "classes": "col-month",
+   "month": "16",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "17",
+   "classes": "col-month",
+   "month": "17",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "18",
+   "classes": "col-month",
+   "month": "18",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "19",
+   "classes": "col-month",
+   "month": "19",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "20",
+   "classes": "col-month",
+   "month": "20",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "21",
+   "classes": "col-month",
+   "month": "21",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "22",
+   "classes": "col-month",
+   "month": "22",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "23",
+   "classes": "col-month",
+   "month": "23",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "24",
+   "classes": "col-month",
+   "month": "24",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "25",
+   "classes": "col-month",
+   "month": "25",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "26",
+   "classes": "col-month",
+   "month": "26",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "27",
+   "classes": "col-month",
+   "month": "27",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "28",
+   "classes": "col-month",
+   "month": "28",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "29",
+   "classes": "col-month",
+   "month": "29",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "30",
+   "classes": "col-month",
+   "month": "30",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "31",
+   "classes": "col-month",
+   "month": "31",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "32",
+   "classes": "col-month",
+   "month": "32",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "33",
+   "classes": "col-month",
+   "month": "33",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "34",
+   "classes": "col-month",
+   "month": "34",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "35",
+   "classes": "col-month",
+   "month": "35",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "36",
+   "classes": "col-month",
+   "month": "36",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "37",
+   "classes": "col-month",
+   "month": "37",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "38",
+   "classes": "col-month",
+   "month": "38",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "39",
+   "classes": "col-month",
+   "month": "39",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "40",
+   "classes": "col-month",
+   "month": "40",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "41",
+   "classes": "col-month",
+   "month": "41",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "42",
+   "classes": "col-month",
+   "month": "42",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "43",
+   "classes": "col-month",
+   "month": "43",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "44",
+   "classes": "col-month",
+   "month": "44",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "45",
+   "classes": "col-month",
+   "month": "45",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "46",
+   "classes": "col-month",
+   "month": "46",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "47",
+   "classes": "col-month",
+   "month": "47",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "48",
+   "classes": "col-month",
+   "month": "48",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "49",
+   "classes": "col-month",
+   "month": "49",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "50",
+   "classes": "col-month",
+   "month": "50",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "51",
+   "classes": "col-month",
+   "month": "51",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "52",
+   "classes": "col-month",
+   "month": "52",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "53",
+   "classes": "col-month",
+   "month": "53",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "54",
+   "classes": "col-month",
+   "month": "54",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "55",
+   "classes": "col-month",
+   "month": "55",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "56",
+   "classes": "col-month",
+   "month": "56",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "57",
+   "classes": "col-month",
+   "month": "57",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "58",
+   "classes": "col-month",
+   "month": "58",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "59",
+   "classes": "col-month",
+   "month": "59",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "60",
+   "classes": "col-month",
+   "month": "60",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "61",
+   "classes": "col-month",
+   "month": "61",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "62",
+   "classes": "col-month",
+   "month": "62",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "63",
+   "classes": "col-month",
+   "month": "63",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "64",
+   "classes": "col-month",
+   "month": "64",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "65",
+   "classes": "col-month",
+   "month": "65",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "66",
+   "classes": "col-month",
+   "month": "66",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "67",
+   "classes": "col-month",
+   "month": "67",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "68",
+   "classes": "col-month",
+   "month": "68",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "69",
+   "classes": "col-month",
+   "month": "69",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "70",
+   "classes": "col-month",
+   "month": "70",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "71",
+   "classes": "col-month",
+   "month": "71",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "text": "72",
+   "classes": "col-month",
+   "month": "72",
+   "hidden": false,
+   "inlineDisplay": null
+  }
+ ],
+ "rows": [
+  {
+   "type": "category",
+   "text": "Крупная моторика",
+   "count": "[4/40]",
+   "classes": "category-row",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "type": "skill",
+   "id": "GM_001",
+   "name": "Рефлекс Моро",
+   "classes": "skill-completed",
+   "zpdReady": "false",
+   "startMonth": "0",
+   "endMonth": "3",
+   "checked": true,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "4xcell-completed|col-month",
+    "15xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_002",
+   "name": "Флексорная поза",
+   "classes": "skill-completed",
+   "zpdReady": "false",
+   "startMonth": "0",
+   "endMonth": "1",
+   "checked": true,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "2xcell-completed|col-month",
+    "17xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_003",
+   "name": "Поворот головы в стороны (лёжа)",
+   "classes": "skill-completed",
+   "zpdReady": "false",
+   "startMonth": "0",
+   "endMonth": "2",
+   "checked": true,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "3xcell-completed|col-month",
+    "16xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_004",
+   "name": "Подъём головы на животе (45°)",
+   "classes": "skill-completed",
+   "zpdReady": "false",
+   "startMonth": "1",
+   "endMonth": "2",
+   "checked": true,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "col-month",
+    "2xcell-completed|col-month",
+    "16xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_005",
+   "name": "Удержание головы в вертикальном положении",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "2",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "2xcol-month",
+    "3xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_006",
+   "name": "Подъём груди на животе (опора на предплечья)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "3xcol-month",
+    "2xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_007",
+   "name": "Исчезновение примитивных рефлексов",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "4",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "4xcol-month",
+    "3xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_008",
+   "name": "Переворот со спины на живот",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "4xcol-month",
+    "3xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_009",
+   "name": "Переворот с живота на спину",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "5",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "3xcol-month",
+    "3xcell-active|col-month",
+    "13xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_010",
+   "name": "Притягивание к положению сидя",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "4xcol-month",
+    "3xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_011",
+   "name": "Сидение с поддержкой (tripod)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "5",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "5xcol-month",
+    "2xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_012",
+   "name": "Опора на выпрямленные руки на животе",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "5",
+   "endMonth": "7",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "5xcol-month",
+    "3xcell-active|col-month",
+    "11xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_013",
+   "name": "Сидение без поддержки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "9",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "6xcol-month",
+    "4xcell-active|col-month",
+    "9xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_014",
+   "name": "Защитные реакции при сидении",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "9",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "6xcol-month",
+    "4xcell-active|col-month",
+    "9xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_015",
+   "name": "Ползание на животе",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "9",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "6xcol-month",
+    "4xcell-active|col-month",
+    "9xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_016",
+   "name": "Ползание на четвереньках",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "7",
+   "endMonth": "11",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "7xcol-month",
+    "5xcell-active|col-month",
+    "7xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_017",
+   "name": "Переход из положения лёжа в сидя",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "11",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "8xcol-month",
+    "4xcell-active|col-month",
+    "7xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_018",
+   "name": "Стояние с поддержкой",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "11",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "6xcol-month",
+    "6xcell-active|col-month",
+    "7xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_019",
+   "name": "Подтягивание до стояния",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "8xcol-month",
+    "5xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_020",
+   "name": "Хождение вдоль опоры (круизинг)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "13",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "8xcol-month",
+    "6xcell-active|col-month",
+    "5xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_021",
+   "name": "Ходьба с поддержкой за руку",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_022",
+   "name": "Стояние без поддержки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "16",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "9xcol-month",
+    "8xcell-active|col-month",
+    "2xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_023",
+   "name": "Самостоятельная ходьба",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "10",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "10xcol-month",
+    "9xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_024",
+   "name": "Приседание и подъём с пола",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "16",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "12xcol-month",
+    "5xcell-active|col-month",
+    "2xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_025",
+   "name": "Ходьба по лестнице с поддержкой",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "14",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "14xcol-month",
+    "5xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_026",
+   "name": "Бег",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "16",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "16xcol-month",
+    "3xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_027",
+   "name": "Удар по мячу ногой",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_028",
+   "name": "Бросок мяча сверху",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_029",
+   "name": "Прыжок на месте двумя ногами",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "22",
+   "endMonth": "30",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "2xcol-month",
+    "9xcell-active|col-month",
+    "42xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_030",
+   "name": "Ходьба по лестнице без поддержки (приставным шагом)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "22",
+   "endMonth": "30",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "2xcol-month",
+    "9xcell-active|col-month",
+    "42xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_031",
+   "name": "Прыжок вперёд",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_032",
+   "name": "Езда на трёхколёсном велосипеде",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_033",
+   "name": "Стояние на одной ноге кратковременно",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_034",
+   "name": "Ходьба по лестнице чередующимся шагом (подъём)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_035",
+   "name": "Ловля большого мяча",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_036",
+   "name": "Ходьба по лестнице чередующимся шагом (спуск)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_037",
+   "name": "Подскок (прыжок на одной ноге)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "54",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "13xcell-active|col-month",
+    "18xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_038",
+   "name": "Стояние на одной ноге 10 секунд",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "13xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_039",
+   "name": "Скиппинг (подскоки с ноги на ногу)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "19xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "GM_040",
+   "name": "Ловля мяча одной рукой",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "60",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": null,
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "40xcol-month",
+    "13xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "category",
+   "text": "Мелкая моторика",
+   "count": "[0/37]",
+   "classes": "category-row collapsed",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "type": "skill",
+   "id": "FM_001",
+   "name": "Рефлекторный хватательный рефлекс",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "3",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcell-active|col-month",
+    "15xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_002",
+   "name": "Кисти в кулачках",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "2",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcell-active|col-month",
+    "16xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_003",
+   "name": "Раскрытие кистей",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "2",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "2xcol-month",
+    "3xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_004",
+   "name": "Удержание вложенной погремушки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "2",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "2xcol-month",
+    "3xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_005",
+   "name": "Сведение рук по средней линии",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "5",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "3xcell-active|col-month",
+    "13xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_006",
+   "name": "Целенаправленное дотягивание",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "5",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "3xcell-active|col-month",
+    "13xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_007",
+   "name": "Захват погремушки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcol-month",
+    "3xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_008",
+   "name": "Потряхивание погремушки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcol-month",
+    "3xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_009",
+   "name": "Ладонный захват (palmar grasp)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "5",
+   "endMonth": "7",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "5xcol-month",
+    "3xcell-active|col-month",
+    "11xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_010",
+   "name": "Перекладывание предмета из руки в руку",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "5",
+   "endMonth": "8",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "5xcol-month",
+    "4xcell-active|col-month",
+    "10xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_011",
+   "name": "Радиально-ладонный захват",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "9",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "4xcell-active|col-month",
+    "9xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_012",
+   "name": "Захват двух кубиков",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "9",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "4xcell-active|col-month",
+    "9xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_013",
+   "name": "Указание пальцем (тыкание)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "7",
+   "endMonth": "10",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "7xcol-month",
+    "4xcell-active|col-month",
+    "8xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_014",
+   "name": "Загребающий захват мелких предметов",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "7",
+   "endMonth": "10",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "7xcol-month",
+    "4xcell-active|col-month",
+    "8xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_015",
+   "name": "Нижний пинцетный захват",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "11",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "4xcell-active|col-month",
+    "7xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_016",
+   "name": "Стучание двумя предметами друг о друга",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "11",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "4xcell-active|col-month",
+    "7xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_017",
+   "name": "Верхний (зрелый) пинцетный захват",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "10",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "10xcol-month",
+    "5xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_018",
+   "name": "Произвольное отпускание предмета",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "4xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_019",
+   "name": "Башня из 2-3 кубиков",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_020",
+   "name": "Вкладывание форм",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_021",
+   "name": "Каракули кулачным захватом",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_022",
+   "name": "Переворачивание страниц по несколько",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_023",
+   "name": "Башня из 6 кубиков",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_024",
+   "name": "Копирование вертикальной линии",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "22",
+   "endMonth": "28",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "2xcol-month",
+    "7xcell-active|col-month",
+    "44xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_025",
+   "name": "Копирование горизонтальной линии",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "30",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "7xcell-active|col-month",
+    "42xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_026",
+   "name": "Нанизывание крупных бусин",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "30",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "7xcell-active|col-month",
+    "42xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_027",
+   "name": "Башня из 8-10 кубиков",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "26",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "6xcol-month",
+    "11xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_028",
+   "name": "Копирование круга",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "40",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "11xcell-active|col-month",
+    "32xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_029",
+   "name": "Резание ножницами (надрезы)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "28",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "8xcol-month",
+    "9xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_030",
+   "name": "Копирование креста",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "40",
+   "endMonth": "54",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "20xcol-month",
+    "15xcell-active|col-month",
+    "18xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_031",
+   "name": "Рисование человека из 2-4 частей",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "54",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "13xcell-active|col-month",
+    "18xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_032",
+   "name": "Резание по прямой линии",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_033",
+   "name": "Копирование квадрата",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "13xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_034",
+   "name": "Рисование человека из 6+ частей",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "66",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "13xcell-active|col-month",
+    "6xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_035",
+   "name": "Копирование треугольника",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "19xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_036",
+   "name": "Письмо имени",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "19xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "FM_037",
+   "name": "Трёхточечный захват карандаша",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "category",
+   "text": "Когнитивное развитие",
+   "count": "[0/26]",
+   "classes": "category-row collapsed",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "type": "skill",
+   "id": "C_001",
+   "name": "Зрительная фиксация на лице",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "2",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcell-active|col-month",
+    "16xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_002",
+   "name": "Поворот к источнику звука",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "5xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_003",
+   "name": "Прослеживание взглядом предмета",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "1",
+   "endMonth": "3",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "col-month",
+    "3xcell-active|col-month",
+    "15xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_004",
+   "name": "Рассматривание своих рук",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "2",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "2xcol-month",
+    "3xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_005",
+   "name": "Связь действия и результата",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "4xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_006",
+   "name": "Поиск упавшего предмета взглядом",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcol-month",
+    "3xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_007",
+   "name": "Предвосхищение событий",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "4xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_008",
+   "name": "Постоянство объекта (частичное)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "9",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "4xcell-active|col-month",
+    "9xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_009",
+   "name": "Изучение предметов разными способами",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "10",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "5xcell-active|col-month",
+    "8xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_010",
+   "name": "Постоянство объекта (полное)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "5xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_011",
+   "name": "Использование игрушек по назначению",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_012",
+   "name": "Понимание причинно-следственных игрушек",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_013",
+   "name": "Показывание частей тела",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_014",
+   "name": "Простая символическая игра",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_015",
+   "name": "Символическая игра с куклой/игрушкой",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_016",
+   "name": "Поиск перемещённого предмета",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_017",
+   "name": "Сортировка по форме или цвету",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "20",
+   "endMonth": "30",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "11xcell-active|col-month",
+    "42xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_018",
+   "name": "Символическая игра с замещением",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_019",
+   "name": "Понимание понятий 'больше-меньше'",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_020",
+   "name": "Называние цветов",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_021",
+   "name": "Счёт до 10",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "54",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "13xcell-active|col-month",
+    "18xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_022",
+   "name": "Понимание понятия времени",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_023",
+   "name": "Теория разума",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_024",
+   "name": "Понимание противоположностей",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "13xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_025",
+   "name": "Распознавание букв и цифр",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "19xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "C_026",
+   "name": "Рифмование",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "19xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "category",
+   "text": "Речь и коммуникация",
+   "count": "[0/26]",
+   "classes": "category-row collapsed",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "type": "skill",
+   "id": "L_001",
+   "name": "Разнообразный плач",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "3",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcell-active|col-month",
+    "15xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_002",
+   "name": "Гуление",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "2",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "2xcol-month",
+    "3xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_003",
+   "name": "Поворот на голос",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "4xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_004",
+   "name": "Смех",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "5",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "3xcell-active|col-month",
+    "13xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_005",
+   "name": "Вокализация в ответ на речь",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "7",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcol-month",
+    "4xcell-active|col-month",
+    "11xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_006",
+   "name": "Лепет (каноническое бормотание)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "10",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "5xcell-active|col-month",
+    "8xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_007",
+   "name": "Реакция на своё имя",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "10",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "5xcell-active|col-month",
+    "8xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_008",
+   "name": "Реакция на 'нет'",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "7",
+   "endMonth": "10",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "7xcol-month",
+    "4xcell-active|col-month",
+    "8xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_009",
+   "name": "Вариативный лепет",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "5xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_010",
+   "name": "Понимание простых слов",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "5xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_011",
+   "name": "Жест указания",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_012",
+   "name": "Первые слова",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "10",
+   "endMonth": "16",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "10xcol-month",
+    "7xcell-active|col-month",
+    "2xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_013",
+   "name": "Выполнение простых команд с жестом",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_014",
+   "name": "Словарь 15-50 слов",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "15",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "15xcol-month",
+    "4xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_015",
+   "name": "Выполнение команд без жеста",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "15",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "15xcol-month",
+    "4xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_016",
+   "name": "Двухсловные фразы",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "28",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "9xcell-active|col-month",
+    "44xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_017",
+   "name": "Фразы из 3-4 слов",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_018",
+   "name": "Вопросы кто, что, где",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_019",
+   "name": "Речь понятна посторонним на 75%",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_020",
+   "name": "Выполнение двухступенчатых команд",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_021",
+   "name": "Рассказывание о событиях дня",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_022",
+   "name": "Вопросы почему",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_023",
+   "name": "Сложные предложения",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_024",
+   "name": "Речь понятна на 100%",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "13xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_025",
+   "name": "Пересказ истории",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "66",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "19xcell-active|col-month",
+    "6xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "L_026",
+   "name": "Выполнение трёхступенчатых команд",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "13xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "category",
+   "text": "Социально-эмоциональное развитие",
+   "count": "[0/25]",
+   "classes": "category-row collapsed",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "type": "skill",
+   "id": "SE_001",
+   "name": "Предпочтение человеческого лица",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "0",
+   "endMonth": "2",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcell-active|col-month",
+    "16xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_002",
+   "name": "Успокоение от взрослого",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "5xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_003",
+   "name": "Социальная улыбка",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "1",
+   "endMonth": "3",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "col-month",
+    "3xcell-active|col-month",
+    "15xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_004",
+   "name": "Зрительный контакт",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "2",
+   "endMonth": "4",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "2xcol-month",
+    "3xcell-active|col-month",
+    "14xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_005",
+   "name": "Различные выражения эмоций",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "3",
+   "endMonth": "6",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "3xcol-month",
+    "4xcell-active|col-month",
+    "12xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_006",
+   "name": "Взаимное общение (очерёдность)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "4",
+   "endMonth": "7",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "4xcol-month",
+    "4xcell-active|col-month",
+    "11xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_007",
+   "name": "Страх незнакомцев",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "7xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_008",
+   "name": "Совместное внимание (инициирует)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_009",
+   "name": "Совместное внимание (следует за взглядом)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "5xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_010",
+   "name": "Социальные жестовые игры",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_011",
+   "name": "Тревога разлуки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "11xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_012",
+   "name": "Привязанность к значимому взрослому",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "9",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "9xcol-month",
+    "6xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_013",
+   "name": "Подражание действиям взрослых",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_014",
+   "name": "Социальное обращение",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "15",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "15xcol-month",
+    "4xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_015",
+   "name": "Реакция на эмоции других",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_016",
+   "name": "Параллельная игра",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "18",
+   "endMonth": "30",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "18xcol-month",
+    "cell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "11xcell-active|col-month",
+    "42xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_017",
+   "name": "Утешение других",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_018",
+   "name": "Успокоение после разлуки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "19xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_019",
+   "name": "Совместная игра с детьми",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_020",
+   "name": "Ролевая игра с другими",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_021",
+   "name": "Понимание правил поведения",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "36",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "16xcol-month",
+    "13xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_022",
+   "name": "Дружба с предпочтением",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_023",
+   "name": "Соблюдение очереди и правил в играх",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "13xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_024",
+   "name": "Описание эмоций",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "66",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "19xcell-active|col-month",
+    "6xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "SE_025",
+   "name": "Независимая игра вдали от родителей",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "54",
+   "endMonth": "72",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "34xcol-month",
+    "19xcell-active|col-month"
+   ]
+  },
+  {
+   "type": "category",
+   "text": "Самообслуживание",
+   "count": "[0/20]",
+   "classes": "category-row collapsed",
+   "hidden": false,
+   "inlineDisplay": null
+  },
+  {
+   "type": "skill",
+   "id": "AD_001",
+   "name": "Сосание и глотание",
+   "classes": "zpd-ready",
+   "zpdReady": "true",
+   "startMonth": "0",
+   "endMonth": "1",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "2xcell-active|col-month",
+    "17xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_002",
+   "name": "Удержание бутылочки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "6",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "6xcol-month",
+    "7xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_003",
+   "name": "Питьё из чашки с помощью",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "14",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "7xcell-active|col-month",
+    "4xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_004",
+   "name": "Еда пальчиковой пищи",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "8",
+   "endMonth": "12",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "8xcol-month",
+    "5xcell-active|col-month",
+    "6xcol-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_005",
+   "name": "Еда ложкой самостоятельно",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_006",
+   "name": "Питьё из чашки самостоятельно",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "14",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "14xcol-month",
+    "5xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_007",
+   "name": "Снятие носков",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_008",
+   "name": "Снятие шапки",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "12",
+   "endMonth": "18",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "12xcol-month",
+    "7xcell-active|col-month",
+    "col-month|current-month-col",
+    "53xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_009",
+   "name": "Помощь при одевании",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "15",
+   "endMonth": "24",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "15xcol-month",
+    "4xcell-active|col-month",
+    "cell-active|col-month|current-month-col",
+    "5xcell-active|col-month",
+    "48xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_010",
+   "name": "Еда вилкой",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_011",
+   "name": "Снятие одежды",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_012",
+   "name": "Мытьё рук с помощью",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "36",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "13xcell-active|col-month",
+    "36xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_013",
+   "name": "Приучение к горшку (дневное)",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "24",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "4xcol-month",
+    "19xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_014",
+   "name": "Надевание одежды с помощью",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_015",
+   "name": "Расстёгивание крупных пуговиц",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "42",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "13xcell-active|col-month",
+    "30xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_016",
+   "name": "Самостоятельное одевание",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_017",
+   "name": "Чистка зубов с помощью",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "30",
+   "endMonth": "48",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "10xcol-month",
+    "19xcell-active|col-month",
+    "24xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_018",
+   "name": "Мытьё рук самостоятельно",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "42",
+   "endMonth": "60",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "22xcol-month",
+    "19xcell-active|col-month",
+    "12xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_019",
+   "name": "Застёгивание молнии",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "48",
+   "endMonth": "66",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "28xcol-month",
+    "19xcell-active|col-month",
+    "6xcol-month"
+   ]
+  },
+  {
+   "type": "skill",
+   "id": "AD_020",
+   "name": "Завязывание шнурков",
+   "classes": "",
+   "zpdReady": "false",
+   "startMonth": "60",
+   "endMonth": "84",
+   "checked": false,
+   "hidden": false,
+   "inlineDisplay": "none",
+   "months": [
+    "19xcol-month",
+    "col-month|current-month-col",
+    "40xcol-month",
+    "13xcell-active|col-month"
+   ]
+  }
+ ]
+}

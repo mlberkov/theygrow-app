@@ -10,6 +10,12 @@
 # engine-minted source ids). Configurable path via --quarantine-report.
 *.quarantine.json
 
+# Parity-suite run output (A1-P1). The committed baselines live in
+# app/tests/__baselines__/ and are tracked; these are per-run artifacts only.
+test-results/
+playwright-report/
+blob-report/
+
 # Standard ignores (P4 pass)
 .venv/
 __pycache__/

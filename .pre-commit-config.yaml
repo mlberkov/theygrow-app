@@ -10,6 +10,12 @@
 # plus kb-v1.json — the vendored KB artifact is consumed byte-as-published, VDK-P2)
 # and api/ (Dockerfile/cloudbuild.yaml). Read-only validators (check-yaml,
 # check-json) run repo-wide.
+#
+# A1-P1 adds app/tests/__baselines__/ to the same excludes, for the kb-v1.json
+# reason: those files are byte-exact comparands. trailing-whitespace would strip
+# meaningful trailing space inside captured HTML and silently corrupt the parity
+# baselines. The suite's own source (app/tests/*.js, app/playwright.config.js)
+# stays INSIDE the hooks' reach — only the recorded artifacts are excluded.
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -43,9 +49,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: end-of-file-fixer
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|tests/__baselines__/)|api/(Dockerfile|cloudbuild\.yaml)|data/)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 
