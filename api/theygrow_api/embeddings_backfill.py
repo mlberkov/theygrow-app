@@ -14,6 +14,16 @@ flag (the ZDR + DPA + EU-residency clearance) AND, on the real path, embedder
 endpoint/key presence. With the flag unset, NO text is sent and NOTHING is written — the
 run refuses (``EmbedderNotReady``) before touching the provider or the DB.
 
+The gate is scoped to EGRESS (A2-P2 / ``L2-DL-002``). Clearance authorizes child text to
+cross a specific third-party boundary, so it is asked of exactly the paths that cross
+one: the real provider, and any injected provider that does not declare zero egress. An
+IN-PERIMETER provider (``performs_no_egress = True``, e.g. the staging seed's
+deterministic local embedder) removes that boundary rather than satisfying it, so it runs
+with clearance unset. The check is fail-closed — an absent or non-``True`` declaration
+reads as egressing — so the narrowing cannot become a bypass by omission. The predicate
+itself is ``ports.provider.performs_no_egress``; it moved there in A2-P3 (``L2-DL-003``)
+when the read path and the answers surface became its second and third call sites.
+
 Idempotency (status-driven, NOT delete-then-insert): only ``pending`` (and, unless
 ``--no-retry-failed``, ``failed``) rows are selected; ``ready`` rows are skipped, so a
 re-run over a fully-embedded corpus is a no-op. A provider error marks that batch
@@ -43,7 +53,7 @@ from theygrow_api.db.engine import get_engine
 from theygrow_api.db.models import EMBEDDING_DIMENSION, EventChunk
 from theygrow_api.logging import install_pii_redaction
 from theygrow_api.parameters import RuntimeParameters
-from theygrow_api.ports.provider import EmbeddingProvider
+from theygrow_api.ports.provider import EmbeddingProvider, performs_no_egress
 from theygrow_api.signals import EmbeddingCounters, SignalSink, default_sink
 
 logger = logging.getLogger(__name__)
@@ -208,17 +218,25 @@ def embed_backfill(
     """Embed ``pending`` (and ``failed``, unless ``retry_failed`` is False) chunks.
 
     Fail-closed: the ZDR+DPA+EU clearance gate runs FIRST — if unset, this raises
-    ``EmbedderNotReady`` before any provider call or DB write. When ``connection`` is
-    supplied the caller owns the transaction (tests); otherwise one is opened here.
-    Idempotent: ``ready`` rows are skipped. One ``EMBEDDING_COUNTERS`` signal (counts +
-    token cost + wall-clock) is emitted through ``sink``; §4: counts/timings only.
+    ``EmbedderNotReady`` before any provider call or DB write. The gate is scoped to
+    EGRESS (A2-P2): it applies to the real provider path and to any injected provider
+    that does not structurally declare zero egress, and is skipped only for an
+    in-perimeter provider, which removes the third-party surface instead of crossing it.
+    When ``connection`` is supplied the caller owns the transaction (tests); otherwise
+    one is opened here. Idempotent: ``ready`` rows are skipped. One ``EMBEDDING_COUNTERS``
+    signal (counts + token cost + wall-clock) is emitted through ``sink``; §4:
+    counts/timings only.
     """
     sink = sink if sink is not None else default_sink()
     settings = settings if settings is not None else get_settings()
 
-    # §4 gate, BEFORE any text is read or sent.
-    _ensure_embedder_cleared(settings)
-    provider = provider if provider is not None else _build_provider(settings)
+    # §4 gate, BEFORE any text is read or sent. The real path is gated then built; an
+    # injected provider is gated unless it declares no egress (default: gated).
+    if provider is None:
+        _ensure_embedder_cleared(settings)
+        provider = _build_provider(settings)
+    elif not performs_no_egress(provider):
+        _ensure_embedder_cleared(settings)
 
     started = time.perf_counter()
     if connection is not None:

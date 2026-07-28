@@ -7,6 +7,11 @@ enforcement (fabricated citation rejected; present-but-irrelevant context honest
 no_evidence), the ADR-015 honesty-flag policy for grounded-but-uncertain answers, the
 per-segment provenance mapping, and the GROUNDING_COVERAGE / DEGRADATION_EVENT emissions.
 
+Since A2-P3 the answers gate is scoped to EGRESS: an undeclared provider stays gated (the
+fail-closed default — that is the invariant), a truthy-but-not-``True`` declaration stays
+gated, and only an in-perimeter provider runs with clearance unset. The narrowing grants no
+clearance; ``answers_privacy_cleared`` remains unset and the real path unchanged.
+
 They do NOT establish real retrieval recall, Russian-FTS adequacy (the 'simple'-config
 limitation, M4-DL-001), or whether a real LLM correctly self-declares no_evidence — that
 recall/grounding-QUALITY mini-eval is the M4-CLOSE step against the actual corpus with cleared
@@ -25,6 +30,7 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import Connection, insert, text
 
+from theygrow_api.adapters.answers.local_scripted import ScriptedAnswersProvider
 from theygrow_api.adapters.answers.openai_client import AnswersProviderUnavailable
 from theygrow_api.config import Settings
 from theygrow_api.db.models import EMBEDDING_DIMENSION, SourceMessage
@@ -50,6 +56,12 @@ class _FakeEmbed:
     def embed_texts(self, texts: Sequence[str]) -> EmbeddingBatch:
         self.calls.append(list(texts))
         return EmbeddingBatch(vectors=[self._vector for _ in texts], total_tokens=1)
+
+
+class _InPerimeterEmbed(_FakeEmbed):
+    """Same fake embedder, structurally declaring zero egress (the A2-P3 exemption carrier)."""
+
+    performs_no_egress = True
 
 
 class _FakeAnswers:
@@ -188,8 +200,9 @@ def test_grounded_success_returns_answer_with_provenance(connection: Connection)
 
 
 def test_answers_fail_closed_when_uncleared_zero_calls(connection: Connection) -> None:
-    # M4-P4-INV-001 (ADR-014): the answers §4 gate runs FIRST — even with a provider in hand,
-    # an uncleared process makes zero provider calls and never reaches retrieval/egress.
+    # M4-P4-INV-001 (ADR-014): the answers §4 gate runs FIRST. _FakeAnswers declares nothing,
+    # so it reads as egressing (the A2-P3 narrowing's fail-closed default) and an uncleared
+    # process makes zero provider calls and never reaches retrieval/egress.
     _seed_alpha(connection)
     embed = _FakeEmbed(_unit_vec(1.0))
     answers = _FakeAnswers()
@@ -206,6 +219,49 @@ def test_answers_fail_closed_when_uncleared_zero_calls(connection: Connection) -
 
     assert answers.calls == []  # zero answers-provider calls (no context left the perimeter)
     assert embed.calls == []  # the gate is before retrieve, so the query was not even embedded
+
+
+def test_in_perimeter_answers_provider_runs_with_clearance_unset(connection: Connection) -> None:
+    """A2-P3: the answers gate is scoped to egress, so an in-perimeter provider runs.
+
+    The exemption grants NO clearance: ``answers_privacy_cleared`` stays unset and the real
+    adapter's path stays fail-closed. It only records that this provider crosses nothing.
+    """
+    _seed_alpha(connection)
+    embed = _InPerimeterEmbed(_unit_vec(1.0))
+    answers = ScriptedAnswersProvider("cite_all")
+
+    result = answer_query(
+        connection,
+        "comm-1",
+        "alpha",
+        embedding_provider=embed,
+        answers_provider=answers,
+        settings=_settings(embedder_cleared=False, answers_cleared=False),
+    )
+
+    assert answers.call_count == 1
+    assert result.answer_text is not None
+    assert result.degradation is None
+
+
+def test_truthy_answers_declaration_is_not_enough(connection: Connection) -> None:
+    """Fail-closed by identity: only an exact ``True`` buys the in-perimeter exemption."""
+    _seed_alpha(connection)
+    answers = ScriptedAnswersProvider("cite_all")
+    answers.performs_no_egress = "yes"  # type: ignore[assignment]
+
+    with pytest.raises(AnswersNotReady):
+        answer_query(
+            connection,
+            "comm-1",
+            "alpha",
+            embedding_provider=_FakeEmbed(_unit_vec(1.0)),
+            answers_provider=answers,
+            settings=_settings(answers_cleared=False),
+        )
+
+    assert answers.call_count == 0
 
 
 def test_no_context_degrades_with_zero_answers_calls(connection: Connection) -> None:

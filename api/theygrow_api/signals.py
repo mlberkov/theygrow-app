@@ -15,6 +15,7 @@ Taxonomy:
   * ``EMBEDDING_COUNTERS``  — P2, emitted: embeddings backfill counts + token cost + timing.
   * ``GROUNDING_COVERAGE``  — P4, emitted: cited vs offered segment counts per answer.
   * ``DEGRADATION_EVENT``   — P4, emitted: honest-degradation events (a §4-safe mode label).
+  * ``EVAL_SCORECARD``      — A2-P3, emitted: per-case-class eval outcome counts + timing.
 
 P2/P3/P4 signals MUST emit through this SAME seam (M4-DL-002). The seam is an injectable
 ``SignalSink`` so tests capture emissions and a future metrics backend swaps in without
@@ -39,6 +40,7 @@ class SignalKind(StrEnum):
     EMBEDDING_COUNTERS = "embedding.counters"
     GROUNDING_COVERAGE = "grounding.coverage"
     DEGRADATION_EVENT = "degradation.event"
+    EVAL_SCORECARD = "eval.scorecard"
 
 
 @dataclass(frozen=True)
@@ -47,7 +49,9 @@ class SignalDescriptor:
 
     kind: SignalKind
     field_names: tuple[str, ...]
-    producing_stage: str  # "P1" | "P2" | "P3" | "P4"
+    # M4 packet ids ("P1".."P4") for the engine spine; milestone-qualified ("A2-P3") for
+    # the non-spine tracks, which do not share M4's packet numbering.
+    producing_stage: str
     emitted_now: bool
     note: str
 
@@ -110,6 +114,31 @@ SIGNAL_TAXONOMY: dict[SignalKind, SignalDescriptor] = {
             "Honest-degradation event (M4-P4): a §4-safe bounded mode label ('no_evidence' | "
             "'provider_unavailable' | 'parse_failure' | 'weak_evidence' | 'ambiguous'). "
             "Emitted by services.query_service.answer_query on each degraded contour."
+        ),
+    ),
+    SignalKind.EVAL_SCORECARD: SignalDescriptor(
+        kind=SignalKind.EVAL_SCORECARD,
+        field_names=(
+            "case_class",
+            "cases",
+            "passed",
+            "failed",
+            "holdout_cases",
+            "holdout_passed",
+            "scope_violations",
+            "route_violations",
+            "duration_ms",
+        ),
+        producing_stage="A2-P3",
+        emitted_now=True,
+        note=(
+            "Eval-pipeline outcome (A2-P3): per-case-class counts + wall-clock for one run of "
+            "the labeled query set against the synthetic staging corpus, plus a "
+            "case_class='total' roll-up (the RetrievalLatency leg='fused' pattern — one kind, "
+            "a bounded label distinguishing the emissions). Emitted by "
+            "evals.scorecard.emit_scorecard. Counts and a bounded label only: no query text, "
+            "no chunk text, no chunk ids, no community_id. Contract-conformance counts on a "
+            "fixed synthetic corpus — NOT a recall or answer-quality measure."
         ),
     ),
 }
@@ -233,6 +262,43 @@ class DegradationEvent:
 
     def fields(self) -> dict[str, object]:
         return {"mode": self.mode}
+
+
+@dataclass(frozen=True)
+class EvalScorecard:
+    """A2-P3 signal: one case class's eval outcome, or the run's ``"total"`` roll-up.
+
+    ``case_class`` is a bounded label — one of the six labeled-set classes, or ``"total"``
+    — in the counts/ids class exactly like ``RetrievalLatency.leg``. It is REQUIRED (no
+    default): every emission is labelled, never unlabelled.
+
+    §4-safe: counts and one bounded label. No query text, no chunk text, no chunk ids
+    (a synthetic ``chunk_id`` still names its community by substring), no ``community_id``.
+    """
+
+    case_class: str
+    cases: int
+    passed: int
+    failed: int
+    holdout_cases: int
+    holdout_passed: int
+    scope_violations: int
+    route_violations: int
+    duration_ms: float
+    kind: SignalKind = SignalKind.EVAL_SCORECARD
+
+    def fields(self) -> dict[str, object]:
+        return {
+            "case_class": self.case_class,
+            "cases": self.cases,
+            "passed": self.passed,
+            "failed": self.failed,
+            "holdout_cases": self.holdout_cases,
+            "holdout_passed": self.holdout_passed,
+            "scope_violations": self.scope_violations,
+            "route_violations": self.route_violations,
+            "duration_ms": self.duration_ms,
+        }
 
 
 @runtime_checkable

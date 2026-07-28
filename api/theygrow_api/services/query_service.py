@@ -21,10 +21,22 @@ structurally on three independent edges:
 
 §4 / second egress (ADR-014, per-egress clearance): the assembled family context is sent to
 the chat/answers LLM — a distinct third-party residency surface from the embedder. The answers
-clearance flag (``answers_privacy_cleared``) is checked FIRST, before any egress, even when a
-provider is injected (tests): an uncleared process raises ``AnswersNotReady`` and makes ZERO
-answers-provider calls. Logs/signals carry counts + a bounded mode label only — never text or
-family-identifying ids.
+clearance flag (``answers_privacy_cleared``) is checked FIRST, before any egress: an uncleared
+process raises ``AnswersNotReady`` and makes ZERO answers-provider calls. Logs/signals carry
+counts + a bounded mode label only — never text or family-identifying ids.
+
+Since A2-P3 (``L2-DL-003``) that check is scoped to EGRESS, mirroring what A2-P2 did for the
+embedder: it is asked of the real provider path and of any injected provider that does not
+structurally declare ``performs_no_egress is True``, and is skipped only for an in-perimeter
+answers provider, which removes the third-party surface instead of crossing it. The
+declaration check is fail-closed — absent or non-``True`` reads as egressing.
+
+**The narrowing grants no clearance.** It changes WHO must be cleared, never WHETHER:
+``answers_privacy_cleared`` remains unset and default-false, the real-provider path stays
+fail-closed exactly as before, and owner clearance for the answers residency surface (ZDR +
+DPA + EU) remains an OPEN PREREQUISITE ahead of the chat milestone's go-live. Nothing in this
+module, and nothing downstream of it, may read the in-perimeter exemption as that clearance
+having been obtained.
 """
 
 from __future__ import annotations
@@ -37,7 +49,7 @@ from sqlalchemy import Connection
 from theygrow_api.adapters.answers.openai_client import AnswersProviderUnavailable
 from theygrow_api.config import Settings, get_settings
 from theygrow_api.parameters import RuntimeParameters
-from theygrow_api.ports.provider import AnswersProvider, EmbeddingProvider
+from theygrow_api.ports.provider import AnswersProvider, EmbeddingProvider, performs_no_egress
 from theygrow_api.retrieval.search_repository import DateRange
 from theygrow_api.services.context_assembler import (
     AssembledContext,
@@ -118,7 +130,12 @@ class GroundedAnswer:
 
 
 def _ensure_answers_cleared(settings: Settings) -> None:
-    """§4 gate (ADR-014): refuse unless the operator affirmed the answers clearance flag."""
+    """§4 gate (ADR-014): refuse unless the operator affirmed the answers clearance flag.
+
+    Asked of every path that actually crosses the answers residency boundary. An
+    in-perimeter provider does not reach here — not because it is cleared, but because it
+    crosses nothing (see the module docstring: the narrowing grants no clearance).
+    """
     if not settings.answers_privacy_cleared:
         raise AnswersNotReady(
             "answers_privacy_cleared is not set; refusing to send family context to the "
@@ -186,7 +203,7 @@ def answer_query(
     Contour order (closed corpus, honest degradation):
       1. validate ``community_id``; empty/whitespace query -> honest ``no_evidence`` (no calls).
       2. ``_ensure_answers_cleared`` -> the §4 answers gate FIRST (fail-closed before any
-         egress, even with an injected provider).
+         egress), skipped only for an injected provider declaring zero egress (A2-P3).
       3. ``retrieve()`` (its own embedder gate runs inside) -> fused note-only candidates.
       4. ``assemble_context`` -> the grounded context.
       5. grounding gate: below ``grounding_min_segments`` -> honest ``no_evidence``, ZERO
@@ -204,8 +221,13 @@ def answer_query(
     if not query_text.strip():
         return _degrade(query_text, _MODE_NO_EVIDENCE, sink)
 
-    # §4 answers gate, BEFORE any egress — even with an injected provider (ADR-014).
-    _ensure_answers_cleared(settings)
+    # §4 answers gate, BEFORE any egress (ADR-014). Scoped to egress (A2-P3): asked of the
+    # real path and of any injected provider that does not declare zero egress (default:
+    # gated). Deliberately NOT restructured into the backfill's gate-and-build block — the
+    # provider is built LATER, after the grounding gate, so nothing is constructed below the
+    # bar. The gate moves; the build does not.
+    if answers_provider is None or not performs_no_egress(answers_provider):
+        _ensure_answers_cleared(settings)
 
     fused = retrieve(
         connection,

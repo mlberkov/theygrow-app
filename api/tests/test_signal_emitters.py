@@ -4,7 +4,8 @@ M4-P3-INV-003 (operability, ADR-013): the set of ``SignalKind`` declared
 ``emitted_now=True`` in the taxonomy equals the set actually emitted when the known
 producers run. This is the EXPLICIT-COUPLING form: the test drives each producer
 (``rederive`` -> DERIVATION_COUNTERS, the sparse leg -> RETRIEVAL_LATENCY, the embeddings
-backfill -> EMBEDDING_COUNTERS) with a recording sink and compares.
+backfill -> EMBEDDING_COUNTERS, ``evals.scorecard.emit_scorecard`` -> EVAL_SCORECARD) with a
+recording sink and compares.
 
 Consequences this enforces:
   * Flipping a defined-not-emitted kind to ``emitted_now=True`` WITHOUT a producer emitting it
@@ -13,7 +14,9 @@ Consequences this enforces:
     the present-but-irrelevant contour (the model declares retrieved chunks not evidence)
     emits BOTH in one call (coverage counts + a degradation event).
   * Adding a new emitted producer means adding its driver to this test — the coupling is
-    explicit by design, not a fragile reflective scan.
+    explicit by design, not a fragile reflective scan. A2-P3's EVAL_SCORECARD is driven from
+    a hand-built ``Scorecard``: its emitter is a pure function over an already-computed
+    scorecard precisely so this test never needs a seeded 295-chunk contour to cover it.
 DB-backed (the producers need a real Postgres); skips with the rest of the suite when
 ``DATABASE_URL`` is unset.
 """
@@ -30,6 +33,7 @@ from theygrow_api.config import Settings
 from theygrow_api.db.models import EMBEDDING_DIMENSION, SourceMessage
 from theygrow_api.derivation import rederive
 from theygrow_api.embeddings_backfill import embed_backfill
+from theygrow_api.evals.scorecard import CaseResult, emit_scorecard, summarize
 from theygrow_api.ports.provider import AnswerResponse, EmbeddingBatch
 from theygrow_api.retrieval.search_repository import sparse_candidates
 from theygrow_api.services.query_service import answer_query
@@ -107,6 +111,19 @@ def test_every_emitted_now_kind_has_a_wired_producer(connection: Connection) -> 
         answers_provider=_FakeAnswers(),
         settings=_cleared_settings(),
         sink=sink,
+    )
+    # EVAL_SCORECARD: the A2-P3 emitter is a pure function over a computed scorecard, so it
+    # is driven here without seeding a contour (see the module docstring).
+    emit_scorecard(
+        summarize(
+            (CaseResult(case_id="lex-001", case_class="lexical-hit", holdout=False, passed=True),),
+            durations_ms={"lexical-hit": 1.0},
+            total_duration_ms=1.0,
+            corpus_chunks=1,
+            corpus_communities=1,
+            mode="ci",
+        ),
+        sink,
     )
 
     emitted = {s.kind for s in sink.signals}

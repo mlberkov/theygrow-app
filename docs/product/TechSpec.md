@@ -7,7 +7,7 @@ For the delivery order, see `BuildPlan.md`. For runtime behavioral contract, see
 ## Monorepo
 
 - `/app` — the PWA. The static PWA served assets live here, migrated from repo root in M2-P1; its build-config (`app/Dockerfile`/`app/nginx.conf`/`app/cloudbuild.yaml`) relocated into the subtree in M2-P3. The shell is `app/index.html`; since the A1 `spa-split` milestone its stylesheet and its native ES-module graph live under the versioned mount `app/m/v{N}/`, served at `/m/v{N}/` (version-in-path, copy-forward bumps — `A1-DL-004`). Delivery stays **buildless**: no bundler, no transpiler; the files execute as they lie. Playwright and Node are dev/CI only and ship in neither the image nor the build context.
-- `/api` — Python / FastAPI backend. Lands in M2; from M2-P3 it deploys as **its own Cloud Run service** with its own build-config (`api/Dockerfile`/`api/cloudbuild.yaml`). Origin unification (the same-origin `/api` proxy, no CORS) is M5.
+- `/api` — Python / FastAPI backend. Lands in M2; from M2-P3 it deploys as **its own Cloud Run service** with its own build-config (`api/Dockerfile`/`api/cloudbuild.yaml`). Since the A2 `l2-staging` milestone `/api` deploys as **two** services from **two** self-contained build-configs on separate triggers: production (`api/cloudbuild.yaml`, now behind the L1 `--no-traffic`/sha-tag promotion gate) and a private, database-attached **staging** contour (`api/cloudbuild.staging.yaml`) — same `api/Dockerfile` and build context, distinct image name, live identifiers supplied as trigger substitutions rather than committed (`L2-DL-001`; service, registry and instance names live in `../RUNBOOK.md`). Origin unification (the same-origin `/api` proxy, no CORS) is M5.
 - `/docs` — operating contract, decision log, invariants, runbook, execution map, product specs (this file).
 - `/scripts` — ops + dev scripts (lands as needed).
 - `/infra` — IaC (post-M5).
@@ -22,6 +22,7 @@ No other top-level product directories.
 - Vector index lives in the same Postgres instance via pgvector (a derived port) — not a separate vector DB. Embeddings are **≤1536-dim from M3**.
 - Schema lands in M3 once the `/export` verification gate clears.
 - **Prod vs dev (ADR-008).** Production is **managed Cloud SQL Postgres + pgvector** (→ AlloyDB by load). Dev uses a local Postgres 16 + pgvector via the dev-only `docker-compose.yml`. dev vs prod is a config difference (the env-driven config reads connection/infra endpoints from the environment), not a code difference. No connection is opened and no schema exists before M3.
+- **Staging (ADR-020 as amended, A2).** A third contour: a **separate staging database on the same Cloud SQL instance** as production — the accepted cost default, with isolation enforced by SQL grants and a least-privilege runtime identity rather than by a second instance (`L2-DL-001`). It is **not** a second source of truth: staging holds **no real family data**, only a committed synthetic `/export` v1 corpus (`L2-DL-002`), and no third-party provider is cleared for it — both per-egress clearance gates stay unset and fail-closed. Every step of standing the contour up is owner-run; see `../RUNBOOK.md` "Staging contour".
 
 ## Retrieval / RAG
 

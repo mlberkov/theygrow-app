@@ -1,0 +1,158 @@
+{
+  "export": {
+    "format": "theygrow.export",
+    "schema_version": 1,
+    "scope": {
+      "community_id": "comm-staging-gamma",
+      "requester_user_id": "comm-staging-gamma-requester"
+    },
+    "generated_at": "2026-07-27T12:00:00+03:00",
+    "record_count": 12
+  },
+  "records": [
+    {
+      "source_message_id": "sm-gamma-0001",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-2",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-2",
+      "external_message_id": "msg-gamma-0001",
+      "edit_seq": 0,
+      "raw_text": "2024-06-15\nПриезжала бабушка, привезла банки с вареньем.",
+      "detected_route": "note",
+      "created_at": "2024-06-16T21:07:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0002",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-1",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-1",
+      "external_message_id": "msg-gamma-0002",
+      "edit_seq": 0,
+      "raw_text": "2024-08-25\nПеребирали шкаф, половину вещей отложили отдать.",
+      "detected_route": "note",
+      "created_at": "2024-08-26T21:14:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0003",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-2",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-2",
+      "external_message_id": "msg-gamma-0003",
+      "edit_seq": 0,
+      "raw_text": "2024-11-04\nНичего особенного, обычный будний день.",
+      "detected_route": "note",
+      "created_at": "2024-11-05T21:21:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0004",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-1",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-1",
+      "external_message_id": "msg-gamma-0004",
+      "edit_seq": 0,
+      "raw_text": "2025-01-14\nСчитали расходы за месяц, вышло больше ожидаемого.",
+      "detected_route": "note",
+      "created_at": "2025-01-15T21:28:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0005",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-2",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-2",
+      "external_message_id": "msg-gamma-0005",
+      "edit_seq": 0,
+      "raw_text": "2025-03-26\nСоседи затеяли ремонт, шум стоял с утра до вечера.",
+      "detected_route": "note",
+      "created_at": "2025-03-27T21:35:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0006",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-1",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-1",
+      "external_message_id": "msg-gamma-0006",
+      "edit_seq": 0,
+      "raw_text": "2025-06-05\nЗаписались к парикмахеру на следующую неделю.",
+      "detected_route": "note",
+      "created_at": "2025-06-06T21:42:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0007",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-2",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-2",
+      "external_message_id": "msg-gamma-0007",
+      "edit_seq": 0,
+      "raw_text": "2025-08-15\nМашина не завелась, вызывали помощь на парковку.",
+      "detected_route": "note",
+      "created_at": "2025-08-16T21:49:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0008",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-1",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-1",
+      "external_message_id": "msg-gamma-0008",
+      "edit_seq": 0,
+      "raw_text": "Долго обсуждали отпуск, так ничего и не решили.",
+      "detected_route": "note",
+      "created_at": "2025-10-25T20:28:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0009",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-2",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-2",
+      "external_message_id": "msg-gamma-0009",
+      "edit_seq": 0,
+      "raw_text": "День прошёл в бумагах, вечером сил не осталось.",
+      "detected_route": "note",
+      "created_at": "2026-01-04T20:39:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0010",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-1",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-1",
+      "external_message_id": "msg-gamma-0010",
+      "edit_seq": 0,
+      "raw_text": "Заказали новые шторы, ждать обещали две недели.",
+      "detected_route": "note",
+      "created_at": "2026-03-16T20:50:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0011",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-2",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-2",
+      "external_message_id": "msg-gamma-0011",
+      "edit_seq": 0,
+      "raw_text": "2025-04-11\nДолго обсуждали отпуск, так ничего и не решили.",
+      "detected_route": "draft",
+      "created_at": "2025-04-12T21:17:00+03:00"
+    },
+    {
+      "source_message_id": "sm-gamma-0012",
+      "community_id": "comm-staging-gamma",
+      "author_user_id": "author-gamma-1",
+      "external_chat_id": "chat-gamma",
+      "external_user_id": "user-gamma-1",
+      "external_message_id": "msg-gamma-0012",
+      "edit_seq": 0,
+      "raw_text": "2025-05-21\nДень прошёл в бумагах, вечером сил не осталось.",
+      "detected_route": "draft",
+      "created_at": "2025-05-22T21:24:00+03:00"
+    }
+  ]
+}

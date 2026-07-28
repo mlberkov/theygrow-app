@@ -16,6 +16,14 @@
 # container in the runner — it touches no GCP and is independent of the Cloud
 # Build deploy.
 #
+# From A2-P3 a third job, `eval`, runs the labeled query set against a seeded
+# synthetic staging contour and emits a counts-only scorecard. It proves that a
+# change did not break retrieval fusion, note-only eligibility, community scoping,
+# the grounding gate or honest degradation ON A FIXED SYNTHETIC CORPUS. It measures
+# neither Russian lexical recall nor grounded-answer quality — both providers are
+# in-perimeter stand-ins, so the run is free, repeatable and makes zero third-party
+# calls. It builds nothing and touches no GCP.
+#
 # From A1-P1 a second job, `parity`, gates the /app PWA — the first non-Python
 # gate in this repo. It runs the three-level parity suite (DOM snapshot, visual
 # regression, behavioral smoke) that the A1 spa-split refactor is measured
@@ -82,6 +90,67 @@ jobs:
 
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure
+
+  # A2-P3 — the eval gate. Runs the SAME entry point (`theygrow-eval`) the owner runs
+  # against the staging contour, so the gate cannot drift into a local shadow of itself —
+  # the argument `scripts/parity-suite.sh` already makes for the frontend. Independent of
+  # `quality` (not `needs:`) for the same reason `parity` is: a lint failure must not hide
+  # an eval regression, or vice versa.
+  #
+  # The service database is named `theygrow_staging` so the seed's and the eval's contour
+  # guards RUN FOR REAL here rather than being monkeypatched — `pg_isready` must name the
+  # same database or the job stalls on a health check against one that does not exist.
+  # It builds nothing, deploys nothing and touches no GCP; both clearance flags stay unset
+  # and the run makes zero third-party provider calls.
+  eval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: theygrow
+          POSTGRES_DB: theygrow_staging
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U theygrow -d theygrow_staging"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://theygrow@localhost:5432/theygrow_staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Runtime deps only — the eval is a shipped entry point, not a test harness.
+      - name: Install /api package
+        run: python -m pip install ./api
+
+      - name: Apply migrations
+        working-directory: api   # alembic.ini uses a relative script_location
+        run: python -m alembic upgrade head
+
+      - name: Seed the staging contour (synthetic corpus, zero provider calls)
+        run: theygrow-seed-staging --corpus api/corpus/staging
+
+      - name: Eval (labeled query set -> scorecard)
+        run: theygrow-eval --mode ci --corpus api/corpus/staging --out eval-scorecard.json
+
+      # `if: always()` on purpose: a FAILING eval still exits 1 with a valid scorecard, and
+      # that is exactly when the artifact is wanted.
+      - name: Upload scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-scorecard
+          path: eval-scorecard.json
+          retention-days: 7
+          if-no-files-found: warn
 
   # A1-P1 — the /app parity gate. Independent of `quality` (not `needs:`) so a
   # Python lint failure never hides a frontend regression, and vice versa.
