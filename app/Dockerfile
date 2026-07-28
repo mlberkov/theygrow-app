@@ -2,8 +2,13 @@
 FROM nginx:alpine
 
 # Build context is the /app subtree (self-contained per-app build, M2-P3).
-# Копируем файл nginx.conf
-COPY nginx.conf /etc/nginx/nginx.conf
+# nginx.conf ships as a TEMPLATE (A3-P1): the same-origin /api upstream is a live
+# identifier that never enters the repo, so app/docker-entrypoint.sh renders this
+# file to /etc/nginx/nginx.conf at container start. The repo-side filename stays
+# `nginx.conf` deliberately — it is enumerated as a live-deploy path in AGENTS.md §7,
+# in scripts/check-contract-integrity.sh and in docs/RUNBOOK.md, and it is what the
+# delivery-contract drift guard parses.
+COPY nginx.conf /etc/nginx/nginx.conf.template
 
 # Копируем файл index.html в папку, откуда Nginx раздает файлы
 COPY index.html /usr/share/nginx/html/index.html
@@ -25,8 +30,17 @@ COPY icons/ /usr/share/nginx/html/icons/
 COPY sw.js /usr/share/nginx/html/sw.js
 COPY offline.html /usr/share/nginx/html/offline.html
 
+# Копируем entrypoint (A3-P1): рендерит конфиг, минтит ID-токен для /api-прокси,
+# обновляет его и передаёт управление nginx. Плоская двухаргументная форма COPY —
+# без --chmod/--from, без wildcard: ship-list-гард в app/tests/delivery-contract.spec.js
+# падает (fail closed) на любой форме COPY, которую он не разбирает полностью.
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+
 # Открываем порт 8080 (стандарт для Cloud Run)
 EXPOSE 8080
 
-# Запускаем Nginx
+# Запускаем Nginx через entrypoint. Вызов идёт через /bin/sh, поэтому образ не
+# зависит от бита исполнения на закоммиченном файле; ENTRYPOINT базового образа
+# намеренно замещается целиком (см. шапку docker-entrypoint.sh).
+ENTRYPOINT ["/bin/sh", "/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

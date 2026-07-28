@@ -7,11 +7,25 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA']
 
-  # Step 3: deploy to its OWN Cloud Run service (own URL; no nginx proxy — that is M5).
+  # Step 3: deploy to its OWN Cloud Run service (own URL). Since A3-P1 that URL is
+  # reachable only through the PWA container's same-origin /api proxy (ADR-038 / ADR-007);
+  # the browser never talks to it directly and no CORS header is ever issued.
   # No --set-env-vars / --set-secrets / --add-cloudsql-instances: /api/health is still
   # the whole served surface and needs no environment. M3/M4 landed the database
   # consumers as owner-run offline CLIs, not as routes, so production stays unwired
   # deliberately; the DB-wired sibling is api/cloudbuild.staging.yaml.
+  #
+  # --no-allow-unauthenticated (A3-P1, was --allow-unauthenticated): the service takes
+  # only authenticated calls, and the proxy authenticates service-to-service with a
+  # metadata-minted ID token whose audience is this service's URL. The explicit negative
+  # is deliberate — merely DROPPING the flag would leave an existing allUsers binding in
+  # place, whereas the negative form actively removes it.
+  #
+  # This flag is SERVICE-level IAM, not revision-scoped: it applies the moment this deploy
+  # runs, regardless of the --no-traffic split below. Editing this file also matches the
+  # /api trigger's includedFiles = api/**, so merging the packet that changes it fires this
+  # build. Hence the ordering constraint in docs/RUNBOOK.md "Same-origin /api proxy": the
+  # PWA runtime service account must already hold roles/run.invoker here.
   #
   # --no-traffic --tag lands each push as a 0%-traffic, per-revision sha-tagged
   # revision: deploy stops meaning release, and promotion becomes an explicit owner
@@ -29,7 +43,7 @@ steps:
       - 'europe-west1'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated'
+      - '--no-allow-unauthenticated'
       - '--port'
       - '8080'
       - '--no-traffic'

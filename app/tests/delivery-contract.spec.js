@@ -61,16 +61,81 @@ test.describe('delivery contract — tests/server.js mirrors app/nginx.conf', ()
   }
 
   test('nginx declares no location the mirror is unaware of', () => {
-    const declared = Array.from(conf.matchAll(/location\s+([^{]+?)\s*\{/g)).map((m) => m[1].trim());
+    // Comments are stripped first (A3-P1). The scan is a text match over the whole
+    // file, and `[^{]+?` crosses newlines — so a COMMENT that merely mentions the word
+    // "location" is reported as a phantom location spanning everything up to the next
+    // real `{`. That is a false RED with a baffling failure message, and A3-P1's proxy
+    // comment triggered it. Stripping `#` to end-of-line is a heuristic (it would also
+    // strip a `#` inside a quoted value), which is safe here because nginx directives
+    // in this file carry none, and wrong in the harmless direction if one ever appears:
+    // a stripped directive can only under-report, which the mirrored-rule assertions
+    // above would then catch.
+    const directives = conf.replace(/#.*$/gm, '');
+    const declared = Array.from(directives.matchAll(/location\s+([^{]+?)\s*\{/g)).map((m) => m[1].trim());
     const mirrored = HEADER_RULES.map((r) => r.nginxLocation);
     // /health and the dotfile deny rule are behavioural, not header rules; the
     // server implements both directly and they carry no add_header.
-    const exempt = ['/health', '~ /\\.'];
+    // `^~ /api/` (A3-P1) is exempt for the same reason and one more: it is a reverse
+    // proxy to a live Cloud Run service, which the parity server deliberately does not
+    // mirror — there is nothing to proxy to locally. Its own contract is asserted by
+    // the config-shape block below instead.
+    const exempt = ['/health', '~ /\\.', '^~ /api/'];
     const unknown = declared.filter((l) => !mirrored.includes(l) && !exempt.includes(l));
     expect(
       unknown,
       'app/nginx.conf grew a location the parity server does not mirror'
     ).toEqual([]);
+  });
+});
+
+// A3-P1-INV-001 — same-origin /api proxy, config shape.
+//
+// This is a config-shape guard and nothing more. It proves what the committed
+// nginx config SAYS; it proves nothing about the live token exchange, the IAM
+// decision, or that the upstream is reachable — the metadata server does not exist
+// off Cloud Run, so those are owner-run smoke assertions (docs/RUNBOOK.md
+// "Same-origin /api proxy"). The three properties below are exactly the ones that
+// can rot silently in a text file and that no other test would notice.
+test.describe('same-origin /api proxy — config shape (A3-P1-INV-001)', () => {
+  const API_LOCATION = '^~ /api/';
+
+  test('no location issues a CORS header — the browser reaches /api same-origin', () => {
+    const corsHeaders = Array.from(
+      conf.matchAll(/add_header\s+(Access-Control-[A-Za-z-]+)/gi)
+    ).map((m) => m[1]);
+    expect(
+      corsHeaders,
+      'app/nginx.conf issues a CORS header; the same-origin topology (ADR-007) means none is ever needed'
+    ).toEqual([]);
+  });
+
+  test('the /api proxy sets Authorization from the container-minted ID token', () => {
+    const block = locationBlock(conf, API_LOCATION);
+    expect(block, `location "${API_LOCATION}" not found in app/nginx.conf`).not.toBeNull();
+
+    // The literal matters in both halves: a Bearer built from anything other than
+    // $api_id_token is not the service-to-service identity, and the absence of this
+    // proxy_set_header would silently PASS THROUGH whatever Authorization the client
+    // sent — the one failure mode that still returns 200 in a smoke test.
+    expect(
+      block,
+      'the /api proxy must set Authorization from $api_id_token, not forward the client value'
+    ).toMatch(/proxy_set_header\s+Authorization\s+"Bearer \$api_id_token"\s*;/);
+
+    // $api_id_token is defined by the entrypoint-written include, never in this file.
+    expect(
+      block,
+      'the /api proxy must include the entrypoint-written token file (it also carries the unconfigured 503)'
+    ).toMatch(/include\s+\/etc\/nginx\/conf\.d\/api-id-token\.conf\s*;/);
+  });
+
+  test('the /api proxy sends SNI — nginx defaults proxy_ssl_server_name off', () => {
+    const block = locationBlock(conf, API_LOCATION);
+    expect(block).not.toBeNull();
+    expect(
+      block,
+      'Cloud Run routes by SNI; without proxy_ssl_server_name on, the TLS handshake reaches the wrong service or none'
+    ).toMatch(/proxy_ssl_server_name\s+on\s*;/);
   });
 });
 
