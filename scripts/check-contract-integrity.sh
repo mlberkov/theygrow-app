@@ -12,12 +12,14 @@
 #   3. Live-infra names stay confined to docs/RUNBOOK.md (the sole carrier).
 #
 # Out of scope by design (never scanned):
-#   - Live-deploy paths (app/{cloudbuild.yaml,Dockerfile,nginx.conf,index.html,
-#     sw.js,manifest.json,offline.html,icons/,kb-v1.json,m/},
+#   - Live-deploy paths (app/{cloudbuild.yaml,Dockerfile,nginx.conf,
+#     docker-entrypoint.sh,index.html,sw.js,manifest.json,offline.html,icons/,
+#     kb-v1.json,m/},
 #     api/{cloudbuild.yaml,cloudbuild.staging.yaml,Dockerfile})
 #     — they legitimately carry the live-infra names as operational reality
 #     (docs/RUNBOOK.md "Live-infra divergence"). The build-config relocated into
-#     the owning subtrees in M2-P3; the staging build-config joined it in A2-P1.
+#     the owning subtrees in M2-P3; the staging build-config joined it in A2-P1;
+#     the PWA container entrypoint joined it in A3-P1.
 #   - api/pyproject.toml — its PEP 621 distribution name is "theygrow-api"
 #     (the same token as the /api Cloud Run service); it is not a contract/spine
 #     file, so check 3 never scans it. See the bare-service-name note at check 3.

@@ -1,4 +1,42 @@
+# Живые идентификаторы (URL прод-сервиса /api и runtime-сервисный аккаунт PWA) в репозиторий
+# не попадают: они приходят подстановками триггера с пустыми значениями по умолчанию — тот же
+# приём, что и в api/cloudbuild.staging.yaml. Значения хранит docs/RUNBOOK.md
+# ("Live-infra divergence"), выставляет их владелец в консоли Cloud Build.
+#
+# Опция подстановок MUST_MATCH (умолчание Cloud Build) сохраняется намеренно: сборка упадёт,
+# если триггер передаст ключ, не объявленный здесь, — так опечатка в имени подстановки не
+# разрешится молча в пустую строку.
+substitutions:
+  # Базовый URL прод-сервиса /api. Одновременно цель proxy_pass и audience ID-токена
+  # (A3-P1): Cloud Run принимает только токен, чей aud равен URL самого сервиса.
+  _API_UPSTREAM_URL: ''
+  # Runtime-сервисный аккаунт, под которым работает PWA-сервис. Именно ему выдаётся
+  # roles/run.invoker на прод-/api — поэтому он должен быть выделенным least-privilege
+  # аккаунтом, а НЕ проектным compute-аккаунтом по умолчанию (ADR-020, прецедент
+  # staging-аккаунта): invoker на общем аккаунте открыл бы /api всей проектной нагрузке.
+  _PWA_RUNTIME_SA: ''
+
 steps:
+  # Шаг 0: падаем сразу, если триггер не настроен. Гард несущий, а не декоративный:
+  # пустой --set-env-vars API_UPSTREAM_URL= разворачивает контейнер, который отдаёт PWA
+  # штатно и молча 503-ит /api — расхождение, которое всплывёт только на смоуке (или позже).
+  # Значения передаются через env: и разыменовываются как $$VAR, потому что Cloud Build
+  # подставляет $VAR текстуально ещё до запуска контейнера.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    env:
+      - 'API_UPSTREAM_URL=${_API_UPSTREAM_URL}'
+      - 'PWA_RUNTIME_SA=${_PWA_RUNTIME_SA}'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        missing=0
+        [ -n "$$API_UPSTREAM_URL" ] || { echo "FATAL: trigger substitution _API_UPSTREAM_URL is empty" >&2; missing=1; }
+        [ -n "$$PWA_RUNTIME_SA" ]   || { echo "FATAL: trigger substitution _PWA_RUNTIME_SA is empty"   >&2; missing=1; }
+        [ "$$missing" -eq 0 ] || { echo "FATAL: PWA trigger is not configured — see docs/RUNBOOK.md 'Same-origin /api proxy'" >&2; exit 1; }
+        echo "PWA trigger substitutions present"
+
   # Шаг 1: Собираем Docker образ (build context = ./app)
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/child-tracker-repo/web-app:$COMMIT_SHA', 'app']
@@ -7,7 +45,12 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/child-tracker-repo/web-app:$COMMIT_SHA']
 
-  # Шаг 3: Деплоим в Cloud Run
+  # Шаг 3: Деплоим в Cloud Run.
+  # --allow-unauthenticated остаётся: PWA — публичная входная дверь продукта (PDR-002).
+  # Приватным с A3-P1 становится только /api, и ходит в него этот контейнер, а не браузер.
+  # --service-account пиннит идентичность, которой выдан roles/run.invoker на прод-/api:
+  # без явного аккаунта сервис работает под проектным compute-аккаунтом по умолчанию, и
+  # выдача invoker ему открыла бы /api всей нагрузке проекта.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -23,6 +66,10 @@ steps:
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
+      - '--service-account'
+      - '${_PWA_RUNTIME_SA}'
+      - '--set-env-vars'
+      - 'API_UPSTREAM_URL=${_API_UPSTREAM_URL}'
       - '--no-traffic'
       - '--tag'
       - 'sha-$SHORT_SHA'

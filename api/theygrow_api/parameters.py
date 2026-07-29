@@ -30,6 +30,12 @@ Parameter scope:
 P2 (embedding model + final <=1536 dimension) and P3 (top_k / candidate_k, RRF weights)
 MUST land their knobs in THIS surface and emit through the ``signals.py`` seam (M4-DL-002).
 
+A3-P2 widened "product / algorithm" slightly, deliberately: the served-engine POOL knobs live
+here too, not on ``Settings``. ``Settings`` binds default-less infra *identity* (the connection
+string) and fails loudly when it is absent; the pool knobs are tunables with defaults that need
+``changed_in`` provenance and a rendered value — which is exactly what this surface is for
+(A3-DL-002).
+
 §4: this surface holds configuration only — never child data.
 """
 
@@ -47,7 +53,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 #: ``rrf_dense_weight``, ``rrf_sparse_weight``) were added — a knob-count change, not a
 #: value change. v4 (M4-DL-005): the P4 grounded-ask knobs (``answers_model``,
 #: ``grounding_min_segments``) were added — a knob-count change, not a value change.
-PARAMETERS_SCHEMA_VERSION = 4
+#: v5 (A3-DL-002): the five served-engine pool knobs (``db_pool_size``, ``db_max_overflow``,
+#: ``db_pool_timeout_seconds``, ``db_pool_recycle_seconds``, ``db_connect_timeout_seconds``)
+#: were added — a knob-count change, not a value change.
+PARAMETERS_SCHEMA_VERSION = 5
 
 #: Sparse-FTS text-search configuration — the SURFACE value of this knob. ``'simple'``
 #: does no Russian stemming (known recall limitation, ADR-008; port-out trigger ->
@@ -139,6 +148,47 @@ class RuntimeParameters(BaseSettings):
     #: M4-DL-004), so a score threshold would be meaningless across queries. Default 1 =
     #: "need >=1 grounded segment"; raise to require denser grounding.
     grounding_min_segments: int = 1
+
+    # --- A3-P2 served-engine pool (A3-DL-002). These govern the PROCESS-CACHED engine the
+    # deployed service builds (``db.engine.served_engine``) and NOTHING else: the offline
+    # CLIs and ``alembic/env.py`` keep ``create_db_engine``'s per-run, disposed-at-exit
+    # engine untouched. ``pool_pre_ping`` is deliberately NOT a knob — off, a Cloud-SQL-
+    # recycled connection makes readiness report a false negative, which is a correctness
+    # setting, not a tuning choice.
+    #
+    # THE ARITHMETIC IS THE POINT: db_pool_size x (Cloud Run --max-instances) must fit inside
+    # the application role's CONNECTION LIMIT with headroom left for the owner's Cloud SQL
+    # Auth Proxy sessions and migration runs. Shipped: 2 x 2 = 4 against a CONNECTION LIMIT of
+    # 30, leaving wide headroom. Raising --max-instances requires raising the role's CONNECTION
+    # LIMIT FIRST (docs/RUNBOOK.md "Production database enablement").
+    #
+    # The 30 is INSTANCE-derived, not application-derived, and it supersedes the 10 A3-P2
+    # shipped here: max_connections 50 minus 3 superuser-reserved minus ~5 Cloud SQL agents
+    # leaves ~42, of which 12 are held back for the owner's sessions (A3-DL-004). The
+    # RUNBOOK carries the derivation; this comment must not restate it and drift from it.
+
+    #: Connections held per process by the served engine. Half of the ceiling arithmetic above.
+    db_pool_size: int = 2
+
+    #: Burst allowance above ``db_pool_size``. ZERO is load-bearing: it makes the ceiling a
+    #: hard one, so the unauthenticated-reachable readiness path cannot open connection N+1
+    #: under load (there is no rate limiting in front of it).
+    db_max_overflow: int = 0
+
+    #: Seconds a request waits for a pooled connection before the engine gives up. Short by
+    #: design: with ``db_max_overflow = 0`` an excess request must fail fast into the ordinary
+    #: 503 rather than pile up holding a Cloud Run request slot.
+    db_pool_timeout_seconds: int = 2
+
+    #: Seconds after which a pooled connection is recycled. Kept below the idle-connection
+    #: reaping done by Cloud SQL and by Cloud Run instance scale-down, so a long-idle instance
+    #: does not answer its next probe over a server-side-closed socket.
+    db_pool_recycle_seconds: int = 1800
+
+    #: libpq ``connect_timeout`` for the served engine, in seconds. Bounds a hung dial (a wrong
+    #: socket path, an unreachable instance) so readiness answers 503 promptly instead of
+    #: holding the request until the platform times it out.
+    db_connect_timeout_seconds: int = 5
 
 
 def current_parameters() -> tuple[Parameter, ...]:
@@ -270,6 +320,71 @@ def current_parameters() -> tuple[Parameter, ...]:
                 "Below it -> honest degradation (no_evidence), zero provider calls, never a "
                 "parametric/web fallback. Count-based, not score-based (RRF fuses on rank; "
                 "score calibration is out of scope, M4-DL-004). Default 1."
+            ),
+        ),
+        Parameter(
+            name="db_pool_size",
+            value=runtime.db_pool_size,
+            type_label="int",
+            scope="runtime",
+            changed_in="A3-DL-002",
+            note=(
+                "Connections held per process by the SERVED engine (db.engine.served_engine), "
+                "which only the deployed service builds; the offline CLIs and alembic keep "
+                "create_db_engine's per-run engine. Half of the ceiling arithmetic: "
+                "db_pool_size x Cloud Run --max-instances must fit inside the application "
+                "role's CONNECTION LIMIT, with headroom for the owner's Auth Proxy sessions "
+                "and migration runs (shipped 2 x 2 = 4 against a limit of 30)."
+            ),
+        ),
+        Parameter(
+            name="db_max_overflow",
+            value=runtime.db_max_overflow,
+            type_label="int",
+            scope="runtime",
+            changed_in="A3-DL-002",
+            note=(
+                "Burst allowance above db_pool_size. Zero is load-bearing, not a default: it "
+                "makes the per-process ceiling a hard one, so the unauthenticated-reachable "
+                "readiness path cannot open connection N+1 under load. There is no rate "
+                "limiting in front of it."
+            ),
+        ),
+        Parameter(
+            name="db_pool_timeout_seconds",
+            value=runtime.db_pool_timeout_seconds,
+            type_label="int",
+            scope="runtime",
+            changed_in="A3-DL-002",
+            note=(
+                "Seconds a request waits for a pooled connection before the engine gives up. "
+                "Short by design: with db_max_overflow = 0 an excess request must fail fast "
+                "into the ordinary 503 rather than pile up holding a Cloud Run request slot."
+            ),
+        ),
+        Parameter(
+            name="db_pool_recycle_seconds",
+            value=runtime.db_pool_recycle_seconds,
+            type_label="int",
+            scope="runtime",
+            changed_in="A3-DL-002",
+            note=(
+                "Seconds after which a pooled connection is recycled. Kept below the "
+                "idle-connection reaping done by Cloud SQL and by Cloud Run instance "
+                "scale-down, so a long-idle instance does not probe over a server-side-closed "
+                "socket. Paired with pool_pre_ping, which is fixed policy and not a knob."
+            ),
+        ),
+        Parameter(
+            name="db_connect_timeout_seconds",
+            value=runtime.db_connect_timeout_seconds,
+            type_label="int",
+            scope="runtime",
+            changed_in="A3-DL-002",
+            note=(
+                "libpq connect_timeout for the served engine. Bounds a hung dial (a wrong "
+                "socket path, an unreachable instance) so readiness answers 503 promptly "
+                "instead of holding the request until the platform times it out."
             ),
         ),
     )

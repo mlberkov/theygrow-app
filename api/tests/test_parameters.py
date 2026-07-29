@@ -26,8 +26,8 @@ def _by_name() -> dict[str, Parameter]:
 
 def test_schema_version_is_int() -> None:
     assert isinstance(PARAMETERS_SCHEMA_VERSION, int)
-    # v4 (M4-DL-005): the P4 grounded-ask knobs (answers_model, grounding_min_segments) added.
-    assert PARAMETERS_SCHEMA_VERSION == 4
+    # v5 (A3-DL-002): the five served-engine pool knobs were added — a knob-count change.
+    assert PARAMETERS_SCHEMA_VERSION == 5
 
 
 def test_every_parameter_carries_nonempty_changed_in() -> None:
@@ -129,6 +129,46 @@ def test_p4_knobs_are_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
     by = _by_name()
     assert by["answers_model"].value == "custom-chat-model"
     assert by["grounding_min_segments"].value == 3
+
+
+def test_a3_p2_pool_knobs_are_runtime_with_provenance() -> None:
+    by = _by_name()
+    for name in (
+        "db_pool_size",
+        "db_max_overflow",
+        "db_pool_timeout_seconds",
+        "db_pool_recycle_seconds",
+        "db_connect_timeout_seconds",
+    ):
+        knob = by[name]
+        assert knob.scope == "runtime"
+        assert knob.changed_in == "A3-DL-002"
+        assert knob.type_label == "int"
+        assert isinstance(knob.value, int)
+
+
+def test_a3_p2_pool_defaults_are_the_shipped_connection_arithmetic() -> None:
+    """db_pool_size x --max-instances must fit the role's CONNECTION LIMIT with headroom.
+
+    Shipped: 2 x 2 = 4 against a CONNECTION LIMIT of 30 (docs/RUNBOOK.md, "Production database
+    enablement"), leaving wide headroom for the owner's Auth Proxy sessions and migration runs.
+    The 30 is instance-derived and supersedes the 10 A3-P2 assumed (A3-DL-004). The
+    zero-overflow default is what makes that a ceiling rather than a hope; changing either
+    default without revisiting the role's limit is the failure this pins.
+    """
+    by = _by_name()
+    assert by["db_pool_size"].value == 2
+    assert by["db_max_overflow"].value == 0
+    assert "CONNECTION LIMIT" in (by["db_pool_size"].note or "")
+    assert "no rate limiting" in (by["db_max_overflow"].note or "")
+
+
+def test_a3_p2_pool_knobs_are_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("THEYGROW_PARAM_DB_POOL_SIZE", "3")
+    monkeypatch.setenv("THEYGROW_PARAM_DB_CONNECT_TIMEOUT_SECONDS", "9")
+    by = _by_name()
+    assert by["db_pool_size"].value == 3
+    assert by["db_connect_timeout_seconds"].value == 9
 
 
 def test_embedding_dimension_is_schema_bound_with_provenance() -> None:

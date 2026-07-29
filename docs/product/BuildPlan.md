@@ -21,7 +21,7 @@ Introduce the monorepo split (`/app` + `/api`) and stand up the FastAPI skeleton
 
 - **P1** — Monorepo split: migrate the static PWA from repo root into `/app`; repoint the `Dockerfile` COPY sources; reconcile RUNBOOK/TechSpec. Served `/` stays byte-identical. **Done** @ a77dfef.
 - **P2** — FastAPI `/api` skeleton: `GET /api/health` (structured, non-PII, in-process), env-driven **read-only** config (DB connection + infra endpoints from env, no secret defaults; opens no connections), a provider-port **interface stub** (engine stays out of perimeter), the **PII forward guard** active byte-one, and the quality harness gaining teeth on `api/` (mypy strict + pytest in CI). No business endpoints; no DB connection. Decision `M2-DL-001`. **Current.**
-- **P3** — Runtime + deploy path: a dev-only docker-compose (Postgres 16 / pgvector), build-config relocated from repo root into `/app` + `/api`, and the `/api` deploy path — `/api` deploys as **its own Cloud Run service** (own build-config + trigger) so `/api/health` is green not just in CI but deployed. No real DB connection or schema yet (M3). The nginx same-origin `/api` proxy is **M5**, not P3 (see M5). Decision `M2-DL-002`.
+- **P3** — Runtime + deploy path: a dev-only docker-compose (Postgres 16 / pgvector), build-config relocated from repo root into `/app` + `/api`, and the `/api` deploy path — `/api` deploys as **its own Cloud Run service** (own build-config + trigger) so `/api/health` is green not just in CI but deployed. No real DB connection or schema yet (M3). The nginx same-origin `/api` proxy is not P3; `M2-DL-002` reassigned it to M5, and it ultimately landed in **A3-P1** (`A3-DL-001`). Decision `M2-DL-002`.
 
 ## M3 — episodic store + `/export` importer
 
@@ -44,9 +44,10 @@ Port retrieval / RAG from `diary-memory-service` into `theygrow-app`'s `/api`. T
 
 Stand up the chat surface against the two grounded sources (family memory + canon). The runtime contract from `RUNTIME-INVARIANTS.md` becomes fully enforced at this milestone:
 
-- **Origin unification** — the nginx same-origin `/api` proxy: the PWA and `/api` are served same-origin (no CORS). Reassigned here from the M2-P3 misrecording (ADR-007; see `M2-DL-002`); until M5, `/api` runs as its own Cloud Run service on its own URL.
 - **Grounding gate** — block generation when grounded coverage is absent.
 - **Honest degradation** — explicit "no grounded answer" surface; never a synthesized fallback.
 - **Per-segment provenance** — source attribution per answer segment, not per answer.
 - **Medical boundary** — health-adjacent / red-flag prompts route to specialist referral, not generated diagnosis.
 - **Closed corpus** — sealed end-to-end on the answer surface.
+
+**Origin unification is no longer part of M5.** The nginx same-origin `/api` proxy — the PWA and `/api` served same-origin, no CORS anywhere (ADR-007) — landed in **A3-P1** (`A3-DL-001`, amending `M2-DL-002`), well ahead of the chat surface: production `/api` is private and reached only through the PWA's nginx. M5 inherits that topology rather than establishing it.
