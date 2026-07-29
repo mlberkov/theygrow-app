@@ -19,6 +19,7 @@ from theygrow_api.signals import (
     EvalScorecard,
     GroundingCoverage,
     LoggingSignalSink,
+    ReadinessProbe,
     RetrievalLatency,
     SignalKind,
     default_sink,
@@ -29,8 +30,9 @@ _FORBIDDEN = {"raw_text", "chunk_text", "community_id", "author_user_id"}
 
 #: Bounded enum-style label keys (counts/ids class, §4-safe) whose values are short labels
 #: rather than numeric counts/timings — e.g. the retrieval ``leg`` discriminator, the
-#: degradation ``mode`` label (M4-P4) and the eval ``case_class`` label (A2-P3).
-_LABEL_KEYS = {"leg", "mode", "case_class"}
+#: degradation ``mode`` label (M4-P4), the eval ``case_class`` label (A2-P3) and the readiness
+#: ``outcome`` / ``failure_class`` labels (A3-P2).
+_LABEL_KEYS = {"leg", "mode", "case_class", "outcome", "failure_class"}
 
 
 def test_taxonomy_defines_every_kind() -> None:
@@ -38,21 +40,24 @@ def test_taxonomy_defines_every_kind() -> None:
     for kind, desc in SIGNAL_TAXONOMY.items():
         assert desc.kind == kind
         # M4 packet ids for the engine spine; milestone-qualified for non-spine tracks,
-        # which do not share M4's packet numbering (A2-P3 is the eval pipeline).
-        assert desc.producing_stage in {"P1", "P2", "P3", "P4", "A2-P3"}
+        # which do not share M4's packet numbering (A2-P3 is the eval pipeline, A3-P2 the
+        # deployed readiness probe).
+        assert desc.producing_stage in {"P1", "P2", "P3", "P4", "A2-P3", "A3-P2"}
 
 
 def test_all_kinds_are_emitted_now_as_of_p4() -> None:
     # As of M4-P4 every declared kind has a live producer (the two P4 kinds — GROUNDING_COVERAGE
     # and DEGRADATION_EVENT — were activated when query_service landed); A2-P3 added
-    # EVAL_SCORECARD with its emitter in the same packet. INV-003 (test_signal_emitters) is
-    # the producer-coupling guarantee; here we just pin the taxonomy.
+    # EVAL_SCORECARD and A3-P2 added READINESS_PROBE, each with its emitter in the same packet.
+    # INV-003 (test_signal_emitters) is the producer-coupling guarantee; here we just pin the
+    # taxonomy.
     for kind, desc in SIGNAL_TAXONOMY.items():
-        assert desc.emitted_now is True, f"{kind} should be emitted as of A2-P3"
+        assert desc.emitted_now is True, f"{kind} should be emitted as of A3-P2"
     assert SIGNAL_TAXONOMY[SignalKind.GROUNDING_COVERAGE].producing_stage == "P4"
     assert SIGNAL_TAXONOMY[SignalKind.DEGRADATION_EVENT].producing_stage == "P4"
     assert SIGNAL_TAXONOMY[SignalKind.EMBEDDING_COUNTERS].producing_stage == "P2"
     assert SIGNAL_TAXONOMY[SignalKind.EVAL_SCORECARD].producing_stage == "A2-P3"
+    assert SIGNAL_TAXONOMY[SignalKind.READINESS_PROBE].producing_stage == "A3-P2"
 
 
 def test_signal_payloads_are_safe_counts_and_timings() -> None:
@@ -86,6 +91,7 @@ def test_signal_payloads_are_safe_counts_and_timings() -> None:
             route_violations=0,
             duration_ms=12.5,
         ),
+        ReadinessProbe(outcome="unavailable", failure_class="connect_failed", latency_ms=4.0),
     ):
         payload = sig.fields()
         assert not (_FORBIDDEN & set(payload)), "signal payload must carry no §4 fields"

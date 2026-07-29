@@ -1,4 +1,46 @@
+# The live Cloud SQL / secret / service-account identifiers are NOT in this repo: they
+# arrive as trigger substitutions with empty defaults (A3-P2), the same technique as
+# api/cloudbuild.staging.yaml and app/cloudbuild.yaml. Values live in docs/RUNBOOK.md
+# ("Live-infra divergence") and are set by the owner in the Cloud Build console.
+#
+# ORDERING, and it is the INVERSE of A3-P1's: these substitutions are set AFTER the packet
+# merges, never before. Cloud Build's default MUST_MATCH option (kept deliberately — it
+# turns a substitution typo into a red build instead of a silent empty string) fails every
+# build when a trigger supplies a key the config on `main` does not declare. See
+# docs/RUNBOOK.md "Production database enablement".
+substitutions:
+  # Cloud SQL instance connection name (project:region:instance).
+  _CLOUDSQL_INSTANCE: ''
+  # Secret Manager secret holding the production DATABASE_URL (socket form — RUNBOOK).
+  _DB_SECRET_NAME: ''
+  # Runtime service account this service runs as (dedicated, least-privilege).
+  _API_RUNTIME_SA: ''
+
 steps:
+  # Step 0: fail fast on an unconfigured trigger. This guard is load-bearing, not
+  # decorative, and this is the config where it matters most: an empty
+  # --add-cloudsql-instances parses to an EMPTY LIST, so the deploy SUCCEEDS with no Cloud
+  # SQL attachment and /api/health — which needs no environment — stays green. The only
+  # thing that would notice is /api/health/ready, on a revision that already looks
+  # deployed. Values travel through env: and are dereferenced with $$VAR, because Cloud
+  # Build substitutes $VAR textually before this container ever runs.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    env:
+      - 'CLOUDSQL_INSTANCE=${_CLOUDSQL_INSTANCE}'
+      - 'DB_SECRET_NAME=${_DB_SECRET_NAME}'
+      - 'API_RUNTIME_SA=${_API_RUNTIME_SA}'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        missing=0
+        [ -n "$$CLOUDSQL_INSTANCE" ] || { echo "FATAL: trigger substitution _CLOUDSQL_INSTANCE is empty" >&2; missing=1; }
+        [ -n "$$DB_SECRET_NAME" ]    || { echo "FATAL: trigger substitution _DB_SECRET_NAME is empty"    >&2; missing=1; }
+        [ -n "$$API_RUNTIME_SA" ]    || { echo "FATAL: trigger substitution _API_RUNTIME_SA is empty"    >&2; missing=1; }
+        [ "$$missing" -eq 0 ] || { echo "FATAL: production /api trigger is not configured — see docs/RUNBOOK.md 'Production database enablement'" >&2; exit 1; }
+        echo "production /api trigger substitutions present"
+
   # Step 1: build the /api image (build context = ./api)
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'europe-west1-docker.pkg.dev/ordinal-avatar-479419-t7/theygrow-api-repo/api:$COMMIT_SHA', 'api']
@@ -10,10 +52,26 @@ steps:
   # Step 3: deploy to its OWN Cloud Run service (own URL). Since A3-P1 that URL is
   # reachable only through the PWA container's same-origin /api proxy (ADR-038 / ADR-007);
   # the browser never talks to it directly and no CORS header is ever issued.
-  # No --set-env-vars / --set-secrets / --add-cloudsql-instances: /api/health is still
-  # the whole served surface and needs no environment. M3/M4 landed the database
-  # consumers as owner-run offline CLIs, not as routes, so production stays unwired
-  # deliberately; the DB-wired sibling is api/cloudbuild.staging.yaml.
+  # Since A3-P2 this deploy IS database-wired: --add-cloudsql-instances mounts the Cloud SQL
+  # Auth proxy as a Unix socket, --set-secrets injects DATABASE_URL from Secret Manager, and
+  # --service-account pins a dedicated least-privilege runtime identity. Before A3-P2 the
+  # service carried none of the three and its whole served surface was /api/health, which
+  # needs no environment; GET /api/health/ready is what changed that. Liveness stays
+  # environment-free by design — on a rollback to an unattached revision it is the route
+  # that keeps answering.
+  #
+  # --service-account is NOT optional and NOT deferrable: the project has exactly one
+  # identity today, the default compute account carrying roles/editor and shared by Cloud
+  # Build and both runtimes, so granting roles/cloudsql.client there would open the family
+  # database to every workload in the project (ADR-038 as amended). Cloud Build needs
+  # roles/iam.serviceAccountUser on this account or the deploy fails with an actAs error
+  # that names nothing useful.
+  #
+  # --max-instances 2 is a CHANGE, not a default: the live service ran with maxScale 20, so
+  # this narrows the ceiling tenfold. It is the other half of the connection arithmetic —
+  # db_pool_size (2, parameters.py) x max-instances (2) = 4 connections, against the
+  # application role's CONNECTION LIMIT of 10, leaving 6 for the owner's Auth Proxy sessions
+  # and migration runs. RAISE THE ROLE'S CONNECTION LIMIT BEFORE RAISING THIS.
   #
   # --no-allow-unauthenticated (A3-P1, was --allow-unauthenticated): the service takes
   # only authenticated calls, and the proxy authenticates service-to-service with a
@@ -46,6 +104,14 @@ steps:
       - '--no-allow-unauthenticated'
       - '--port'
       - '8080'
+      - '--service-account'
+      - '${_API_RUNTIME_SA}'
+      - '--add-cloudsql-instances'
+      - '${_CLOUDSQL_INSTANCE}'
+      - '--set-secrets'
+      - 'DATABASE_URL=${_DB_SECRET_NAME}:latest'
+      - '--max-instances'
+      - '2'
       - '--no-traffic'
       - '--tag'
       - 'sha-$SHORT_SHA'

@@ -17,6 +17,9 @@ Consequences this enforces:
     explicit by design, not a fragile reflective scan. A2-P3's EVAL_SCORECARD is driven from
     a hand-built ``Scorecard``: its emitter is a pure function over an already-computed
     scorecard precisely so this test never needs a seeded 295-chunk contour to cover it.
+    A3-P2's READINESS_PROBE joined on the same terms, driven from the session-scoped engine:
+    the probe takes an ``Engine`` (it borrows and returns a pooled connection) rather than the
+    transaction-scoped ``Connection`` the other producers are handed.
 DB-backed (the producers need a real Postgres); skips with the rest of the suite when
 ``DATABASE_URL`` is unset.
 """
@@ -27,10 +30,11 @@ import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import Connection, insert
+from sqlalchemy import Connection, Engine, insert
 
 from theygrow_api.config import Settings
 from theygrow_api.db.models import EMBEDDING_DIMENSION, SourceMessage
+from theygrow_api.db.readiness import probe_readiness
 from theygrow_api.derivation import rederive
 from theygrow_api.embeddings_backfill import embed_backfill
 from theygrow_api.evals.scorecard import CaseResult, emit_scorecard, summarize
@@ -76,7 +80,9 @@ def _cleared_settings() -> Settings:
     )
 
 
-def test_every_emitted_now_kind_has_a_wired_producer(connection: Connection) -> None:
+def test_every_emitted_now_kind_has_a_wired_producer(
+    connection: Connection, migrated_engine: Engine
+) -> None:
     connection.execute(
         insert(SourceMessage),
         {
@@ -125,6 +131,9 @@ def test_every_emitted_now_kind_has_a_wired_producer(connection: Connection) -> 
         ),
         sink,
     )
+    # READINESS_PROBE: the A3-P2 deployed probe. Driven from the session engine rather than the
+    # test's transaction-scoped connection, because it borrows its own pooled connection.
+    probe_readiness(migrated_engine, sink=sink)
 
     emitted = {s.kind for s in sink.signals}
     expected = {kind for kind, desc in SIGNAL_TAXONOMY.items() if desc.emitted_now}
@@ -135,7 +144,9 @@ def test_every_emitted_now_kind_has_a_wired_producer(connection: Connection) -> 
 
 
 def test_no_defined_not_emitted_kinds_remain_as_of_p4() -> None:
-    # M4-P4 activated the last two deferred kinds; the defined-not-emitted set is now empty.
+    # M4-P4 activated the last two deferred kinds; the defined-not-emitted set is now empty and
+    # has stayed empty across A2-P3 (EVAL_SCORECARD) and A3-P2 (READINESS_PROBE), each of which
+    # landed its emitter in the same packet as its descriptor.
     # A future deferred-then-activated kind re-enters via the coupling test above.
     not_emitted = {kind for kind, desc in SIGNAL_TAXONOMY.items() if not desc.emitted_now}
     assert not_emitted == set()

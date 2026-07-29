@@ -56,7 +56,9 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Construct settings from the environment.
 
-    Provided as a FastAPI dependency seam for future routes. No P2 route depends
-    on it, so the health skeleton needs zero environment to run.
+    Since A3-P2 exactly ONE route reaches this — ``GET /api/health/ready``, and only
+    lazily, on the first request that builds the served engine. ``GET /api/health``
+    (liveness) still constructs no settings and needs zero environment to run; keeping it
+    that way is half of A3-P2-INV-001.
     """
     return Settings()

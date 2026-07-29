@@ -16,6 +16,7 @@ Taxonomy:
   * ``GROUNDING_COVERAGE``  — P4, emitted: cited vs offered segment counts per answer.
   * ``DEGRADATION_EVENT``   — P4, emitted: honest-degradation events (a §4-safe mode label).
   * ``EVAL_SCORECARD``      — A2-P3, emitted: per-case-class eval outcome counts + timing.
+  * ``READINESS_PROBE``     — A3-P2, emitted: deployed readiness outcome + failure class + latency.
 
 P2/P3/P4 signals MUST emit through this SAME seam (M4-DL-002). The seam is an injectable
 ``SignalSink`` so tests capture emissions and a future metrics backend swaps in without
@@ -41,6 +42,7 @@ class SignalKind(StrEnum):
     GROUNDING_COVERAGE = "grounding.coverage"
     DEGRADATION_EVENT = "degradation.event"
     EVAL_SCORECARD = "eval.scorecard"
+    READINESS_PROBE = "readiness.probe"
 
 
 @dataclass(frozen=True)
@@ -139,6 +141,21 @@ SIGNAL_TAXONOMY: dict[SignalKind, SignalDescriptor] = {
             "evals.scorecard.emit_scorecard. Counts and a bounded label only: no query text, "
             "no chunk text, no chunk ids, no community_id. Contract-conformance counts on a "
             "fixed synthetic corpus — NOT a recall or answer-quality measure."
+        ),
+    ),
+    SignalKind.READINESS_PROBE: SignalDescriptor(
+        kind=SignalKind.READINESS_PROBE,
+        field_names=("outcome", "failure_class", "latency_ms"),
+        producing_stage="A3-P2",
+        emitted_now=True,
+        note=(
+            "Deployed readiness probe (A3-P2): two §4-safe bounded labels + the probe's own "
+            "wall-clock. 'outcome' mirrors the HTTP body's status enum ('ready' | "
+            "'unavailable'); 'failure_class' says WHERE it failed ('none' | 'config_invalid' | "
+            "'connect_failed' | 'query_failed') and is derived from the control-flow branch, "
+            "NEVER from exception text — which is what keeps the host, user, DSN and driver "
+            "string out of it. Emitted by db.readiness.probe_readiness / check_readiness on "
+            "every GET /api/health/ready. Timings live here, never in the response body."
         ),
     ),
 }
@@ -298,6 +315,33 @@ class EvalScorecard:
             "scope_violations": self.scope_violations,
             "route_violations": self.route_violations,
             "duration_ms": self.duration_ms,
+        }
+
+
+@dataclass(frozen=True)
+class ReadinessProbe:
+    """A3-P2 signal: one deployed readiness probe — two bounded labels + the probe's latency.
+
+    ``outcome`` mirrors the HTTP body's status enum (``"ready"`` | ``"unavailable"``) so a log
+    line and a response correlate without a mapping table. ``failure_class`` is the bounded
+    WHERE (``"none"`` | ``"config_invalid"`` | ``"connect_failed"`` | ``"query_failed"``),
+    derived from which control-flow branch was taken — never from exception text. That is the
+    §4 argument: psycopg/SQLAlchemy connection errors carry the host, the user and the socket
+    path, and none of it can reach a fixed enum. Both are labels in the counts/ids class,
+    exactly like ``RetrievalLatency.leg``. Neither carries a default: every emission is
+    labelled on both axes.
+    """
+
+    outcome: str
+    failure_class: str
+    latency_ms: float
+    kind: SignalKind = SignalKind.READINESS_PROBE
+
+    def fields(self) -> dict[str, object]:
+        return {
+            "outcome": self.outcome,
+            "failure_class": self.failure_class,
+            "latency_ms": self.latency_ms,
         }
 
 
