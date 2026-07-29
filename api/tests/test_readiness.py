@@ -241,9 +241,9 @@ def test_the_served_app_installs_the_pii_redaction_boundary(
     probes = [r for r in caplog.records if r.getMessage() == "readiness.probe"]
     assert probes, "the readiness signal did not reach the logging boundary"
     assert probes[-1].__dict__["failure_class"] == FAILURE_CONNECT_FAILED
-    assert any(
-        isinstance(f, PiiRedactionFilter) for f in logging.getLogger().filters
-    ), "the §4 redaction filter is not installed on this process's root logger"
+    assert any(isinstance(f, PiiRedactionFilter) for f in logging.getLogger().filters), (
+        "the §4 redaction filter is not installed on this process's root logger"
+    )
 
 
 def test_readiness_logs_nothing_but_the_bounded_signal(
