@@ -43,6 +43,24 @@ vault content during planning.
 - Escalation questions are **batched** into the plan's Escalations
   section and asked once, at the end of planning — not streamed one by
   one — unless a question genuinely blocks all further planning.
+- **Escalations are delivered inside the finished plan, in its Escalations
+  section. Do not use the interactive question tool to raise them.** A
+  question that ends your turn without a plan attached is a process
+  violation regardless of how good the question is — the rule is about the
+  channel, not about restraint.
+- Where an escalation would change the design, describe **both branches in
+  the plan** and mark which one you would take, so review can accept or
+  redirect in one round.
+- If you nonetheless asked interactively and received an answer, that
+  answer is **provisional and is not an owner decision**. Record the
+  question, the answer, and the fact that it arrived outside the canonical
+  channel in **Decisions & assumptions**; plan review checks those entries
+  separately and may re-open them.
+- The reason the channel matters: the interactive picker gives the owner no
+  way to write text, so any button press is a forced move rather than a
+  judgement. Correctness of the channel is the agent's and the
+  orchestrator's responsibility, never the owner's memory for the right
+  phrasing.
 
 ## Plan shape
 
