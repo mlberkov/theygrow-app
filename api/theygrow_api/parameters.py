@@ -159,8 +159,13 @@ class RuntimeParameters(BaseSettings):
     # THE ARITHMETIC IS THE POINT: db_pool_size x (Cloud Run --max-instances) must fit inside
     # the application role's CONNECTION LIMIT with headroom left for the owner's Cloud SQL
     # Auth Proxy sessions and migration runs. Shipped: 2 x 2 = 4 against a CONNECTION LIMIT of
-    # 10, leaving 6. Raising --max-instances requires raising the role's CONNECTION LIMIT
-    # FIRST (docs/RUNBOOK.md "Production database enablement").
+    # 30, leaving wide headroom. Raising --max-instances requires raising the role's CONNECTION
+    # LIMIT FIRST (docs/RUNBOOK.md "Production database enablement").
+    #
+    # The 30 is INSTANCE-derived, not application-derived, and it supersedes the 10 A3-P2
+    # shipped here: max_connections 50 minus 3 superuser-reserved minus ~5 Cloud SQL agents
+    # leaves ~42, of which 12 are held back for the owner's sessions (A3-DL-004). The
+    # RUNBOOK carries the derivation; this comment must not restate it and drift from it.
 
     #: Connections held per process by the served engine. Half of the ceiling arithmetic above.
     db_pool_size: int = 2
@@ -329,7 +334,7 @@ def current_parameters() -> tuple[Parameter, ...]:
                 "create_db_engine's per-run engine. Half of the ceiling arithmetic: "
                 "db_pool_size x Cloud Run --max-instances must fit inside the application "
                 "role's CONNECTION LIMIT, with headroom for the owner's Auth Proxy sessions "
-                "and migration runs (shipped 2 x 2 = 4 against a limit of 10)."
+                "and migration runs (shipped 2 x 2 = 4 against a limit of 30)."
             ),
         ),
         Parameter(

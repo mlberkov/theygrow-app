@@ -60,18 +60,23 @@ steps:
   # environment-free by design — on a rollback to an unattached revision it is the route
   # that keeps answering.
   #
-  # --service-account is NOT optional and NOT deferrable: the project has exactly one
-  # identity today, the default compute account carrying roles/editor and shared by Cloud
-  # Build and both runtimes, so granting roles/cloudsql.client there would open the family
-  # database to every workload in the project (ADR-038 as amended). Cloud Build needs
-  # roles/iam.serviceAccountUser on this account or the deploy fails with an actAs error
-  # that names nothing useful.
+  # --service-account is NOT optional and NOT deferrable: the default compute account
+  # carries roles/editor and is shared by Cloud Build and both runtimes, so granting
+  # roles/cloudsql.client there would open the family database to every workload in the
+  # project (ADR-038 as amended). Cloud Build needs roles/iam.serviceAccountUser on this
+  # account or the deploy fails with an actAs error that names nothing useful.
+  # The project holds FOUR identities (A3-DL-004): that default compute account, the PWA
+  # runtime account, the /api runtime account this flag names, and a legacy Cloud Build
+  # agent account holding roles/cloudbuild.builds.builder that no trigger runs under.
+  # Three branches still to narrow, default account last.
   #
   # --max-instances 2 is a CHANGE, not a default: the live service ran with maxScale 20, so
-  # this narrows the ceiling tenfold. It is the other half of the connection arithmetic —
-  # db_pool_size (2, parameters.py) x max-instances (2) = 4 connections, against the
-  # application role's CONNECTION LIMIT of 10, leaving 6 for the owner's Auth Proxy sessions
-  # and migration runs. RAISE THE ROLE'S CONNECTION LIMIT BEFORE RAISING THIS.
+  # this narrows the ceiling tenfold. It is what brings the deployed service under the
+  # ceiling rule — max-instances x db_pool_size <= 30, the application role's CONNECTION
+  # LIMIT. Shipped: 2 x 2 = 4, wide headroom; at maxScale 20 the demand would be 40, over
+  # the ceiling. The 30 is INSTANCE-derived and supersedes the 10 A3-P2 assumed here
+  # (A3-DL-004; the derivation is in docs/RUNBOOK.md "Production database enablement").
+  # The flag and the pool move together. RAISE THE ROLE'S CONNECTION LIMIT BEFORE RAISING THIS.
   #
   # --no-allow-unauthenticated (A3-P1, was --allow-unauthenticated): the service takes
   # only authenticated calls, and the proxy authenticates service-to-service with a

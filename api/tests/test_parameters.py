@@ -150,8 +150,9 @@ def test_a3_p2_pool_knobs_are_runtime_with_provenance() -> None:
 def test_a3_p2_pool_defaults_are_the_shipped_connection_arithmetic() -> None:
     """db_pool_size x --max-instances must fit the role's CONNECTION LIMIT with headroom.
 
-    Shipped: 2 x 2 = 4 against a CONNECTION LIMIT of 10 (docs/RUNBOOK.md, "Production database
-    enablement"), leaving 6 for the owner's Auth Proxy sessions and migration runs. The
+    Shipped: 2 x 2 = 4 against a CONNECTION LIMIT of 30 (docs/RUNBOOK.md, "Production database
+    enablement"), leaving wide headroom for the owner's Auth Proxy sessions and migration runs.
+    The 30 is instance-derived and supersedes the 10 A3-P2 assumed (A3-DL-004). The
     zero-overflow default is what makes that a ceiling rather than a hope; changing either
     default without revisiting the role's limit is the failure this pins.
     """
