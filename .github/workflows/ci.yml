@@ -227,7 +227,20 @@ jobs:
   # into the Android project (native/android/.gitignore keeps that copy out of
   # git, so it MUST be regenerated here), and only then can Gradle package it.
   # It touches no GCP and deploys nothing.
+  # NOT ON workflow_dispatch, and this is a spend fix rather than a scope change
+  # (L1-P3, LSC-DL-003). A dispatch on an already-pushed commit duplicates the
+  # WHOLE workflow: run 31640121268 (dispatch) and 31640121253 (push) were the
+  # same commit and both started this job at 20:56:20Z, building the same APK
+  # twice at the same instant — which is also how the class-B verdict was
+  # established, since one went green and the other red in that same second.
+  # The dispatch path loses nothing: `android-instrumented` already runs
+  # `:app:packageDebug` on its way to the emulator, and now uploads the APK
+  # under the SAME artifact name, so `docs/RUNBOOK.md`'s "download
+  # theygrow-debug-apk" holds whichever path produced it. On `pull_request`
+  # both jobs run, so the upload there is gated to dispatch only — exactly one
+  # job ever publishes that artifact name, which v4 requires.
   android:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -492,6 +505,29 @@ jobs:
           # was quiet, while a missing file says nothing at all.
           script: |
             ./gradlew --no-daemon connectedDebugAndroidTest; status=$?; mkdir -p logcat; adb logcat -d > logcat/instrumented-logcat.txt 2>&1 || true; exit $status
+
+      # The installable APK on the dispatch path (LSC-DL-003). `android` is
+      # skipped on workflow_dispatch, and the emulator run has already produced
+      # this file via :app:packageDebug — so it is uploaded here under the same
+      # artifact name, with the same retention, rather than assembled a second
+      # time. `docs/RUNBOOK.md`'s "download theygrow-debug-apk" then holds
+      # whichever path produced it.
+      #
+      # DISPATCH ONLY, and the condition is load-bearing: on `pull_request`
+      # BOTH jobs run, and two uploads sharing one artifact name fail the run in
+      # upload-artifact v4. On a PR the APK comes from `android`; here it comes
+      # from this job; the two never both publish it.
+      #
+      # `always()` so a red instrumented test still leaves an installable build
+      # to reproduce the failure by hand.
+      - name: Upload the debug APK
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: theygrow-debug-apk
+          path: native/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Upload the emulator logcat
         if: always()
