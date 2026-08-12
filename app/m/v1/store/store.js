@@ -35,6 +35,41 @@ export function mintId() {
     return crypto.randomUUID();
 }
 
+// The import's idempotence, expressed as an id (L1-P4).
+//
+// A minted id is random, so a second import run would mint new ids and append
+// the family's history all over again — into a journal that cannot be edited or
+// pruned. A DERIVED id is a function of what it identifies, so the second run
+// computes the same ids, reads back which of them the store already holds, and
+// appends only the remainder. That is the whole re-runnability mechanism, and it
+// needs no ledger: the journal is the only record of what has been imported, so
+// there is no second truth that can drift out of step with it.
+//
+// The parts are HASHED, never encoded. The id of a mark is derived from a
+// profile id and a skill id, and neither is recoverable from the digest, so a
+// derived id discloses nothing a minted one would not.
+//
+// Shaped as a UUID with version 8 (RFC 9562's "custom" version) so that it is
+// indistinguishable in form from mintId()'s output — nothing downstream, and no
+// device at L7, should have to care which way an id was made.
+export async function derivedId(...parts) {
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+        throw new StoreError('crypto.subtle is unavailable; ids cannot be derived');
+    }
+    // A unit separator, because it cannot occur in a skill id, a profile id or a
+    // name — concatenating without one would let two different tuples collide.
+    const input = [STORE_CONFIG.derivedIdNamespace, ...parts].join('\u001f');
+    const digest = new Uint8Array(
+        await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+    );
+    const bytes = digest.slice(0, 16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x80;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}`
+        + `-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 function mintPassphrase(bits = STORE_CONFIG.passphraseBits) {
     const bytes = new Uint8Array(bits / 8);
     crypto.getRandomValues(bytes);

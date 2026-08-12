@@ -51,6 +51,22 @@ export const STORE_CONFIG = Object.freeze({
     // encrypted operational snapshot that does need one belongs to L7 together
     // with the relay and the key-scope model that are its only consumers.
     passphraseBits: 256,
+
+    // changed_in: LSC-DL-004 — the namespace the legacy import hashes its
+    // deterministic ids under. It is the whole idempotence mechanism: the same
+    // profile and the same skill always derive the same journal id, so a second
+    // run recognises its own earlier work by reading the journal rather than by
+    // consulting a ledger that could disagree with it.
+    //
+    // THE VERSION IS INSIDE THE VALUE, and changing it re-imports the family's
+    // entire history as a second set of entries that the append-only journal can
+    // never be rid of. It is not a knob to turn casually.
+    derivedIdNamespace: 'theygrow/legacy-import/v1',
+
+    // changed_in: LSC-DL-004 — how many candidate ids are checked for existence
+    // per round trip. SQLite's default parameter ceiling is 999, so this stays
+    // well under it; it bounds the probe, not the import.
+    legacyImportProbeBatch: 200,
 });
 
 // The complete set of plugin methods this app is allowed to call.

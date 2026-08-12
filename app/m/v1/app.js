@@ -35,6 +35,7 @@ import { wireSkillCompletion } from './surfaces/skill-completion.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
 import { wireExport } from './surfaces/export.js';
+import { offerImportIfPending, wireImport } from './surfaces/import.js';
 import { initNativeStore } from './store/boot.js';
 
 // Инициализация приложения.
@@ -71,6 +72,12 @@ async function init(storeOutcome) {
     wireOnboarding();
     wireExport();
     wireSkillCompletion();
+    wireImport();
+
+    // Предложить перенос — последним, когда интерфейс уже собран: модалка
+    // ложится поверх готовой таблицы, а не поверх пустого экрана. Не
+    // ожидается: перенос — решение родителя, а не часть загрузки.
+    offerImportIfPending();
 }
 
 // Запуск при загрузке страницы: ждём kb-артефакт, затем строим UI

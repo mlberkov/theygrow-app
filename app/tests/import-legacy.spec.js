@@ -88,10 +88,13 @@ function appendedIds(fake) {
         .map((s) => s.values[0]);
 }
 
+// The trailing space and paren matter: `INSERT INTO child_attribute` shares a
+// prefix with `INSERT INTO child`, and a looser match counts every attribute row
+// as a child row and double-counts its journal id.
 function childIds(fake) {
     return fake
         .statements()
-        .filter((s) => s.statement.includes('INSERT INTO child'))
+        .filter((s) => s.statement.includes('INSERT INTO child ('))
         .map((s) => s.values[0]);
 }
 
@@ -195,7 +198,7 @@ test.describe('property 2 — an interrupted run is completed, not corrupted', (
         const { fake } = await runImport({});
         const transactions = fake.transactions();
         const childTx = transactions.find((tx) =>
-            tx.statements.some((s) => s.includes('INSERT INTO child'))
+            tx.statements.some((s) => s.includes('INSERT INTO child ('))
         );
         expect(childTx, 'the child row is written inside a transaction').toBeTruthy();
         expect(childTx.transaction).toBe(true);

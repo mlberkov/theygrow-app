@@ -64,6 +64,7 @@ const OFFLINE_URLS = [
   '/m/v1/store/store.js',
   '/m/v1/store/journal.js',
   '/m/v1/store/repo-journal.js',
+  '/m/v1/store/import-legacy.js',
   '/m/v1/store/bridge.js',
   '/m/v1/store/config.js',
   '/m/v1/store/errors.js',
@@ -81,6 +82,7 @@ const OFFLINE_URLS = [
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
   '/m/v1/surfaces/export.js',
+  '/m/v1/surfaces/import.js',
   '/m/v1/export/run.js',
   '/m/v1/export/build.js',
   '/m/v1/export/readout.js',

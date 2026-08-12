@@ -92,10 +92,12 @@
     <link rel="modulepreload" href="/m/v1/store/store.js">
     <link rel="modulepreload" href="/m/v1/store/journal.js">
     <link rel="modulepreload" href="/m/v1/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v1/store/import-legacy.js">
     <link rel="modulepreload" href="/m/v1/store/bridge.js">
     <link rel="modulepreload" href="/m/v1/store/config.js">
     <link rel="modulepreload" href="/m/v1/store/errors.js">
     <link rel="modulepreload" href="/m/v1/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/import.js">
     <link rel="modulepreload" href="/m/v1/export/run.js">
     <link rel="modulepreload" href="/m/v1/export/build.js">
     <link rel="modulepreload" href="/m/v1/export/readout.js">
@@ -237,6 +239,24 @@
          несмягчённые и проверяются тестом app/tests/export-contour.spec.js:
          медиа в архив не входит, и облачной резервной копии этих данных нет.
          Оба показываются ДО нажатия кнопки, а не после. -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="importModalClose">&times;</span>
+            <h2>Перенести историю в приложение</h2>
+            <p>Раньше отметки хранились в браузере. Приложение может перенести их сюда, на устройство, — вместе с именем и датой рождения ребёнка.</p>
+            <p class="export-plain">Из браузера ничего не удаляется. Всё, что там записано, останется там же и после переноса.</p>
+            <p class="export-plain">Браузерная версия продолжает работать со своим хранилищем. Отметка, поставленная в браузере ПОСЛЕ этого переноса, здесь не появится, пока перенос не будет запущен ещё раз. Отметки, сделанные здесь, в браузере не появятся никогда.</p>
+            <p>У перенесённых отметок нет даты наблюдения: в браузере она не записывалась. Они получат дату переноса, и в архиве будет прямо сказано, что настоящая дата неизвестна.</p>
+            <p>Отметьте, кого перенести. Снятый профиль можно перенести позже — а вот отменить перенос нельзя: журнал только пополняется.</p>
+            <div id="importChoices" class="import-choices"></div>
+            <p id="importStatus" class="export-status" hidden></p>
+            <div class="modal-buttons">
+                <button type="button" class="modal-button modal-button-secondary" id="importCloseBtn">Не сейчас</button>
+                <button type="button" class="modal-button modal-button-primary" id="importRunBtn">Перенести</button>
+            </div>
+        </div>
+    </div>
+
     <div id="storeUnavailableModal" class="modal">
         <div class="modal-content">
             <span class="modal-close" id="storeUnavailableClose">&times;</span>

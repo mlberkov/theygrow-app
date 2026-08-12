@@ -16,6 +16,11 @@
     "included": false,
     "statement_ru": "Фотографии, видео и звукозаписи в архив не входят. Каталог attachments/ существует, но пуст."
   },
+  "provenance": {
+    "statement_ru": "У каждой записи журнала есть поле origin. Записи с origin = migrated_legacy перенесены из ранней версии приложения, которая хранила отметки без дат. У них дата события равна дате переноса, а момент события пуст: настоящая дата неизвестна, и в этом архиве её нет. В наборе child_skill_state то же самое сказано полем event_date_basis. Если у большой группы навыков стоит одна дата с такой пометкой, это день переноса, а не день, когда ребёнок освоил их все.",
+    "origin_field": "origin",
+    "basis_field": "event_date_basis"
+  },
   "determinism": {
     "statement_ru": "Один и тот же журнал и одно и то же значение exported_at_utc дают побайтово одинаковый архив. При разном exported_at_utc расходятся только два файла: MANIFEST.json и print/archive.pdf — формат PDF/A обязывает записывать дату создания внутрь файла. Всё остальное совпадает побайтово.",
     "entry_order": "fixed",
@@ -171,9 +176,9 @@
         { "name": "author_participant_id", "type": "text", "description_ru": "Кто внёс запись. Пустым не бывает: запись всегда чья-то, а не безличный факт." },
         { "name": "subject_child_id", "type": "text", "description_ru": "О каком ребёнке запись." },
         { "name": "visibility_class", "type": "text", "description_ru": "child_shared — общая запись; participant_private — личная запись автора." },
-        { "name": "origin", "type": "text", "description_ru": "authored — внесено участником вручную; migrated_legacy — перенесено из ранней версии приложения; imported — ввезено извне." },
-        { "name": "event_date_local", "type": "text", "description_ru": "Дата наблюдения по местному календарю, ГГГГ-ММ-ДД." },
-        { "name": "event_at_utc", "type": "integer", "description_ru": "Момент наблюдения, миллисекунды с 1 января 1970 года UTC. Может быть пусто." },
+        { "name": "origin", "type": "text", "description_ru": "authored — внесено участником вручную; migrated_legacy — перенесено из ранней версии приложения, где отметка хранилась без даты, поэтому её дата события равна дате переноса; imported — ввезено извне." },
+        { "name": "event_date_local", "type": "text", "description_ru": "Дата наблюдения по местному календарю, ГГГГ-ММ-ДД. ВАЖНО: если origin равен migrated_legacy, это НЕ дата наблюдения, а дата переноса записи из ранней версии приложения. Настоящая дата там не сохранялась и неизвестна." },
+        { "name": "event_at_utc", "type": "integer", "description_ru": "Момент наблюдения, миллисекунды с 1 января 1970 года UTC. Может быть пусто. У записей с origin = migrated_legacy это поле всегда пусто: момент наблюдения не сохранялся и восстановить его неоткуда." },
         { "name": "event_utc_offset_min", "type": "integer", "description_ru": "Сдвиг местного времени от UTC в минутах в момент наблюдения." },
         { "name": "entry_at_utc", "type": "integer", "description_ru": "Момент внесения записи, миллисекунды с 1 января 1970 года UTC. Вместе с id задаёт порядок записей в архиве." },
         { "name": "entry_utc_offset_min", "type": "integer", "description_ru": "Сдвиг местного времени от UTC в минутах в момент внесения." }
@@ -259,9 +264,9 @@
       "name": "child_skill_state",
       "kind": "derived",
       "title_ru": "Текущее состояние навыков",
-      "description_ru": "Вычислено из журнала: для каждой пары ребёнок-навык берётся последнее утверждение по паре (entry_at_utc, id). Предшествующие навыки, которые автор считал освоенными, здесь НЕ показаны: продукт не выдумывает утверждений, которых родитель не делал. Признак намерения автора лежит в поле prerequisite_propagation набора assertion.",
+      "description_ru": "Вычислено из журнала: для каждой пары ребёнок-навык берётся последнее утверждение по паре (entry_at_utc, id). Предшествующие навыки, которые автор считал освоенными, здесь НЕ показаны: продукт не выдумывает утверждений, которых родитель не делал. Признак намерения автора лежит в поле prerequisite_propagation набора assertion. У части утверждений дата события — это дата переноса из ранней версии приложения, а не дата наблюдения; такие строки помечены полем event_date_basis.",
       "params": ["self_participant_id", "self_participant_id"],
-      "query": "SELECT je.subject_child_id AS child_id, a.skill_id AS skill_id, a.kind AS state, je.visibility_class AS visibility_class, je.author_participant_id AS asserted_by, a.effective_from_date AS effective_from_date, a.prerequisite_propagation AS prerequisite_propagation, a.journal_id AS assertion_id FROM assertion a JOIN journal_entry je ON je.id = a.journal_id WHERE a.skill_id IS NOT NULL AND (je.visibility_class = 'child_shared' OR je.author_participant_id = ?) AND NOT EXISTS (SELECT 1 FROM assertion a2 JOIN journal_entry je2 ON je2.id = a2.journal_id WHERE je2.subject_child_id = je.subject_child_id AND a2.skill_id = a.skill_id AND a2.skill_id IS NOT NULL AND (je2.visibility_class = 'child_shared' OR je2.author_participant_id = ?) AND (je2.entry_at_utc, je2.id) > (je.entry_at_utc, je.id)) ORDER BY je.subject_child_id, a.skill_id",
+      "query": "SELECT je.subject_child_id AS child_id, a.skill_id AS skill_id, a.kind AS state, je.visibility_class AS visibility_class, je.author_participant_id AS asserted_by, a.effective_from_date AS effective_from_date, a.prerequisite_propagation AS prerequisite_propagation, a.journal_id AS assertion_id, je.origin AS origin, CASE WHEN je.origin = 'migrated_legacy' THEN 'import_date_unknown' ELSE 'observed' END AS event_date_basis FROM assertion a JOIN journal_entry je ON je.id = a.journal_id WHERE a.skill_id IS NOT NULL AND (je.visibility_class = 'child_shared' OR je.author_participant_id = ?) AND NOT EXISTS (SELECT 1 FROM assertion a2 JOIN journal_entry je2 ON je2.id = a2.journal_id WHERE je2.subject_child_id = je.subject_child_id AND a2.skill_id = a.skill_id AND a2.skill_id IS NOT NULL AND (je2.visibility_class = 'child_shared' OR je2.author_participant_id = ?) AND (je2.entry_at_utc, je2.id) > (je.entry_at_utc, je.id)) ORDER BY je.subject_child_id, a.skill_id",
       "columns": [
         { "name": "child_id", "type": "text", "description_ru": "Идентификатор ребёнка." },
         { "name": "skill_id", "type": "text", "description_ru": "Идентификатор навыка из справочника навыков." },
@@ -270,7 +275,9 @@
         { "name": "asserted_by", "type": "text", "description_ru": "Кто сделал это утверждение." },
         { "name": "effective_from_date", "type": "text", "description_ru": "С какой даты утверждение действует, ГГГГ-ММ-ДД." },
         { "name": "prerequisite_propagation", "type": "text", "description_ru": "Намерение автора относительно предшествующих навыков." },
-        { "name": "assertion_id", "type": "text", "description_ru": "Запись журнала, из которой взято это состояние." }
+        { "name": "assertion_id", "type": "text", "description_ru": "Запись журнала, из которой взято это состояние." },
+        { "name": "origin", "type": "text", "description_ru": "Откуда взялось это утверждение: authored — родитель отметил навык в приложении; migrated_legacy — утверждение перенесено из ранней версии, хранившей отметки без дат." },
+        { "name": "event_date_basis", "type": "text", "description_ru": "Чем является дата в поле effective_from_date. observed — это дата, когда родитель отметил навык освоенным. import_date_unknown — это дата ПЕРЕНОСА записи в приложение, а не дата наблюдения: ранняя версия дат не сохраняла, поэтому настоящая дата неизвестна и восстановить её неоткуда. Если у многих навыков стоит одна и та же дата с пометкой import_date_unknown, это день переноса, а не день, когда ребёнок освоил их все." }
       ]
     }
   ]

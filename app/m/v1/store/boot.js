@@ -27,6 +27,7 @@ import {
     loadChildren,
     loadMarks,
 } from './repo-journal.js';
+import { pendingImport, runImport } from './import-legacy.js';
 
 let handle = null;
 
@@ -78,6 +79,8 @@ export {
     existingEntryIds,
     loadChildren,
     loadMarks,
+    pendingImport,
     projectSkillState,
     readSince,
+    runImport,
 };

@@ -129,6 +129,15 @@ export function renderReadme(declaration) {
         ''
     );
 
+    // L1-P4. Read this section as a correction to the dates above it, because
+    // that is what it is. Part of this history was carried in from an earlier
+    // version of the app that stored marks with no date at all, and the schema
+    // has no nullable slot for the date — so those entries wear the date they
+    // were imported on. Left unsaid, a reader in 2044 would open text/skills.txt
+    // and find three hundred skills mastered on a single afternoon.
+    sections.push(RULE, 'О ДАТАХ: ЧАСТЬ ЗАПИСЕЙ ПЕРЕНЕСЕНА', RULE, '');
+    sections.push(wrap(declaration.provenance.statement_ru), '');
+
     sections.push(RULE, 'ПОЧЕМУ АРХИВ НЕ ЗАШИФРОВАН', RULE, '');
     sections.push(
         wrap(
