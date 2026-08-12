@@ -13,10 +13,20 @@
 import { isNativeStore, openStore } from './store.js';
 import {
     acknowledgeCursor,
+    appendEntries,
     appendEntry,
+    existingEntryIds,
     projectSkillState,
     readSince,
 } from './journal.js';
+import {
+    appendChild,
+    appendMark,
+    childRow,
+    completedFrom,
+    loadChildren,
+    loadMarks,
+} from './repo-journal.js';
 
 let handle = null;
 
@@ -52,5 +62,22 @@ export async function initNativeStore() {
 // their eventual callers, for one structural reason: this module is the store's
 // single entry point in the shell's import graph, and a module OUTSIDE that
 // graph is a module the storage-seam scan (LSC-P1-INV-001) never reads. P4's
-// write path calls these; P2 ships them unused and proven.
-export { acknowledgeCursor, appendEntry, projectSkillState, readSince };
+// write path calls these; P2 shipped them unused and proven.
+//
+// L1-P4 adds the repository half for the same reason: core/state.js reaches the
+// journal through this one door, so store/ keeps exactly one entrance from core/
+// and the seam scan keeps reaching everything behind it.
+export {
+    acknowledgeCursor,
+    appendChild,
+    appendEntries,
+    appendEntry,
+    appendMark,
+    childRow,
+    completedFrom,
+    existingEntryIds,
+    loadChildren,
+    loadMarks,
+    projectSkillState,
+    readSince,
+};

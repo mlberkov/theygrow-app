@@ -4,7 +4,7 @@
 // модуль его мутирует. Разделение заодно убирает ребро table -> profile:
 // честная деградация без профиля (ADR-015) живёт здесь.
 
-import { getCurrentProfile, getCompletedSkills, saveCompletedSkills } from '../core/state.js';
+import { canRecord, getCurrentProfile, getCompletedSkills, markSkill } from '../core/state.js';
 import { getSkillRowsForCategory } from '../core/dom-utils.js';
 import { refreshAllZpdReadiness } from '../core/zpd.js';
 import { openCreateProfileModal } from './profile.js';
@@ -37,36 +37,83 @@ function updateCategoryCounter(skillRow) {
     }
 }
 
-// Переключение состояния навыка
-export function toggleSkillCompletion(skillId, isCompleted) {
-    // Честная деградация (ADR-015): без профиля отметку сохранять некуда.
-    // Раньше запись молча терялась, а чекбокс оставался отмеченным — DOM
-    // расходился с состоянием, и ЗБР-фильтр показывал уже отмеченные навыки.
-    // Теперь отметка откатывается, а пользователю предлагается создать профиль.
+// Хранилище не открылось: сказать об этом прямо.
+//
+// Молчаливый откат галочки — это ровно та рассинхронизация DOM и данных,
+// которую честная деградация здесь и убирает: родитель должен узнать, что
+// отметка НЕ сохранена, а не догадаться об этом через неделю.
+function showStoreUnavailable() {
+    const modal = document.getElementById('storeUnavailableModal');
+    if (modal) modal.classList.add('show');
+}
+
+export function wireSkillCompletion() {
+    const modal = document.getElementById('storeUnavailableModal');
+    if (!modal) return;
+    const close = () => modal.classList.remove('show');
+    document.getElementById('storeUnavailableClose').addEventListener('click', close);
+    document.getElementById('storeUnavailableCloseBtn').addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+        if (e.target.id === 'storeUnavailableModal') close();
+    });
+}
+
+// Откат отметки в DOM: действие не состоялось, и галочка не должна утверждать
+// обратное. Вынесено из toggleSkillCompletion, потому что причин отказа теперь
+// две, а откат у них один.
+function rejectMark(skillId, isCompleted) {
+    const rejectedRow = document.querySelector(`tr[data-skill-id="${skillId}"]`);
+    const rejectedCheckbox = rejectedRow && rejectedRow.querySelector('input[type="checkbox"]');
+    if (rejectedCheckbox) rejectedCheckbox.checked = !isCompleted;
+}
+
+// Переключение состояния навыка.
+//
+// Асинхронна с L1-P4: на нативном канале отметка — это запись в журнал, а не
+// присваивание в массиве. Порядок сохранён — сначала запись, потом DOM, — чтобы
+// интерфейс никогда не показывал отметку, которая не сохранилась.
+//
+// Не выбрасывает наружу: вызывается из checkbox.onchange без await, и
+// необработанное отклонение здесь означало бы галочку, рассинхронизированную с
+// данными, — ровно то, что честная деградация тут и предотвращает.
+export async function toggleSkillCompletion(skillId, isCompleted) {
+    // Честная деградация (ADR-015), причина первая: без профиля отметку
+    // сохранять некуда. Раньше запись молча терялась, а чекбокс оставался
+    // отмеченным — DOM расходился с состоянием, и ЗБР-фильтр показывал уже
+    // отмеченные навыки. Теперь отметка откатывается, а пользователю
+    // предлагается создать профиль.
     // GA-событие не отправляется: действие не состоялось.
-    if (!getCurrentProfile()) {
-        const rejectedRow = document.querySelector(`tr[data-skill-id="${skillId}"]`);
-        const rejectedCheckbox = rejectedRow && rejectedRow.querySelector('input[type="checkbox"]');
-        if (rejectedCheckbox) rejectedCheckbox.checked = !isCompleted;
+    if (canRecord() && !getCurrentProfile()) {
+        rejectMark(skillId, isCompleted);
         openCreateProfileModal();
+        return;
+    }
+
+    // Причина вторая, появившаяся вместе с нативным хранилищем: приложение
+    // запущено на устройстве, но хранилище не открылось. Молчаливый откат в
+    // localStorage здесь был бы вторым источником правды без способа их
+    // помирить (ADR-043), поэтому отметка отклоняется и об этом говорится.
+    if (!canRecord()) {
+        rejectMark(skillId, isCompleted);
+        showStoreUnavailable();
+        return;
+    }
+
+    const recorded = await markSkill(skillId, isCompleted).catch(() => false);
+    if (!recorded) {
+        rejectMark(skillId, isCompleted);
+        showStoreUnavailable();
         return;
     }
 
     const completedSkills = getCompletedSkills();
 
-    if (isCompleted) {
-        completedSkills.add(skillId);
-
-        // Google Analytics event - skill completed
-        trackEvent('skill_complete', { skill_id: skillId, action: 'marked_complete' });
-    } else {
-        completedSkills.delete(skillId);
-
-        // Google Analytics event - skill uncompleted
-        trackEvent('skill_complete', { skill_id: skillId, action: 'marked_incomplete' });
-    }
-
-    saveCompletedSkills(completedSkills);
+    // Google Analytics event — после записи, а не до неё: событие сообщает о
+    // состоявшемся действии, и до L1-P4 оно отправлялось раньше сохранения.
+    trackEvent('skill_complete', {
+        skill_id: skillId,
+        action: isCompleted ? 'marked_complete' : 'marked_incomplete',
+    });
 
     // Найти строку навыка и обновить её напрямую (без перестроения таблицы)
     const skillRow = document.querySelector(`tr[data-skill-id="${skillId}"]`);

@@ -268,9 +268,11 @@ test.describe('the projection is read, never stored', () => {
 
     test('loading marks runs the shipped projection query and binds the child', async () => {
         const fake = createFakeBridge({
-            'v_child_skill_state': [
-                { skill_id: 'GM_001', state: 'skill_observed', confirmed_by: 1 },
-            ],
+            answer: {
+                v_child_skill_state: [
+                    { skill_id: 'GM_001', state: 'skill_observed', confirmed_by: 1 },
+                ],
+            },
         });
         let rows = null;
         await withFakeBridge(fake, async () => {
