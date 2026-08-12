@@ -112,27 +112,77 @@ header h1 {
     background: #e9ecef;
 }
 
-/* Кнопка Telegram */
+/* Действие в шапке: иконка плюс подпись (L1-P3).
+   На десктопе подпись видна, на мобильном скрывается и остаётся одна иконка;
+   доступное имя задано в разметке и от подписи не зависит. */
+.header-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--primary-purple);
+    border: none;
+    border-radius: 12px;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px var(--shadow-purple);
+    flex-shrink: 0;
+}
+
+.header-action:hover {
+    background: #7C3AED;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-purple-hover);
+}
+
+.header-action:active {
+    transform: translateY(0);
+}
+
+.header-action:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: 2px;
+}
+
+.header-action-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+/* Чат сообщества — ВТОРИЧНОЕ действие (L1-P3, LSC-DL-003 (y)).
+   Контурный стиль против заливки у кнопки архива. Это не вкус, а иерархия из
+   решений: архив — единственное материальное воплощение постоянного обещания
+   продукта (бесплатно, локально, без ключа, работает даже если поставщика не
+   станет), а ссылка на сообщество — удобство. При одинаковой заливке маленький
+   квадрат рядом с широкой кнопкой читается как «подпись не отрисовалась»;
+   контур делает разницу в размере иерархией, а не дефектом. */
 .telegram-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 44px;
     height: 44px;
-    background: var(--primary-purple);
+    background: transparent;
+    color: var(--primary-purple);
+    border: 2px solid var(--primary-purple);
     border-radius: 12px;
-    border: none;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px var(--shadow-purple);
+    box-shadow: none;
     text-decoration: none;
     flex-shrink: 0;
 }
 
 .telegram-button:hover {
-    background: #7C3AED;
+    background: var(--accent-lavender);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px var(--shadow-purple-hover);
+    box-shadow: none;
 }
 
 .telegram-button:active {
@@ -147,7 +197,7 @@ header h1 {
 .telegram-icon {
     width: 24px;
     height: 24px;
-    color: #ffffff;
+    color: inherit; /* контурный стиль: глиф того же цвета, что и рамка */
 }
 
 /* Выпадающее меню профилей */
@@ -296,6 +346,32 @@ header h1 {
 
 .modal-button-secondary:hover {
     background: #6B7280;
+}
+
+/* Архив (L1-P3). Два несмягчённых утверждения набраны заметнее остального
+   текста намеренно: родитель должен прочитать их до нажатия кнопки, а не
+   после того, как обнаружит отсутствие резервной копии. */
+#exportModal p {
+    margin-bottom: 12px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #374151;
+}
+
+.export-plain {
+    font-weight: 600;
+    color: #111827;
+}
+
+.export-unavailable {
+    padding: 12px;
+    border-radius: 8px;
+    background: #F3F4F6;
+}
+
+.export-status {
+    font-size: 14px;
+    color: var(--primary-purple);
 }
 
 .table-wrapper {
@@ -521,7 +597,13 @@ thead .col-done {
 }
 
 /* Последняя кнопка с отступом */
-.filter-toggle-btn:last-child {
+/* Правая привязка — свойство ИМЕННО кнопки активностей, а не позиции в разметке.
+   Раньше здесь стояло `.filter-toggle-btn:last-child`, и это молча закрепляло
+   правый край за тем, что окажется последним: третья кнопка (L1-P3) забрала
+   привязку себе, а «Подходящие активности» отъехала на 605 px влево. Правило
+   по идентификатору говорит то, что имеет в виду, и следующая добавленная
+   кнопка не сможет снова перехватить край. */
+#activitiesBtn {
     margin-left: auto;
 }
 
@@ -921,6 +1003,25 @@ thead .col-done {
         height: 20px;
     }
 
+    /* L1-P3: на мобильном действие в шапке — только иконка. Подпись прячется,
+       доступное имя остаётся в aria-label/title разметки. */
+    .header-action {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .header-action-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .header-action-label {
+        display: none;
+    }
+
     header {
         padding: 10px 15px;
     }
@@ -1014,36 +1115,30 @@ thead .col-done {
     right: auto;
   }
 
-  /* Telegram кнопка - в хедере справа с текстом */
+  /* Чат сообщества — только иконка, как и на десктопе (L1-P3, решение
+     владельца). Раньше здесь иконка ПРЯТАЛАСЬ и вместо неё через ::after
+     подставлялся текст «Чат сообщества»; текст в псевдоэлементе недоступен для
+     копирования и не является доступным именем — имя теперь задано в разметке
+     через aria-label/title. */
   .telegram-button {
     position: static;
-    width: auto;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     margin: 0;
-    margin-left: auto;
-    box-shadow: 0 2px 8px var(--shadow-purple);
-    padding: 0 14px;
+    padding: 0;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-pink) 100%);
+    /* Вторичное действие и здесь: контур, а не заливка (LSC-DL-003 (y)). */
+    background: transparent;
+    color: var(--primary-purple);
+    border: 2px solid var(--primary-purple);
+    box-shadow: none;
     transition: all 0.3s ease;
   }
 
   .telegram-button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 3px 12px var(--shadow-purple-hover);
-  }
-
-  /* Скрыть иконку Telegram */
-  .telegram-button .telegram-icon {
-    display: none;
-  }
-
-  /* Показать текст "Чат сообщества" белыми буквами */
-  .telegram-button::after {
-    content: 'Чат сообщества';
-    color: #ffffff;
+    background: var(--accent-lavender);
+    box-shadow: none;
   }
 
 
@@ -1268,8 +1363,27 @@ thead .col-done {
 
     flex: 1 1 auto; /* адаптивно */
     min-width: auto;
-    min-height: 36px; /* минимум для касания */
     white-space: normal; /* перенос при необходимости */
+
+    /* ВЫСОТА КНОПКИ НЕ ЗАВИСИТ ОТ ЧИСЛА СТРОК В ПОДПИСИ (L1-P3,
+       LSC-DL-003 (r), (w)). Кнопка фильтра меняет подпись на «Показать все
+       навыки», когда фильтр включён; в закреплённом контейнере короткая подпись
+       перестаёт переноситься, и футер прыгает с 68.78 px на 55 px при каждом
+       переключении — вместе со всей страницей над ним. Проверено арбитром
+       (scripts/parity-suite.sh в закреплённом контейнере), а не локально.
+       Здесь зарезервированы РОВНО ДВЕ СТРОКИ. `lh` — высота строки самого
+       элемента, поэтому 2lh — это две строки ПО ОПРЕДЕЛЕНИЮ, в каких бы
+       метриках шрифта ни считал движок. Это и есть причина писать декларацию, а
+       не измеренную константу в пикселях: то же самое объявление даёт ~49.8 px
+       на машине разработчика и ~68.78 px в контейнере, и в обоих случаях оно
+       означает «две строки». Пиксельная константа была бы верна ровно в одной
+       из двух сред.
+       16px — вертикальные padding из этого же правила (box-sizing: border-box).
+       Порог касания в 36px перекрыт с запасом.
+       ЦЕНА: обрезка вместо роста. Её сторожит
+       app/tests/footer-height.spec.js — см. комментарий там. */
+    height: calc(2lh + 16px);
+    overflow: hidden;
     cursor: pointer;
     transition: opacity 0.2s ease;
     position: relative;
@@ -1301,11 +1415,13 @@ thead .col-done {
     background: var(--border-soft);
   }
 
-  /* Третья кнопка - не выделяем, одинаковый размер */
-  footer button:nth-child(3),
-  footer .filter-toggle-btn:nth-child(3) {
-    flex: 1 1 auto;
-  }
+  /* Здесь стояло `footer button:nth-child(3) { flex: 1 1 auto }` — «третья
+     кнопка, не выделяем, одинаковый размер». Правило удалено, а не
+     перепривязано: третьей кнопки в футере не будет (архив уехал в шапку),
+     значение совпадало с тем, что базовое правило выше уже даёт каждой кнопке
+     футера, то есть оно ничего не меняло ни при какой привязке. Позиционную
+     форму не возвращаем — она снова взведёт ту же ловушку при следующей
+     добавленной кнопке (LSC-DL-003 (s)). */
 
   /* Убираем специфичные стили для .filter-toggle-btn.active */
   footer .filter-toggle-btn.active {

@@ -11,9 +11,32 @@
 <div class="profile-dropdown-item create-new">+ Создать новый профиль</div>
 </div>
                 </div>
-                <a href="https://t.me/+c-5y_69kmu8wNDky" target="_blank" rel="noopener noreferrer" class="telegram-button" title="Чат сообщества - Общайтесь с пользователями и разработчиком, делитесь идеями" aria-label="Перейти в чат сообщества в Telegram" onclick="trackEvent('telegram_click')">
-                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM16.64 8.8L15.03 16.59C14.92 17.08 14.64 17.2 14.23 16.97L11.93 15.29L10.82 16.36C10.7 16.48 10.6 16.58 10.37 16.58L10.54 14.23L14.75 10.42C14.94 10.25 14.71 10.16 14.45 10.33L9.28 13.62L7.02 12.92C6.54 12.77 6.53 12.45 7.12 12.22L16.05 8.54C16.46 8.39 16.82 8.63 16.64 8.8Z" fill="currentColor">
+                <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
+                     файл наружу». Не дискета: дискета означает «сохранить внутри
+                     приложения» и вдобавок мертвый предмет для артефакта, весь
+                     смысл которого — читаться через двадцать лет.
+                     На десктопе иконка + подпись, на мобильном только иконка;
+                     aria-label и title дословно повторяют видимую подпись. -->
+                <button type="button" class="header-action" id="exportBtn" title="Сохранить архив" aria-label="Сохранить архив">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M12 3v11">
+</path>
+                        <path d="M8 10l4 4 4-4">
+</path>
+                        <path d="M4 19h16">
+</path>
+                    </svg>
+                    <span class="header-action-label">Сохранить архив</span>
+                </button>
+                <!-- Чат сообщества. Иконка — обычный бумажный самолётик, общее
+                     соглашение «отправить/сообщение». Это НЕ фирменный знак
+                     Telegram: их логотип — их товарный знак, и мы его не
+                     воспроизводим. -->
+                <a href="https://t.me/+c-5y_69kmu8wNDky" target="_blank" rel="noopener noreferrer" class="telegram-button" title="Чат сообщества" aria-label="Чат сообщества" onclick="trackEvent('telegram_click')">
+                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M21 3L3 10.5l7 2.5 2.5 7L21 3z">
+</path>
+                        <path d="M10 13l11-10">
 </path>
                     </svg>
                 </a>

@@ -82,6 +82,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # L1-P3 — the export suite shells out to `node` to build the artifact with
+      # the shipped builder. No npm install: the export modules import nothing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install tools
         run: python -m pip install "ruff==0.9.2" "mypy==1.14.1" "pre-commit==4.0.1"
 
@@ -105,6 +111,15 @@ jobs:
       # splitter. Standard library only: no service, no device, no network.
       - name: pytest (native store schema)
         run: pytest app/tests/schema
+
+      # L1-P3 — the export artifact's published format. Builds the artifact with
+      # the SHIPPED builder under `node` from a real SQLite database carrying the
+      # real frozen DDL, then reads it back with a reader that imports only the
+      # standard library. Node is set up explicitly rather than relied on from
+      # the runner image, because a missing `node` would make the suite fail
+      # loudly here (harness.py asserts on it) rather than skip silently.
+      - name: pytest (export artifact format)
+        run: pytest app/tests/export
 
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure

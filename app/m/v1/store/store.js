@@ -9,8 +9,14 @@
 // on the device. The passphrase is minted here from crypto.getRandomValues,
 // never derived from anything the parent types, and handed to the plugin, which
 // keeps it in EncryptedSharedPreferences behind an AndroidKeyStore MasterKey
-// (AES256_GCM) — verified in the vendored plugin source, not assumed. The
-// EXPORT key is a separate and still-open question, and belongs to P3.
+// (AES256_GCM) — verified in the vendored plugin source, not assumed.
+//
+// THIS KEY HAS NO SECOND JOB. The export contour (P3) writes an UNENCRYPTED
+// artifact and uses no key: privacy wants encryption, decades of readability
+// forbid it, and one object cannot serve both, so they were split into two
+// (LSC-DL-003). The encrypted operational snapshot — the one that is key-bound —
+// is L7 work, addressed there together with the relay and key-scope model that
+// are its only consumers.
 
 import { STORE_CONFIG } from './config.js';
 import { callPlugin, execute, isNativeStore, pragma, query, run } from './bridge.js';

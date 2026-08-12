@@ -103,8 +103,11 @@ module.exports = defineConfig({
       // read files or exercise pure functions rather than drive a browser, so
       // they cost nothing to run together. L1-P2 adds three — the CRDT
       // merge-semantics run, the store supply-chain guard, and the store's own
-      // unit tests, which import the SHIPPED modules directly under Node.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit)\.spec\.js/,
+      // unit tests, which import the SHIPPED modules directly under Node. L1-P3
+      // adds the export contour's guards; the artifact's own format is proven in
+      // `pytest app/tests/export`, which builds it with the shipped builder and
+      // reads it back blind.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -113,8 +116,11 @@ module.exports = defineConfig({
       use: { viewport: DESKTOP },
     },
     {
+      // L1-P3 adds footer-height.spec.js here and nowhere else: the footer's
+      // height pin is a MOBILE constraint (the desktop footer never wrapped),
+      // so this is the only viewport where the assertion means anything.
       name: 'dom-mobile',
-      testMatch: /dom-parity\.spec\.js/,
+      testMatch: /(dom-parity|footer-height)\.spec\.js/,
       use: { viewport: MOBILE },
     },
     {

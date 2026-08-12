@@ -32,6 +32,7 @@ import { buildTableHeader, buildTableBody, setFixedSkillColumnWidth } from './su
 import { checkAndShowOnboarding, wireOnboarding } from './surfaces/onboarding.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
+import { wireExport } from './surfaces/export.js';
 import { initNativeStore } from './store/boot.js';
 
 // Инициализация приложения
@@ -59,6 +60,7 @@ function init() {
     wireSkillModal();
     wireActivities();
     wireOnboarding();
+    wireExport();
 }
 
 // Запуск при загрузке страницы: ждём kb-артефакт, затем строим UI

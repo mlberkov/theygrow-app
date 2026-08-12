@@ -46,7 +46,10 @@ export const STORE_CONFIG = Object.freeze({
 
     // changed_in: LSC-DL-002 — bits of entropy in the database passphrase. The
     // passphrase is minted on the device, never derived from user input, and
-    // never leaves it. The EXPORT key is a separate, still-open question (P3).
+    // never leaves it. It keys THIS database and nothing else: the L1-P3 export
+    // artifact is unencrypted and needs no key at all (LSC-DL-003), and the
+    // encrypted operational snapshot that does need one belongs to L7 together
+    // with the relay and the key-scope model that are its only consumers.
     passphraseBits: 256,
 });
 

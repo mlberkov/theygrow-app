@@ -448,6 +448,44 @@ scripts/parity-suite.sh --project=contract    # merge semantics, supply chain, s
 
 **Regenerating the Android project.** Do not delete and re-add it casually: `native/android/app/src/main/AndroidManifest.xml` is **hand-edited** — `allowBackup="false"` plus both backup-rule files, which stop Android from uploading the app sandbox (WebView storage today, the native store from L1-P2) to the user's cloud account or transferring it to a new device. `app/tests/native-shell.spec.js` pins those values, so a regeneration that reverts them reds CI rather than silently restoring the default. Re-apply them, do not re-bless the test.
 
+### The export archive — L1-P3
+
+The archive is the family's way out of this device, and it is deliberately the least clever object in the repository: an ordinary `.zip` holding UTF-8 text files, a JSON sidecar index, an `attachments/` directory that explains why it is empty, and a plain-Russian `README.txt`. It is **unencrypted and needs no key** — a key is lost long before the data is. It is produced entirely on the device: no network, no account, no subscription check, and it would still open if this project no longer existed.
+
+**It is not a restore procedure, and there is deliberately no restore procedure here.** Reading the archive back *into* the app is import, which is L6. What follows is how to read it **without** the app, which is the property the packet actually ships.
+
+**Reading the archive without the app (no tooling beyond an unzip and a text editor).**
+
+1. Unzip it. Any archiver on any operating system will do; nothing inside is compressed, so even a damaged archive is recoverable by hand.
+2. Open `README.txt` first. It explains what the archive is, what opens it, what every dataset holds, how the journal is ordered, how a journal row is joined to its detail row, and what the time fields mean.
+3. Read `text/` for the data in words — participants, children and their current attributes, the whole journal, current skill state, diary records.
+4. Read `index.json` for the same data machine-readably. Its `declaration` section is a verbatim copy of `app/m/v1/export/declaration.json` and carries a plain-language explanation of **every field**, which is what makes the archive interpretable with no access to this repository.
+5. `MANIFEST.json` records what produced it: the app version, the canon (`kb-v1.json`) version, and the schema identifier and version **as the device actually held them** — plus per-dataset row counts and the export time.
+
+**What is in the archive and what is not, stated the way the interface states it.** Photographs, video and audio are **not** included; `attachments/` is empty and says so. There is **no cloud backup** of this data — the archive is not a supplement to one, it is the only copy that exists off the device.
+
+**Scope.** The archive carries every child-shared entry plus the private entries of the participant who created it. Another participant's private entries never travel; at L7, each participant exports their own.
+
+**Running the checks that do not need a device.**
+
+```
+pytest app/tests/export                       # the published format: built by the shipped builder under node,
+                                              # then read back by a reader that imports only the stdlib
+scripts/parity-suite.sh --project=contract    # no network, no scheduling, the one-method sink, the plain sentences
+```
+
+**On-device smoke (owner-run, after installing the APK).** The instrumented gate covers the byte path and plugin registration but deliberately does **not** drive the system file picker — automating another app's UI is the kind of assertion that goes green on one Android build and flaky on the next. So check the picker by hand, once:
+
+1. Open the app, press **Сохранить архив**, and read the modal. Both plain sentences must be visible **before** the button.
+2. Press **Создать архив**. The system file picker opens with a suggested name of the form `theygrow-archive-<date>.zip`. Note that it carries no child's name, by decision.
+3. Choose a location and confirm. The status line reports the number of journal entries written.
+4. Close the picker without choosing, on a second run: the app must say **nothing at all**. A closed picker is a decision, not a failure.
+5. Copy the file off the device and walk steps 1–5 of "Reading the archive without the app" above on a desktop.
+6. Export twice without changing anything. The two archives must differ **only** in `MANIFEST.json` — that is the determinism guarantee, and it is the cheapest place to notice it breaking.
+7. Until **L1-P4** lands the write path, expect the archive to be correct and nearly empty. That is the packet's design — the contour exists before the records do, so the first records are recoverable before they are written — not a fault.
+
+**Note for the web channel.** In a browser the export action opens the same modal but offers no button: there is no native store off Capacitor and therefore no journal to project. That is stated in the modal rather than hidden, because a missing button teaches a parent nothing about where their data actually lives.
+
 ### `/api` (FastAPI)
 
 The `/api` service runs as a standalone ASGI app. In production it sits behind the PWA's nginx since A3-P1 (the same-origin proxy), but nothing about that is reproduced locally: run it directly, on its own port, and reach it directly.

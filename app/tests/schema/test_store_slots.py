@@ -124,14 +124,24 @@ RULE_COVERAGE: dict[int, tuple[str, str]] = {
     ),
     5: (
         "the export artifact stays human-readable and self-describing",
-        "DEFERRED: L1-P3 export contour — a requirement on the export, not a schema slot",
+        # Closed by L1-P3. The anchor is deliberately the BLIND reader: a test
+        # that read the artifact with the app's own modules would prove the two
+        # agree, not that the artifact survives the app's absence.
+        "export.test_artifact_selfdescribing::test_a_blind_reader_can_rebuild_the_journal",
     ),
 }
 
 
 def _resolve(test_id: str) -> None:
     module_name, func_name = test_id.split("::")
-    module = importlib.import_module(f".{module_name}", package=__package__)
+    # A dotted name resolves absolutely, so a rule can be closed by a suite
+    # outside this package: rule 5 is a requirement on the EXPORT, and its test
+    # lives in app/tests/export/ beside the artifact it reads (L1-P3).
+    module = (
+        importlib.import_module(module_name)
+        if "." in module_name
+        else importlib.import_module(f".{module_name}", package=__package__)
+    )
     assert hasattr(module, func_name), f"{test_id} does not exist"
 
 

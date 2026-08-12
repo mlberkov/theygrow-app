@@ -52,7 +52,13 @@ repos:
         # is unchanged. The directory carries an __init__.py so mypy resolves it
         # as the package `schema`; without it, its conftest would collide with
         # api/tests/conftest.py as a duplicate top-level module.
-        args: [--config-file=pyproject.toml, api, app/tests/schema]
+        #
+        # L1-P3 adds app/tests/export on the same terms — standard library only
+        # (json, zipfile, sqlite3, subprocess) plus pytest, so the dependency
+        # list is again unchanged, and it carries an __init__.py for the same
+        # collision reason. It imports `schema.harness`, which resolves because
+        # both are packages under the same app/tests root.
+        args: [--config-file=pyproject.toml, api, app/tests/schema, app/tests/export]
         pass_filenames: false
         additional_dependencies:
           - fastapi

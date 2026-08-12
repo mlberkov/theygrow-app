@@ -93,6 +93,16 @@
     <link rel="modulepreload" href="/m/v1/store/bridge.js">
     <link rel="modulepreload" href="/m/v1/store/config.js">
     <link rel="modulepreload" href="/m/v1/store/errors.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v1/export/run.js">
+    <link rel="modulepreload" href="/m/v1/export/build.js">
+    <link rel="modulepreload" href="/m/v1/export/readout.js">
+    <link rel="modulepreload" href="/m/v1/export/sink.js">
+    <link rel="modulepreload" href="/m/v1/export/text.js">
+    <link rel="modulepreload" href="/m/v1/export/readme.js">
+    <link rel="modulepreload" href="/m/v1/export/zip.js">
+    <link rel="modulepreload" href="/m/v1/export/config.js">
+    <link rel="modulepreload" href="/m/v1/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -127,15 +137,44 @@
                         <!-- Профили будут добавлены динамически -->
                     </div>
                 </div>
+                <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
+                     файл наружу». Не дискета: дискета означает «сохранить внутри
+                     приложения» и вдобавок мертвый предмет для артефакта, весь
+                     смысл которого — читаться через двадцать лет.
+                     На десктопе иконка + подпись, на мобильном только иконка;
+                     aria-label и title дословно повторяют видимую подпись. -->
+                <button type="button"
+                        class="header-action"
+                        id="exportBtn"
+                        title="Сохранить архив"
+                        aria-label="Сохранить архив">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <path d="M12 3v11"/>
+                        <path d="M8 10l4 4 4-4"/>
+                        <path d="M4 19h16"/>
+                    </svg>
+                    <span class="header-action-label">Сохранить архив</span>
+                </button>
+                <!-- Чат сообщества. Иконка — обычный бумажный самолётик, общее
+                     соглашение «отправить/сообщение». Это НЕ фирменный знак
+                     Telegram: их логотип — их товарный знак, и мы его не
+                     воспроизводим. -->
                 <a href="https://t.me/+c-5y_69kmu8wNDky"
                    target="_blank"
                    rel="noopener noreferrer"
                    class="telegram-button"
-                   title="Чат сообщества - Общайтесь с пользователями и разработчиком, делитесь идеями"
-                   aria-label="Перейти в чат сообщества в Telegram"
+                   title="Чат сообщества"
+                   aria-label="Чат сообщества"
                    onclick="trackEvent('telegram_click')">
-                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM16.64 8.8L15.03 16.59C14.92 17.08 14.64 17.2 14.23 16.97L11.93 15.29L10.82 16.36C10.7 16.48 10.6 16.58 10.37 16.58L10.54 14.23L14.75 10.42C14.94 10.25 14.71 10.16 14.45 10.33L9.28 13.62L7.02 12.92C6.54 12.77 6.53 12.45 7.12 12.22L16.05 8.54C16.46 8.39 16.82 8.63 16.64 8.8Z" fill="currentColor"/>
+                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <path d="M21 3L3 10.5l7 2.5 2.5 7L21 3z"/>
+                        <path d="M10 13l11-10"/>
                     </svg>
                 </a>
             </div>
@@ -187,6 +226,27 @@
                     <button type="submit" class="modal-button modal-button-primary">Создать</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно архива (L1-P3). Два утверждения в нём намеренно
+         несмягчённые и проверяются тестом app/tests/export-contour.spec.js:
+         медиа в архив не входит, и облачной резервной копии этих данных нет.
+         Оба показываются ДО нажатия кнопки, а не после. -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="exportModalClose">&times;</span>
+            <h2>Сохранить архив</h2>
+            <p>Архив — это обычный zip-файл с текстовыми файлами внутри. Он открывается на любом компьютере без этого приложения, без пароля и без интернета. Создаётся он только тогда, когда вы нажимаете кнопку, и сохраняется туда, куда вы укажете.</p>
+            <p class="export-plain">Фотографии, видео и звукозаписи в архив не входят.</p>
+            <p class="export-plain">Резервной копии этих данных в облаке нет.</p>
+            <p>Архив не зашифрован: ключ теряется быстрее, чем данные. Любой, кто получит этот файл, сможет его прочитать — храните его так же, как хранили бы бумажный семейный альбом.</p>
+            <p id="exportUnavailable" class="export-unavailable" hidden>В браузере архив не создаётся: он собирается из данных приложения на телефоне. Это относится и к данным, которые вы видите сейчас, — резервной копии у них нет.</p>
+            <p id="exportStatus" class="export-status" hidden></p>
+            <div class="modal-buttons">
+                <button type="button" class="modal-button modal-button-secondary" id="exportCloseBtn">Закрыть</button>
+                <button type="button" class="modal-button modal-button-primary" id="exportRunBtn">Создать архив</button>
+            </div>
         </div>
     </div>
 
