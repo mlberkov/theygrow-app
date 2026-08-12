@@ -60,15 +60,35 @@ public class BridgeSmokeTest {
     @Test
     public void the_app_opens_its_encrypted_store_at_boot() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            // The specifier is made absolute BEFORE the import, against the
+            // document. A script handed to evaluateJavascript has no base URL of
+            // its own — Chromium reports it as about:blank — so a path-absolute
+            // specifier cannot be resolved from here, while the identical
+            // specifier resolves normally inside app.js, which is a page module.
+            // That is a property of this probe, not of the shipped web root.
+            // Resolving against document.baseURI yields the very URL app.js
+            // resolved to, so this import returns the module instance the app
+            // booted with rather than a second copy of it.
             evaluate(
                     scenario,
-                    "window.__storeProbe = null;"
-                        + "import('/m/v1/store/boot.js').then(function (m) {"
-                        + " window.__storeProbe = JSON.stringify(m.storeHandle() || {});"
-                        + "}).catch(function (e) { window.__storeProbe = 'err:' + e; });"
+                    "window.__storeModule = null; window.__storeImportError = null;"
+                        + "import(new URL('/m/v1/store/boot.js', document.baseURI).href)"
+                        + ".then(function (m) { window.__storeModule = m; })"
+                        + ".catch(function (e) { window.__storeImportError = 'err:' + e; });"
                         + "'dispatched'");
 
-            String probe = pollFor(scenario, "window.__storeProbe");
+            // The app opens the store from DOMContentLoaded and does not await
+            // it, so the handle appears some time after the module does. Poll
+            // for the handle itself; reading it once races the open and would
+            // report an empty handle as a store that never opened. An import
+            // failure is reported immediately instead of waiting out the clock.
+            String probe =
+                    pollFor(
+                            scenario,
+                            "window.__storeImportError ? window.__storeImportError"
+                                + " : (window.__storeModule && window.__storeModule.storeHandle()"
+                                + " ? JSON.stringify(window.__storeModule.storeHandle()) : null)");
+
             assertTrue("the store never opened at boot: " + probe, probe.contains("\"journalMode\""));
             assertTrue("the store did not come up in WAL: " + probe, probe.toLowerCase().contains("wal"));
             assertTrue("the schema version was not recorded: " + probe, probe.contains("\"schemaVersion\":1"));

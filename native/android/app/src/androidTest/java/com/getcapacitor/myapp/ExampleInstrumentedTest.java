@@ -21,6 +21,10 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("com.getcapacitor.app", appContext.getPackageName());
+        // The scaffold shipped with capacitor's own placeholder id; this app's
+        // id is app.theygrow (capacitor.config.json appId, app/build.gradle
+        // applicationId, the MainActivity package). The expectation was stale,
+        // not the packaging.
+        assertEquals("app.theygrow", appContext.getPackageName());
     }
 }

@@ -313,7 +313,31 @@ jobs:
           target: google_apis
           disable-animations: true
           working-directory: native/android
-          script: ./gradlew --no-daemon connectedDebugAndroidTest
+          # The logcat dump lives INSIDE this step because the emulator only
+          # exists for its duration: once the action returns, the device is gone
+          # and with it the one place boot.js's console.error reason was ever
+          # written. Without it a store that fails to open reports only a poll
+          # timeout, and the reason costs a whole emulator cycle to learn. Dumped
+          # on failure only, and only ever from an emulator that holds no family
+          # data — a green run uploads nothing.
+          script: |
+            set +e
+            ./gradlew --no-daemon connectedDebugAndroidTest
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              mkdir -p logcat
+              adb logcat -d > logcat/instrumented-logcat.txt 2>&1 || true
+            fi
+            exit "$status"
+
+      - name: Upload the emulator logcat
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-logcat
+          path: native/android/logcat/
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Upload the instrumented test report
         if: always()
