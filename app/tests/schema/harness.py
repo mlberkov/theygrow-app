@@ -96,10 +96,16 @@ def connect(path: str = ":memory:") -> sqlite3.Connection:
 # schema's), and readable ids make a failing assertion legible.
 
 
-def seed_participant(conn: sqlite3.Connection, participant_id: str = "p-self") -> str:
+def seed_participant(
+    conn: sqlite3.Connection, participant_id: str = "p-self", is_self: int = 1
+) -> str:
+    # `participant_one_self` is a partial unique index, so a second participant
+    # has to be seeded with is_self = 0 — the schema enforcing that exactly one
+    # participant is the device owner, which is the property L1-P4 leans on when
+    # it says consensus of one must not be a special case.
     conn.execute(
-        "INSERT INTO participant (id, is_self, created_at_utc) VALUES (?, 1, 1000)",
-        (participant_id,),
+        "INSERT INTO participant (id, is_self, created_at_utc) VALUES (?, ?, 1000)",
+        (participant_id, is_self),
     )
     return participant_id
 
@@ -157,12 +163,33 @@ def append_entry(
     origin: str = "authored",
     event_date: str = "2026-01-01",
     entry_at_utc: int = 1000,
+    event_at_utc: int | None = None,
+    event_utc_offset_min: int | None = None,
 ) -> str:
+    # The event INSTANT is optional and defaults to absent, which is the state
+    # every entry seeded before L1-P4 was in. L1-P4 needs both states in one
+    # test: an authored mark knows when it was observed, a migrated one does not
+    # (see test_write_path_projection.py), and the schema's paired CHECK refuses
+    # a half-set instant, so the two columns move together.
+    if (event_at_utc is None) != (event_utc_offset_min is None):
+        raise ValueError("event_at_utc and event_utc_offset_min are set or absent together")
     conn.execute(
         "INSERT INTO journal_entry (id, kind, author_participant_id, subject_child_id,"
-        " visibility_class, origin, event_date_local, entry_at_utc, entry_utc_offset_min)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 180)",
-        (entry_id, kind, author, child_id, visibility, origin, event_date, entry_at_utc),
+        " visibility_class, origin, event_date_local, event_at_utc, event_utc_offset_min,"
+        " entry_at_utc, entry_utc_offset_min)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 180)",
+        (
+            entry_id,
+            kind,
+            author,
+            child_id,
+            visibility,
+            origin,
+            event_date,
+            event_at_utc,
+            event_utc_offset_min,
+            entry_at_utc,
+        ),
     )
     return entry_id
 
@@ -182,6 +209,8 @@ def append_assertion(
     visibility: str = "child_shared",
     origin: str = "authored",
     entry_at_utc: int = 1000,
+    event_at_utc: int | None = None,
+    event_utc_offset_min: int | None = None,
 ) -> str:
     append_entry(
         conn,
@@ -193,6 +222,8 @@ def append_assertion(
         origin=origin,
         event_date=effective_from,
         entry_at_utc=entry_at_utc,
+        event_at_utc=event_at_utc,
+        event_utc_offset_min=event_utc_offset_min,
     )
     conn.execute(
         "INSERT INTO assertion (journal_id, kind, skill_id, effective_from_date,"

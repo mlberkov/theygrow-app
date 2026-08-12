@@ -106,8 +106,11 @@ module.exports = defineConfig({
       // unit tests, which import the SHIPPED modules directly under Node. L1-P3
       // adds the export contour's guards; the artifact's own format is proven in
       // `pytest app/tests/export`, which builds it with the shipped builder and
-      // reads it back blind.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour)\.spec\.js/,
+      // reads it back blind. L1-P4 adds three more: the write path's shape, the
+      // legacy import's four properties, and the signal-payload guard. Those
+      // first two drive a recorder rather than a database — what the SQL MEANS
+      // is `pytest app/tests/schema`, against the real frozen DDL.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|write-path|import-legacy|signal-payload)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
