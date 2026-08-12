@@ -17,11 +17,34 @@
 // Nothing here ships: app/Dockerfile COPYs an explicit file list that does not
 // include tests/, and app/.dockerignore keeps this out of the build context.
 
+// TWO PROFILES since L1-P1. The server above describes the nginx channel; the
+// Capacitor channel is a different delivery surface serving the same bytes, and
+// the parity suite has to be able to boot the app under BOTH or "the Android
+// build behaves identically" is an untested claim.
+//
+//   profile 'nginx'     — everything documented above: HEADER_RULES, the
+//                         try_files fallback, the /sw.js bump cookie. Serves
+//                         app/ on disk.
+//   profile 'capacitor' — what a Capacitor WebView actually provides: local
+//                         assets, no cache/Service-Worker headers, and NO SPA
+//                         fallback. Serves the staged native/www/.
+//
+// The absent fallback is the point rather than an omission. Capacitor's local
+// asset handler is not nginx, and a shell that had come to depend on
+// `try_files $uri $uri/ /index.html` would boot in the browser and fail in the
+// APK. Under this profile that dependency is a red test instead of a
+// device-only surprise.
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const APP_ROOT = path.resolve(__dirname, '..');
+
+const PROFILE = process.env.PARITY_PROFILE === 'capacitor' ? 'capacitor' : 'nginx';
+const SERVE_ROOT = process.env.PARITY_WEB_ROOT
+  ? path.resolve(process.env.PARITY_WEB_ROOT)
+  : APP_ROOT;
 
 // Mirrors app/nginx.conf. Each entry names the nginx location it reflects so the
 // drift guard can pair them up. `test` runs against the URL pathname.
@@ -129,7 +152,9 @@ function wantsBumpedServiceWorker(req) {
   return cookie.split(';').some((c) => c.trim() === `${SW_BUMP_COOKIE}=1`);
 }
 
-function createServer() {
+function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
+  const isNginx = profile === 'nginx';
+
   return http.createServer((req, res) => {
     let pathname;
     try {
@@ -140,6 +165,8 @@ function createServer() {
     }
 
     // --- nginx: location /health -------------------------------------------
+    // Harness-only in both profiles: Playwright's webServer needs a readiness
+    // URL. It is not a claim about what Capacitor serves.
     if (pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'text/plain' }).end('healthy');
       return;
@@ -151,9 +178,12 @@ function createServer() {
       return;
     }
 
-    const { headers } = resolveHeaders(pathname);
+    // The Capacitor profile issues none of the nginx cache/MIME policy: those
+    // headers are the web channel's contract, and claiming them here would make
+    // the native run assert something the APK does not do.
+    const { headers } = isNginx ? resolveHeaders(pathname) : { headers: {} };
 
-    if (pathname === '/sw.js' && wantsBumpedServiceWorker(req)) {
+    if (isNginx && pathname === '/sw.js' && wantsBumpedServiceWorker(req)) {
       let body;
       try {
         body = mutatedServiceWorker();
@@ -166,10 +196,10 @@ function createServer() {
       return;
     }
 
-    // Resolve within APP_ROOT; reject traversal.
+    // Resolve within the served root; reject traversal.
     const rel = pathname.replace(/^\/+/, '');
-    let filePath = path.resolve(APP_ROOT, rel);
-    if (filePath !== APP_ROOT && !filePath.startsWith(APP_ROOT + path.sep)) {
+    let filePath = path.resolve(root, rel);
+    if (filePath !== root && !filePath.startsWith(root + path.sep)) {
       res.writeHead(403).end('forbidden');
       return;
     }
@@ -190,14 +220,14 @@ function createServer() {
     }
 
     // --- nginx: try_files $uri $uri/ /index.html ---------------------------
+    // Capacitor has no equivalent, so under that profile an unknown path 404s
+    // whether or not it carries an extension. See the profile note at the top.
     if (!stat) {
-      filePath = path.join(APP_ROOT, 'index.html');
-      // A missing asset must 404 rather than fall back to the shell, otherwise
-      // the kb-load error path could never be observed.
-      if (path.extname(pathname)) {
+      if (!isNginx || path.extname(pathname)) {
         res.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found');
         return;
       }
+      filePath = path.join(root, 'index.html');
     }
 
     const ext = path.extname(filePath).toLowerCase();
@@ -222,7 +252,9 @@ function createServer() {
 if (require.main === module) {
   const port = Number(process.env.PORT || 8080);
   createServer().listen(port, '127.0.0.1', () => {
-    process.stdout.write(`parity server listening on http://127.0.0.1:${port}\n`);
+    process.stdout.write(
+      `parity server (${PROFILE}) listening on http://127.0.0.1:${port} serving ${SERVE_ROOT}\n`
+    );
   });
 }
 
@@ -233,4 +265,6 @@ module.exports = {
   SW_TEST_VERSION,
   SW_BUMP_COOKIE,
   APP_ROOT,
+  PROFILE,
+  SERVE_ROOT,
 };

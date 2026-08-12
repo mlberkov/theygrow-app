@@ -13,10 +13,19 @@
 #
 # The live Cloud SQL / secret / service-account identifiers are NOT in this repo:
 # they arrive as trigger substitutions (empty defaults below), which keeps the
-# repo free of them while this repository is public. Cloud Build's default
-# MUST_MATCH substitution option is kept deliberately — it fails the build when a
-# trigger supplies a key this file does not declare, catching a substitution typo
-# that ALLOW_LOOSE would silently resolve to empty.
+# repo free of them while this repository is public.
+#
+# SUBSTITUTIONS: what this file does NOT guarantee (corrected in L1-P1). This
+# header used to claim that Cloud Build's "default MUST_MATCH" option was kept
+# deliberately and caught a substitution-name typo. The verifiable fact is that
+# NONE of the three build-configs in this repository declares substitutionOption
+# at all — `options:` below carries only `logging`. The described protection does
+# not exist. (An unverified upstream note holds that trigger-invoked builds run
+# under ALLOW_LOOSE; it is confirmed neither here nor by the owner as of L1-P1
+# and is carried as open debt in docs/RUNBOOK.md.) The Step 0 guard below is the
+# protection that does exist: it fails the build on an EMPTY substitution, which
+# is what a mis-named key resolves to. This config has never executed — its
+# trigger does not exist — so nothing here has been observed either way.
 #
 # STAGING NEVER CONTAINS REAL FAMILY DATA (ADR-020 / ADR-011 / ADR-014). The
 # database is seeded from a synthetic corpus only (A2-P2), and no third-party

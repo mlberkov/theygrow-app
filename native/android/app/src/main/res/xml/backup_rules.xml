@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    L1-P1 — API 24..30 backup rules (the pre-Android-12 format).
+
+    minSdkVersion is 24, so this file governs the older half of the supported
+    range while res/xml/data_extraction_rules.xml governs API 31+. Both exist
+    for that reason, not by duplication.
+
+    Every storage domain is excluded. With android:allowBackup="false" already
+    set, Auto Backup never runs on these levels anyway — this file is what makes
+    the intent survive a future decision to re-enable backup for some narrow,
+    non-family-data purpose: the default would then still be "exclude", and
+    including something would have to be an explicit, reviewable act.
+-->
+<full-backup-content>
+    <exclude domain="root" />
+    <exclude domain="file" />
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
+    <exclude domain="external" />
+</full-backup-content>

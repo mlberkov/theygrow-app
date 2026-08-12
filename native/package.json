@@ -1,0 +1,17 @@
+{
+  "name": "theygrow-native-shell",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev/CI-only Capacitor Android shell for the theygrow PWA (L1-P1). Not part of either delivery channel's web assets: the APK's web root is assembled by tools/stage-webdir.js from app/Dockerfile's COPY list, and nothing in node_modules/ is ever copied into it. No bundler, no transpiler — the web path stays buildless in both channels.",
+  "scripts": {
+    "stage": "node tools/stage-webdir.js",
+    "sync": "node tools/stage-webdir.js && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.0"
+  }
+}

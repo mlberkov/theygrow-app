@@ -3,11 +3,24 @@
 # api/cloudbuild.staging.yaml and app/cloudbuild.yaml. Values live in docs/RUNBOOK.md
 # ("Live-infra divergence") and are set by the owner in the Cloud Build console.
 #
+# SUBSTITUTIONS: what this file does NOT guarantee (corrected in L1-P1). This header used
+# to state that Cloud Build's "default MUST_MATCH option" was kept deliberately and turns a
+# substitution-name typo into a red build. The verifiable fact is that NONE of the three
+# build-configs in this repository declares substitutionOption at all — `options:` below
+# carries only `logging`. This file therefore asserts nothing about substitution matching,
+# and the typo protection described here previously does not exist.
+# (Separately: an unverified upstream note holds that trigger-invoked builds run under
+# ALLOW_LOOSE. It has been confirmed neither here nor by the owner as of L1-P1 and is
+# carried as open debt in docs/RUNBOOK.md — do not rely on it as established.)
+# What DOES protect the deploy is the Step 0 guard below: it fails the build when a
+# substitution is empty, which is exactly what a mis-named key resolves to. Switching to an
+# explicit MUST_MATCH is deliberately deferred — the delivery channel is currently the only
+# one, and a substitution mismatch would break it outright.
+#
 # ORDERING, shared with A3-P1's: these substitutions are set AFTER the packet merges,
-# never before. Cloud Build's default MUST_MATCH option (kept deliberately — it turns a
-# substitution typo into a red build instead of a silent empty string) fails every build
-# when a trigger supplies a key the config on `main` does not declare. See
-# docs/RUNBOOK.md "Production database enablement" and "Same-origin /api proxy".
+# never before. See docs/RUNBOOK.md "Production database enablement" and
+# "Same-origin /api proxy" — and note that the ordering is now kept as the safe sequence,
+# not because a MUST_MATCH failure forces it.
 substitutions:
   # Cloud SQL instance connection name (project:region:instance).
   _CLOUDSQL_INSTANCE: ''

@@ -30,7 +30,13 @@
 # against. It calls scripts/parity-suite.sh, the same entry point developers
 # run locally, so the gate cannot drift into a local shadow of itself; the
 # script pins the browser and font set by running inside a fixed Playwright
-# container. It builds and deploys nothing and touches no GCP.
+# container. It builds and deploys nothing and touches no GCP. Since L1-P1 that
+# suite also covers the CAPACITOR channel: the script stages native/www/ from
+# app/Dockerfile's COPY list and the `native` project boots the app from it.
+#
+# From L1-P1 a fourth job, `android`, assembles the Capacitor debug APK. It is
+# the only gate in this repo that cannot be reproduced on the development
+# machine, which has no JDK, no Android SDK and no Gradle — see the job.
 
 name: CI
 
@@ -172,3 +178,65 @@ jobs:
             app/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # L1-P1 — the Android shell build gate. Independent of `quality` and `parity`
+  # for the reason those two are independent of each other: one gate must never
+  # be able to hide another.
+  #
+  # This job exists because NOTHING about the native build can be proven on the
+  # development machine — it has no JDK, no Android SDK and no Gradle, and the
+  # Capacitor CLI needs Node >= 22 where that box has 18. Every other check in
+  # this packet runs locally; "the Android shell compiles" is the one claim that
+  # is true only if this job is green.
+  #
+  # It builds a DEBUG APK and nothing else. No release keystore, no signing
+  # secret, no store upload: distribution is direct-APK under dark-build
+  # discipline (PDR-019), and key custody is a later, explicit decision. The
+  # artifact is how the owner gets something installable without a local
+  # toolchain.
+  #
+  # Order matters and is not incidental: stage -> sync -> assemble. The staged
+  # web root is derived from app/Dockerfile's COPY list, `cap sync` copies it
+  # into the Android project (native/android/.gitignore keeps that copy out of
+  # git, so it MUST be regenerated here), and only then can Gradle package it.
+  # It touches no GCP and deploys nothing.
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22: @capacitor/cli declares `engines.node >= 22` and hard-fails
+      # below it, rather than warning.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Java 21: native/android/app/capacitor.build.gradle pins
+      # source/targetCompatibility to VERSION_21 (Capacitor 8 / AGP 8.13).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the Capacitor toolchain
+        working-directory: native
+        run: npm ci
+
+      - name: Stage the web root from app/Dockerfile's COPY list
+        run: node native/tools/stage-webdir.js
+
+      - name: Sync the staged web root into the Android project
+        working-directory: native
+        run: npx cap sync android
+
+      - name: Assemble the debug APK
+        working-directory: native/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: theygrow-debug-apk
+          path: native/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error

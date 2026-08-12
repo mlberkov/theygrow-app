@@ -18,8 +18,20 @@
 
 const { defineConfig } = require('@playwright/test');
 
+const path = require('path');
+
 const PORT = Number(process.env.PARITY_PORT || 8080);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
+
+// Second origin for the Capacitor channel (L1-P1). It serves the STAGED APK web
+// root (native/www/, assembled from app/Dockerfile's COPY list) under a
+// Capacitor-shaped delivery profile: no nginx cache/MIME headers, no
+// try_files SPA fallback, no /api. Two servers rather than one because the two
+// channels differ in exactly those delivery semantics — a single server could
+// only prove one of them.
+const NATIVE_PORT = PORT + 1;
+const NATIVE_BASE_URL = `http://127.0.0.1:${NATIVE_PORT}`;
+const NATIVE_WEB_ROOT = path.resolve(__dirname, '..', 'native', 'www');
 
 const DESKTOP = { width: 1280, height: 800 };
 // Matches the viewport A0 verified on; the mobile accordion is a separate code
@@ -61,19 +73,35 @@ module.exports = defineConfig({
     timezoneId: 'UTC',
   },
 
-  webServer: {
-    command: 'node tests/server.js',
-    url: `${BASE_URL}/health`,
-    reuseExistingServer: !process.env.CI,
-    env: { PORT: String(PORT) },
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
+  webServer: [
+    {
+      command: 'node tests/server.js',
+      url: `${BASE_URL}/health`,
+      reuseExistingServer: !process.env.CI,
+      env: { PORT: String(PORT) },
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+    {
+      command: 'node tests/server.js',
+      url: `${NATIVE_BASE_URL}/health`,
+      reuseExistingServer: !process.env.CI,
+      env: {
+        PORT: String(NATIVE_PORT),
+        PARITY_PROFILE: 'capacitor',
+        PARITY_WEB_ROOT: NATIVE_WEB_ROOT,
+      },
+      stdout: 'ignore',
+      stderr: 'pipe',
+    },
+  ],
 
   projects: [
     {
       name: 'contract',
-      testMatch: /delivery-contract\.spec\.js/,
+      // Three static-source guards share this project: they read files rather
+      // than drive a browser, so they cost nothing to run together.
+      testMatch: /(delivery-contract|storage-seam|native-shell)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -90,6 +118,31 @@ module.exports = defineConfig({
       name: 'behavior',
       testMatch: /behavior\.spec\.js/,
       use: { viewport: DESKTOP },
+    },
+    // The Capacitor channel (L1-P1). Same specs, same committed baselines,
+    // different delivery surface.
+    //
+    // It asserts the dom-mobile baselines rather than a set of its own: the two
+    // channels ship byte-identical assets (LSC-P1-INV-002), so a second
+    // baseline set would be a second thing to re-bless and would prove nothing
+    // the hashes do not already prove. Pointing this project at the SAME bytes
+    // is what makes a channel divergence visible — if the APK's asset set ever
+    // renders differently, it reds against the web channel's own record.
+    //
+    // Mobile viewport, not desktop: the shipping target is an Android phone,
+    // and the mobile accordion is a separate code path (innerWidth <= 767).
+    //
+    // behavior.spec.js runs here too, minus the service-worker block it skips
+    // under this profile for the reason stated in that file.
+    {
+      name: 'native',
+      testMatch: /(dom-parity|behavior)\.spec\.js/,
+      snapshotPathTemplate: '{testDir}/__baselines__/dom-mobile/{arg}{ext}',
+      use: {
+        viewport: MOBILE,
+        baseURL: NATIVE_BASE_URL,
+        parityProfile: 'capacitor',
+      },
     },
     {
       name: 'visual-desktop',

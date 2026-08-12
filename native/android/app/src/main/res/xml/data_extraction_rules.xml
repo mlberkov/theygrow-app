@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    L1-P1 — API 31+ backup / transfer rules. Everything is excluded, in both
+    directions, deliberately.
+
+    <cloud-backup> is belt-and-braces next to android:allowBackup="false" in the
+    manifest. <device-transfer> is NOT: allowBackup does not disable
+    device-to-device transfer on Android 12+, so without this block the app
+    sandbox — the WebView's localStorage today, the native store from L1-P2 —
+    would still be copied to a new phone outside any export contour the product
+    controls.
+
+    domain="root" does not imply the others; each storage domain is named
+    explicitly so a new one cannot be inherited by accident.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
