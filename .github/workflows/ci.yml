@@ -317,21 +317,24 @@ jobs:
           # exists for its duration: once the action returns, the device is gone
           # and with it the one place boot.js's console.error reason was ever
           # written. Without it a store that fails to open reports only a poll
-          # timeout, and the reason costs a whole emulator cycle to learn. Dumped
-          # on failure only, and only ever from an emulator that holds no family
-          # data — a green run uploads nothing.
+          # timeout, and the reason costs a whole emulator cycle to learn. The
+          # dump is a whole-device one, taken only ever from an emulator that
+          # holds no family data.
+          #
+          # ONE PHYSICAL LINE, deliberately. This action runs each line of the
+          # script in a shell of its own (`sh -c set +e`, then `sh -c ./gradlew
+          # …` in the run-31612297495 log) and abandons the step as soon as one
+          # line exits non-zero — so a multi-line guard round the dump neither
+          # shares gradle's $? nor ever gets reached. Joined to the gradle
+          # command with `;`, the dump runs whatever gradle did, and the trailing
+          # `exit` keeps the step's own verdict gradle's. The write is
+          # unconditional: an empty log says the capture worked and the device
+          # was quiet, while a missing file says nothing at all.
           script: |
-            set +e
-            ./gradlew --no-daemon connectedDebugAndroidTest
-            status=$?
-            if [ "$status" -ne 0 ]; then
-              mkdir -p logcat
-              adb logcat -d > logcat/instrumented-logcat.txt 2>&1 || true
-            fi
-            exit "$status"
+            ./gradlew --no-daemon connectedDebugAndroidTest; status=$?; mkdir -p logcat; adb logcat -d > logcat/instrumented-logcat.txt 2>&1 || true; exit $status
 
       - name: Upload the emulator logcat
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-instrumented-logcat
