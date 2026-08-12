@@ -373,14 +373,66 @@ jobs:
       # --flavour 2b is the claim the artifact makes about itself, in its XMP
       # packet and in its own declaration.json. Asking the validator for a
       # different flavour than the file claims would make this gate decorative.
+      #
+      # THE VERDICT IS PARSED, NOT GREPPED. The first version of this step
+      # grepped for `compliant="true"`, which NEVER MATCHES: veraPDF writes the
+      # attribute as `isCompliant="true"`, with a capital C, so the lowercase
+      # substring does not occur in a passing report either. The gate could only
+      # ever go red — it failed run 31637683475 on a file the validator had just
+      # reported as PASS with 144 rules passed and 0 failed. A gate that cannot
+      # pass is as worthless as one that cannot fail, and a string match is how
+      # both happen, so the report is parsed as XML and every field that carries
+      # the verdict is checked, including the anti-vacuity one: a report with
+      # zero checks performed is not a pass.
       - name: Validate the print layer against PDF/A-2b
         run: |
           "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format text \
             "${RUNNER_TEMP}/pdfa/archive.pdf" | tee "${RUNNER_TEMP}/pdfa/verapdf.txt"
+          # `|| true` so a non-compliant verdict (exit 1) still writes its report
+          # and reaches the parser below, which is what produces the readable
+          # failure. A crashed validator writes nothing and fails there too.
           "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format mrr \
-            "${RUNNER_TEMP}/pdfa/archive.pdf" > "${RUNNER_TEMP}/pdfa/verapdf.xml"
-          grep -q 'compliant="true"' "${RUNNER_TEMP}/pdfa/verapdf.xml" \
-            || { echo "::error::the print layer is NOT PDF/A-2b conformant"; exit 1; }
+            "${RUNNER_TEMP}/pdfa/archive.pdf" > "${RUNNER_TEMP}/pdfa/verapdf.xml" || true
+          python3 - "${RUNNER_TEMP}/pdfa/verapdf.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          try:
+              root = ET.parse(sys.argv[1]).getroot()
+          except Exception as error:
+              sys.exit(f"::error::the veraPDF report is unreadable ({error}) — the validator did not run")
+
+          reports = root.findall(".//validationReport")
+          if not reports:
+              sys.exit("::error::the veraPDF report contains no validationReport — nothing was validated")
+
+          failures = []
+          checks = 0
+          for report in reports:
+              if report.get("isCompliant") != "true":
+                  failures.append(report.get("statement") or "not compliant")
+              details = report.find("details")
+              if details is None:
+                  failures.append("a validationReport carries no <details>")
+                  continue
+              checks += int(details.get("passedChecks", 0))
+              if details.get("failedRules") != "0" or details.get("failedChecks") != "0":
+                  failures.append(
+                      f"failedRules={details.get('failedRules')}"
+                      f" failedChecks={details.get('failedChecks')}"
+                  )
+
+          # Anti-vacuity: a report that validated nothing must not read as a pass.
+          if checks == 0:
+              failures.append("the validator performed zero checks")
+
+          if failures:
+              for line in failures:
+                  print(f"::error::the print layer is NOT PDF/A-2b conformant: {line}")
+              sys.exit(1)
+
+          print(f"PDF/A-2b conformant: {len(reports)} report(s), {checks} checks passed")
+          PY
 
       - name: Upload the validated artifact and its report
         if: always()

@@ -38,6 +38,52 @@ const DECLARATION = JSON.parse(
     fs.readFileSync(path.join(EXPORT_DIR, 'declaration.json'), 'utf8')
 );
 
+test.describe('the conformance gate can actually pass', () => {
+    // WHY THIS EXISTS. The first version of the veraPDF step grepped the report
+    // for `compliant="true"`. veraPDF writes `isCompliant="true"` — capital C —
+    // so the lowercase substring never occurs, and the gate could ONLY go red.
+    // It failed run 31637683475 on a file the validator had just reported PASS
+    // with 144 rules passed and 0 failed.
+    //
+    // A gate that cannot pass is as worthless as one that cannot fail, and the
+    // per-push suite could not see either, because the defect was in CI rather
+    // than in the PDF. This is the part of that class which IS expressible for
+    // free: the workflow's success condition is checked against the attribute
+    // veraPDF actually emits, captured here from a real report.
+    const WORKFLOW = fs.readFileSync(
+        path.join(APP_ROOT, '..', '.github', 'workflows', 'ci.yml'),
+        'utf8'
+    );
+
+    test('the verdict is read from the attribute veraPDF really writes', () => {
+        expect(WORKFLOW).toContain('isCompliant');
+        // Scanned line by line and comments skipped on purpose: the workflow
+        // DOCUMENTS the broken pattern so it cannot be reintroduced by someone
+        // who never saw it fail, and a naive substring scan would fire on that
+        // explanation instead of on a command.
+        const offenders = WORKFLOW.split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line && !line.startsWith('#'))
+            .filter((line) => /compliant="true"/.test(line) && !/isCompliant/.test(line));
+        expect(
+            offenders,
+            'a command matches `compliant="true"`, which no veraPDF report contains'
+        ).toEqual([]);
+    });
+
+    test('the gate still asks for the flavour the artifact claims', () => {
+        // Asking for a weaker flavour than the file claims would turn the gate
+        // decorative while keeping it green.
+        expect(WORKFLOW).toContain('--flavour 2b');
+        expect(DECLARATION.print_layer.conformance).toBe('PDF/A-2b');
+    });
+
+    test('the validator version is asserted rather than logged', () => {
+        expect(WORKFLOW).toContain('VERAPDF_EXPECTED_VERSION');
+        expect(WORKFLOW).toMatch(/VERAPDF_EXPECTED_VERSION:\s*'\d+\.\d+\.\d+'/);
+    });
+});
+
 test.describe('the print layer binaries are pinned', () => {
     // These two are the only non-icon binaries this app ships, they are read
     // from the APK at export time, and copies of both end up inside every
