@@ -32,6 +32,7 @@ import { buildTableHeader, buildTableBody, setFixedSkillColumnWidth } from './su
 import { checkAndShowOnboarding, wireOnboarding } from './surfaces/onboarding.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
+import { initNativeStore } from './store/boot.js';
 
 // Инициализация приложения
 function init() {
@@ -62,6 +63,13 @@ function init() {
 
 // Запуск при загрузке страницы: ждём kb-артефакт, затем строим UI
 document.addEventListener('DOMContentLoaded', () => {
+    // L1-P2: open the native store when running inside the Capacitor shell.
+    // Deliberately not awaited and deliberately unable to throw — on the web it
+    // returns 'not-native' before touching anything, and on the device a store
+    // that fails to open must not take the tracker down with it. P2 opens the
+    // store and writes no family data; the write path is P4.
+    initNativeStore();
+
     kbReady.then((kb) => {
         initData(kb);
         init();

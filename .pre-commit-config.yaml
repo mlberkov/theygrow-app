@@ -45,7 +45,14 @@ repos:
         # Strict type-check the /api package. pass_filenames is off so the whole
         # package resolves as a unit; additional_dependencies make api's imports
         # available in the hook's isolated venv.
-        args: [--config-file=pyproject.toml, api]
+        #
+        # L1-P2 adds app/tests/schema — the desktop tests for the native store's
+        # frozen DDL. They import the standard library only (sqlite3, pathlib)
+        # plus pytest, which is already declared below, so the dependency list
+        # is unchanged. The directory carries an __init__.py so mypy resolves it
+        # as the package `schema`; without it, its conftest would collide with
+        # api/tests/conftest.py as a duplicate top-level module.
+        args: [--config-file=pyproject.toml, api, app/tests/schema]
         pass_filenames: false
         additional_dependencies:
           - fastapi

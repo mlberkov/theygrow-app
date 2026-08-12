@@ -8,7 +8,7 @@
 // worker activates, and activate() purges every non-current cache (one-time
 // migration off theygrow-v1). Typed-config home (api parameters.py) is in /api,
 // not touched this milestone, so a typed knob is justifiably deferred.
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -47,6 +47,24 @@ const OFFLINE_URLS = [
   '/m/v1/surfaces/activities.js',
   '/m/v1/surfaces/onboarding.js',
   '/m/v1/surfaces/accordion.js',
+  // L1-P2: the native store. These ship to BOTH channels byte-identically
+  // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
+  // anything when there is no Capacitor bridge. They are precached because the
+  // import graph reaches them, and an installed client must not boot offline
+  // with a broken graph. The DDL artifact they read
+  // (/m/v1/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // channel ever fetches it, and that channel does not use this worker.
+  //
+  // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
+  // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
+  // quotes — an apostrophe swallows every entry after it and the guard then
+  // reports the icons as unprecached.
+  '/m/v1/store/boot.js',
+  '/m/v1/store/store.js',
+  '/m/v1/store/journal.js',
+  '/m/v1/store/bridge.js',
+  '/m/v1/store/config.js',
+  '/m/v1/store/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

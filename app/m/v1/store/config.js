@@ -1,0 +1,72 @@
+// Native-store knobs (L1-P2).
+//
+// OPERABILITY (ADR-013 / contract §4.7). Every qualitative knob the store
+// introduces lives HERE, once, with changed_in provenance — never as a literal
+// scattered through store.js or journal.js. The typed versioned config surface
+// of ADR-013 is api/parameters.py, which belongs to the server side this
+// milestone does not touch; the front-side precedent for a device-local knob is
+// CACHE_VERSION in app/sw.js (PWA-DL-001), and this module follows it.
+//
+// This file ships to BOTH delivery channels byte-identically (LSC-P1-INV-002).
+// It is inert on the web: nothing here reads or writes anything by itself.
+
+export const STORE_CONFIG = Object.freeze({
+    // changed_in: LSC-DL-002 — the database file name. Frozen with the schema:
+    // renaming it after the first live record orphans that record.
+    databaseName: 'theygrow',
+
+    // changed_in: LSC-DL-002 — schema version this build expects. The device
+    // records the version it actually applied in schema_meta/schema_migration.
+    schemaVersion: 1,
+
+    // changed_in: LSC-DL-002 — the DDL artifact, fetched from the app's own
+    // origin inside the WebView. Version lives in the FILE NAME, so a v2
+    // migration adds a file rather than editing a published one.
+    schemaUrl: '/m/v1/store/schema/001-core.sql',
+    schemaName: '001-core.sql',
+
+    // changed_in: LSC-DL-002 — STRICT tables need 3.37. Asserted against the
+    // real engine by the Android instrumented test and against the desktop
+    // engine by app/tests/schema/.
+    sqliteVersionFloor: '3.37.0',
+
+    // changed_in: LSC-DL-002 — WAL plus a bounded wait. WAL is what keeps a
+    // reader from blocking the write that records an observation.
+    journalMode: 'WAL',
+    busyTimeoutMs: 5000,
+
+    // changed_in: LSC-DL-002 — run PRAGMA integrity_check at open only when the
+    // previous run did not close cleanly. Always-on would cost a full scan of
+    // the family history on every launch.
+    integrityCheckPolicy: 'after-unclean-shutdown',
+
+    // changed_in: LSC-DL-002 — how many journal entries a cursor read returns.
+    // Background filing is L5; the shape it will page through is this one.
+    cursorBatchSize: 100,
+
+    // changed_in: LSC-DL-002 — bits of entropy in the database passphrase. The
+    // passphrase is minted on the device, never derived from user input, and
+    // never leaves it. The EXPORT key is a separate, still-open question (P3).
+    passphraseBits: 256,
+});
+
+// The complete set of plugin methods this app is allowed to call.
+//
+// This is a supply-chain boundary, not documentation: @capacitor-community/
+// sqlite also ships JSON import/export, its own upgrade versioning, sync tables
+// and TypeORM plumbing, none of which may become load-bearing here. The wrapper
+// is replaceable; the schema is not. app/tests/store-supply-chain.spec.js fails
+// if a call site reaches for a method outside this list.
+export const ALLOWED_PLUGIN_METHODS = Object.freeze([
+    'echo',
+    'isSecretStored',
+    'setEncryptionSecret',
+    'createConnection',
+    'closeConnection',
+    'open',
+    'close',
+    'execute',
+    'executeSet',
+    'query',
+    'run',
+]);

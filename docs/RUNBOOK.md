@@ -415,7 +415,8 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
    - creating or selecting a profile works, and a ticked skill **survives a cold restart** (force-stop, relaunch);
    - the activities modal and the activity→skill deep link behave as on the web;
    - **no `/api` request is attempted** — the app is fully local, and production `/api` is decommissioned;
-   - **record what the service worker actually does inside the WebView.** This is the one open question the repository cannot settle. If it registers, Cache Storage becomes a second copy of the shell **inside** WebView storage; the disposition of that is **L1-P2**'s (see `LSC-DL-001`). Write the observation into that packet's planning input.
+   - **record what the service worker actually does inside the WebView.** This is the one open question the repository cannot settle. If it registers, Cache Storage becomes a second copy of the shell **inside** WebView storage. The disposition **remains open after L1-P2**, which did not take it: it is a product-behaviour change to the native channel and was outside that packet's approved scope. It is carried to **L1-P4** (`LSC-DL-002`, debt note 1). Write the observation into that packet's planning input.
+   - **since L1-P2, check the local store came up.** With the device attached, `adb logcat | grep -i "\[store\]"` should print **nothing**: the store logs only on failure. To see it positively, use the instrumented job instead (below) — it asserts the same thing without a human reading a log.
 
 **Building locally instead (only on a machine with the full toolchain).**
 
@@ -424,6 +425,26 @@ cd native && npm ci && npm run sync && cd android && ./gradlew assembleDebug
 ```
 
 `npm run sync` stages the web root and then runs `cap sync android`; running `cap sync` without staging first would package a stale or missing web root.
+
+### The local store and its instrumented gate — L1-P2
+
+The device holds the family's data in **one SQLCipher-encrypted SQLite file**, created by `app/m/v1/store/store.js` on first launch and keyed by a 256-bit passphrase minted on the device and kept in `EncryptedSharedPreferences` behind an `AndroidKeyStore` master key. Encryption is on **from creation**, so no plaintext database ever exists. The schema is `app/m/v1/store/schema/001-core.sql` — one artifact, shipped in both channels, applied by the app, by the desktop tests and by the instrumented test. **It is frozen** (`LSC-DL-002`): changing it after real records exist means migrating a history that exists nowhere else.
+
+Two rules constrain how that file is written, and both are enforced by test rather than by memory:
+
+- **Every `CREATE TRIGGER` stays on ONE line.** The Android wrapper splits the DDL on `";\n"` and re-joins a trigger body only when a fragment trims to exactly `END`, so a multi-statement trigger written across lines is cut in half and fails **on the device** while passing an ordinary desktop test.
+- **No SQL string literal contains `--` or a lowercase `end;`.** The same splitter strips `--` to end of line inside quotes as well as outside, and uppercases `end;` blindly.
+
+**Running the checks that do not need a device.**
+
+```
+pytest app/tests/schema                       # the DDL, applied through a port of the wrapper's splitter
+scripts/parity-suite.sh --project=contract    # merge semantics, supply chain, store unit tests
+```
+
+**Running the instrumented gate (needs CI, not a local toolchain).** `android-instrumented` boots an emulator and asserts what no desktop test can: that the bundled engine compiles **FTS5** in, that it meets the SQLite floor STRICT tables need, that `PRAGMA cipher_version` is non-empty (the database really is SQLCipher), that the shipped DDL applies and passes `integrity_check`, that WAL works, that the append-only triggers fire, that Russian tokenization behaves as measured — and that the injected Capacitor bridge reaches the SQLite plugin **with no bundled JavaScript**, which is the premise the buildless decision rests on.
+
+**It does not run on push.** By owner decision on CI spend it runs on `pull_request` and on `workflow_dispatch` only. To run it on demand: GitHub → **Actions** → **CI** → **Run workflow**, pick the branch. Do this after any change to the schema, the store modules or the Capacitor toolchain — otherwise the first signal arrives at the milestone PR, possibly several commits after the cause.
 
 **Regenerating the Android project.** Do not delete and re-add it casually: `native/android/app/src/main/AndroidManifest.xml` is **hand-edited** — `allowBackup="false"` plus both backup-rule files, which stop Android from uploading the app sandbox (WebView storage today, the native store from L1-P2) to the user's cloud account or transferring it to a new device. `app/tests/native-shell.spec.js` pins those values, so a regeneration that reverts them reds CI rather than silently restoring the default. Re-apply them, do not re-bless the test.
 

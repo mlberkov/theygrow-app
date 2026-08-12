@@ -39,6 +39,16 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    // L1-P2 — the instrumented store tests. ActivityScenario drives MainActivity
+    // for the bridge probe; the SQLCipher artifact is named here because the
+    // plugin declares it `implementation`, so it is on the app's RUNTIME
+    // classpath but not its compile classpath. The version is pinned to the one
+    // the plugin itself resolves — if the two ever diverge, the engine under the
+    // instrumented assertions stops being the engine the app actually uses.
+    androidTestImplementation "androidx.test:core:1.6.1"
+    androidTestImplementation "androidx.test:runner:1.6.2"
+    androidTestImplementation "net.zetetic:sqlcipher-android:4.17.0@aar"
+    androidTestImplementation "androidx.sqlite:sqlite:2.4.0"
     implementation project(':capacitor-cordova-android-plugins')
 }
 

@@ -37,12 +37,18 @@
 # From L1-P1 a fourth job, `android`, assembles the Capacitor debug APK. It is
 # the only gate in this repo that cannot be reproduced on the development
 # machine, which has no JDK, no Android SDK and no Gradle — see the job.
+#
+# From L1-P2 a fifth job, `android-instrumented`, boots an emulator and runs the
+# store's instrumented tests against the real SQLCipher engine. Unlike every
+# other job here it does NOT run on push — see the job for why, and for what
+# that costs.
 
 name: CI
 
 on:
   push:
   pull_request:
+  workflow_dispatch:   # L1-P2 — lets the owner run the emulator job on demand
 
 permissions:
   contents: read
@@ -93,6 +99,12 @@ jobs:
 
       - name: pytest (api)
         run: pytest api
+
+      # L1-P2 — the native store's frozen DDL, applied to the standard library's
+      # SQLite through a faithful port of the Android wrapper's own statement
+      # splitter. Standard library only: no service, no device, no network.
+      - name: pytest (native store schema)
+        run: pytest app/tests/schema
 
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure
@@ -240,3 +252,74 @@ jobs:
           path: native/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
           if-no-files-found: error
+
+  # L1-P2 — the instrumented store gate. `android` proves the shell COMPILES;
+  # this proves the engine underneath it. The schema frozen in this packet stands
+  # on properties no desktop test can establish — that the bundled SQLite
+  # compiles FTS5 in, that STRICT tables and WAL work, that the shipped DDL
+  # applies to SQLCipher, and that the injected Capacitor bridge reaches the
+  # plugin with no bundled JavaScript, which is the premise the whole buildless
+  # decision rests on (LSC-DL-002).
+  #
+  # NOT A PER-PUSH GATE, by owner decision. It runs on pull_request and on
+  # workflow_dispatch only: booting an emulator on every push to a private repo
+  # is billable minutes spent re-proving a schema that changes once. The
+  # consequence is stated rather than hidden — a regression introduced by a later
+  # packet is caught at PR time, not at push time, so a red result here can
+  # arrive several commits after its cause.
+  android-instrumented:
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Without KVM the emulator falls back to software rendering and the job
+      # times out rather than failing honestly.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install the Capacitor toolchain
+        working-directory: native
+        run: npm ci
+
+      # Same order as the `android` job, and for the same reason: the staged web
+      # root is what `cap sync` copies into assets/public/, which is where the
+      # instrumented test reads the DDL from.
+      - name: Stage the web root from app/Dockerfile's COPY list
+        run: node native/tools/stage-webdir.js
+
+      - name: Sync the staged web root into the Android project
+        working-directory: native
+        run: npx cap sync android
+
+      - name: Instrumented store tests (emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: native/android
+          script: ./gradlew --no-daemon connectedDebugAndroidTest
+
+      - name: Upload the instrumented test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-report
+          path: native/android/app/build/reports/androidTests/
+          retention-days: 7
+          if-no-files-found: warn

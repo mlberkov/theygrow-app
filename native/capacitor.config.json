@@ -8,5 +8,10 @@
   "server": {
     "androidScheme": "https",
     "hostname": "localhost"
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": true
+    }
   }
 }

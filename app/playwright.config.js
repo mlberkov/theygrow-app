@@ -99,9 +99,12 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'contract',
-      // Three static-source guards share this project: they read files rather
-      // than drive a browser, so they cost nothing to run together.
-      testMatch: /(delivery-contract|storage-seam|native-shell)\.spec\.js/,
+      // Static-source guards and off-device unit runs share this project: they
+      // read files or exercise pure functions rather than drive a browser, so
+      // they cost nothing to run together. L1-P2 adds three — the CRDT
+      // merge-semantics run, the store supply-chain guard, and the store's own
+      // unit tests, which import the SHIPPED modules directly under Node.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

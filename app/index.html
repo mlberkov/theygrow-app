@@ -51,8 +51,9 @@
     <title>Child Dev Tracker</title>
     <link rel="stylesheet" href="/m/v1/app.css">
 
-    <!-- Module delivery hints (A1-P6, A1-DL-007). The fifteen NON-ENTRY modules
-         of the /m/v1/ graph. Without these the browser discovers them only after
+    <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
+         /m/v1/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
+         store. Without these the browser discovers them only after
          app.js parses, and their own imports only after that — the boot-order
          cost A1-DL-004/005/006 each recorded and declined to pay.
 
@@ -86,6 +87,12 @@
     <link rel="modulepreload" href="/m/v1/surfaces/activities.js">
     <link rel="modulepreload" href="/m/v1/surfaces/onboarding.js">
     <link rel="modulepreload" href="/m/v1/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v1/store/boot.js">
+    <link rel="modulepreload" href="/m/v1/store/store.js">
+    <link rel="modulepreload" href="/m/v1/store/journal.js">
+    <link rel="modulepreload" href="/m/v1/store/bridge.js">
+    <link rel="modulepreload" href="/m/v1/store/config.js">
+    <link rel="modulepreload" href="/m/v1/store/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->

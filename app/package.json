@@ -10,6 +10,8 @@
     "test:visual": "playwright test --project=visual-desktop --project=visual-mobile"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1"
+    "@automerge/automerge": "2.2.9",
+    "@playwright/test": "1.61.1",
+    "loro-crdt": "1.5.10"
   }
 }
