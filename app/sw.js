@@ -68,9 +68,16 @@ const OFFLINE_URLS = [
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
-  // FETCH at runtime (/m/v1/export/declaration.json) are deliberately NOT here:
-  // only the native channel ever reads them, and that channel does not use this
-  // worker.
+  // FETCH at runtime are deliberately NOT here: the declaration
+  // (/m/v1/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v1/export/assets/. Only the
+  // native channel ever reads them, that channel does not use this worker, and
+  // the web channel cannot export at all — so precaching them would spend
+  // roughly 443 KB of an installed web client cache budget on bytes it can
+  // never use. See LSC-DL-003.
+  //
+  // (Note the wording above avoids an apostrophe on purpose — see the trap
+  // named further down this comment block.)
   '/m/v1/surfaces/export.js',
   '/m/v1/export/run.js',
   '/m/v1/export/build.js',
@@ -79,6 +86,8 @@ const OFFLINE_URLS = [
   '/m/v1/export/text.js',
   '/m/v1/export/readme.js',
   '/m/v1/export/zip.js',
+  '/m/v1/export/pdf.js',
+  '/m/v1/export/ttf.js',
   '/m/v1/export/config.js',
   '/m/v1/export/errors.js',
   '/icons/icon-logo-192-v2.png',

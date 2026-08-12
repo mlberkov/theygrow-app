@@ -32,6 +32,10 @@ class Artifact:
     def _read(self, path: str) -> str:
         return self._zip.read(path).decode("utf-8")
 
+    def raw(self, path: str) -> bytes:
+        """Bytes of any declared file. The print layer is binary; the rest is text."""
+        return self._zip.read(path)
+
     # --- structure, discovered rather than assumed -----------------------
 
     def dataset_names(self) -> list[str]:

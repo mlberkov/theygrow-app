@@ -69,6 +69,43 @@ export const EXPORT_CONFIG = Object.freeze({
     // MANIFEST.json. The skill identifiers in the journal are meaningless without
     // knowing which canon they were written against.
     canonUrl: '/kb-v1.json',
+
+    // --- print layer (checkpoint 2) --------------------------------------
+
+    // changed_in: LSC-DL-003 — the conformance level the print layer CLAIMS and
+    // the XMP packet declares. Changing this string without changing what the
+    // writer emits would make the artifact lie about itself, which is why the
+    // claim is verified by veraPDF in the android-instrumented job rather than
+    // trusted.
+    pdfConformance: 'PDF/A-2b',
+
+    // changed_in: LSC-DL-003 — the embedded font. PDF/A requires every font to
+    // be embedded and there is no Cyrillic base-14 face, so a PDF from this app
+    // always carries one. Vendored unmodified; see assets/PROVENANCE.txt.
+    fontUrl: '/m/v1/export/assets/PTSans-Regular.ttf',
+    pdfFontName: 'PTSans-Regular',
+
+    // changed_in: LSC-DL-003 — the OutputIntent destination profile, required by
+    // PDF/A-2b so the file's colour is reproducible without the device that
+    // wrote it. 456 bytes; it travels inside every exported artifact.
+    iccUrl: '/m/v1/export/assets/sRGB-v2-micro.icc',
+
+    // changed_in: LSC-DL-003 — page typography. Deliberately conservative: one
+    // regular weight, one size, no italics, so the writer needs one font file
+    // and the layout has no state a future edit can get subtly wrong.
+    pdfFontSize: 9,
+    pdfLineLeading: 11,
+    pdfMarginPt: 42,
+
+    // changed_in: LSC-DL-003 — FontDescriptor /StemV. TrueType carries no stem
+    // width, the key is mandatory, and a wrong value affects nothing a viewer
+    // renders; 80 is the conventional value for a regular sans face and is
+    // written down here rather than buried as a literal in the writer.
+    pdfStemV: 80,
+
+    // changed_in: LSC-DL-003 — /Producer. Names the artifact format rather than
+    // a version string, so it does not drift on every release.
+    pdfProducer: 'TheyGrow archive',
 });
 
 // The complete set of methods this app is allowed to call on the export sink.

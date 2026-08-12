@@ -28,6 +28,24 @@ async function loadDeclaration() {
     return response.json();
 }
 
+// The print layer's two binaries. On the native channel these are local asset
+// reads served by Capacitor out of the APK — no network at any point — which is
+// also why they are not in the service worker precache: only this channel ever
+// reads them, and this channel does not use that worker.
+//
+// The fetch calls themselves stay at the call site, addressed literally as
+// EXPORT_CONFIG knobs, rather than being hidden behind a helper that takes a
+// url. app/tests/export-contour.spec.js asserts every fetch argument is a
+// declared knob, and a helper parameter would defeat that gate rather than
+// satisfy it — the point is that a new off-device read cannot be introduced
+// without declaring its target first.
+async function toBytes(response, url) {
+    if (!response.ok) {
+        throw new ExportError(`the print layer asset ${url} is unreadable`);
+    }
+    return new Uint8Array(await response.arrayBuffer());
+}
+
 /**
  * Builds the artifact and hands it to the system file picker.
  *
@@ -44,7 +62,14 @@ export async function runExport({ now = () => Date.now() } = {}) {
         throw new ExportError('the local store is not open, so there is nothing to export');
     }
 
-    const [declaration, canon] = await Promise.all([loadDeclaration(), kbReady]);
+    const [declaration, canon, fontResponse, iccResponse] = await Promise.all([
+        loadDeclaration(),
+        kbReady,
+        fetch(EXPORT_CONFIG.fontUrl),
+        fetch(EXPORT_CONFIG.iccUrl),
+    ]);
+    const font = await toBytes(fontResponse, EXPORT_CONFIG.fontUrl);
+    const icc = await toBytes(iccResponse, EXPORT_CONFIG.iccUrl);
     const selfParticipantId = handle.selfParticipantId;
 
     const readout = await readOut(declaration, { selfParticipantId });
@@ -54,6 +79,7 @@ export async function runExport({ now = () => Date.now() } = {}) {
         selfParticipantId,
         now: now(),
     });
+    manifest.assets = { font, icc };
 
     const bytes = buildArtifact({ declaration, readout, manifest });
     const filename = artifactFilename(manifest.exportedAtUtc);

@@ -12,6 +12,8 @@
 // fails loudly rather than being silently skipped.
 
 import { EXPORT_CONFIG } from './config.js';
+import { ExportError } from './errors.js';
+import { renderPdf } from './pdf.js';
 import { renderAttachmentsNote, renderReadme } from './readme.js';
 import { renderDataset, renderJournal } from './text.js';
 import { writeZip } from './zip.js';
@@ -76,8 +78,25 @@ function buildManifest(declaration, readout, manifest) {
     };
 }
 
-function renderFile(entry, declaration, readout, manifest) {
+function renderFile(entry, declaration, readout, manifest, rendered) {
     switch (entry.path) {
+        case 'print/archive.pdf':
+            // Built LAST, from the text files this same run already produced —
+            // so the print layer is literally the printable form of `text/`
+            // rather than a second rendering with opinions of its own. A
+            // divergence between the two would be undetectable to a reader.
+            return renderPdf({
+                font: manifest.assets.font,
+                icc: manifest.assets.icc,
+                title: declaration.title_ru,
+                exportedAtUtc: manifest.exportedAtUtc,
+                sections: declaration.files
+                    .filter((f) => f.path.startsWith('text/'))
+                    .map((f) => ({
+                        title: f.title_ru,
+                        body: new TextDecoder().decode(rendered.get(f.path)),
+                    })),
+            });
         case 'README.txt':
             return text(renderReadme(declaration));
         case 'MANIFEST.json':
@@ -134,11 +153,36 @@ export function buildArtifact({ declaration, readout, manifest }) {
         }
     }
 
+    const printLayer = declaration.files.some((f) => f.path === 'print/archive.pdf');
+    if (printLayer && !(manifest.assets?.font && manifest.assets?.icc)) {
+        throw new ExportError(
+            'the declaration lists a print layer, so the font and the ICC profile are required'
+        );
+    }
+
+    // Two passes, because the print layer reads what the first pass produced.
+    // The declared order is preserved by rendering into a map keyed on path and
+    // emitting in `declaration.files` order at the end.
+    const rendered = new Map();
+    for (const entry of declaration.files) {
+        if (entry.path === 'print/archive.pdf') continue;
+        rendered.set(entry.path, renderFile(entry, declaration, readout, manifest, rendered));
+    }
+    if (printLayer) {
+        rendered.set(
+            'print/archive.pdf',
+            renderFile(
+                declaration.files.find((f) => f.path === 'print/archive.pdf'),
+                declaration,
+                readout,
+                manifest,
+                rendered
+            )
+        );
+    }
+
     return writeZip(
-        declaration.files.map((entry) => ({
-            path: entry.path,
-            bytes: renderFile(entry, declaration, readout, manifest),
-        }))
+        declaration.files.map((entry) => ({ path: entry.path, bytes: rendered.get(entry.path) }))
     );
 }
 

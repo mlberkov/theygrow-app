@@ -55,7 +55,11 @@ def test_a_blind_reader_finds_every_declared_dataset(artifact: bytes) -> None:
 def test_a_blind_reader_finds_every_declared_file(artifact: bytes) -> None:
     archive = Artifact(artifact)
     for path in archive.declared_file_paths():
-        assert archive.text_file(path), f"the artifact declares {path} but it is unreadable"
+        assert archive.raw(path), f"the artifact declares {path} but it is unreadable"
+        # Everything except the print layer is UTF-8 text a person can open in
+        # any editor; the declaration says which one is not.
+        if path != archive.declaration["print_layer"]["path"]:
+            assert archive.text_file(path), f"{path} is not readable as UTF-8 text"
 
 
 def test_a_blind_reader_can_rebuild_the_journal(artifact: bytes) -> None:

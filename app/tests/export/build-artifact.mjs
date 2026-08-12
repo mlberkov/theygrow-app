@@ -57,12 +57,20 @@ try {
     const declaration = JSON.parse(await readFile(DECLARATION, 'utf8'));
     const payload = JSON.parse(await readFile(payloadPath, 'utf8'));
 
+    // The two vendored binaries are read off disk here for the same reason the
+    // declaration is: there is no origin under `node`. They are the same bytes
+    // the app fetches from its own web root at runtime.
+    const assets = {
+        font: new Uint8Array(await readFile(path.join(EXPORT_DIR, 'assets', 'PTSans-Regular.ttf'))),
+        icc: new Uint8Array(await readFile(path.join(EXPORT_DIR, 'assets', 'sRGB-v2-micro.icc'))),
+    };
+
     await writeFile(
         outPath,
         buildArtifact({
             declaration,
             readout: payload.readout,
-            manifest: payload.manifest,
+            manifest: { ...payload.manifest, assets },
         })
     );
 } finally {

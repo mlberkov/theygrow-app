@@ -11,11 +11,12 @@
 // narrower scan here means the export directory keeps its own guard even if the
 // import graph is rearranged later.
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 
-const { shippedPaths, expandShippedFiles } = require('./support/ship-list');
+const { shippedPaths, expandShippedFiles, offlineUrls } = require('./support/ship-list');
 
 const APP_ROOT = path.resolve(__dirname, '..');
 const EXPORT_DIR = path.join(APP_ROOT, 'm', 'v1', 'export');
@@ -23,6 +24,7 @@ const SHIPPED = expandShippedFiles(
     shippedPaths(fs.readFileSync(path.join(APP_ROOT, 'Dockerfile'), 'utf8')),
     APP_ROOT
 );
+const PRECACHED = offlineUrls(fs.readFileSync(path.join(APP_ROOT, 'sw.js'), 'utf8'));
 
 const EXPORT_SOURCES = fs
     .readdirSync(EXPORT_DIR)
@@ -35,6 +37,56 @@ const SURFACE = fs.readFileSync(path.join(APP_ROOT, 'm', 'v1', 'surfaces', 'expo
 const DECLARATION = JSON.parse(
     fs.readFileSync(path.join(EXPORT_DIR, 'declaration.json'), 'utf8')
 );
+
+test.describe('the print layer binaries are pinned', () => {
+    // These two are the only non-icon binaries this app ships, they are read
+    // from the APK at export time, and copies of both end up inside every
+    // artifact a family keeps. A changed byte is a supply-chain event, so it
+    // reds here rather than travelling silently. Provenance and licences are in
+    // app/m/v1/export/assets/PROVENANCE.txt.
+    const PINNED = {
+        'PTSans-Regular.ttf':
+            '9cc831490532009bae2b3ce0d39c62adfc889060beb421593bfd9d2396d0f10a',
+        'sRGB-v2-micro.icc':
+            '0a8a33aea66a6f154a5642ebe168ef287e73265d9f7b51c42a45e6eedbacda7a',
+        'PTSans-OFL.txt': '2758cf7a872827f39661cf8cc24188113c030447aefb5ca7145993650076ca8c',
+    };
+
+    for (const [name, digest] of Object.entries(PINNED)) {
+        test(`${name} matches its pinned digest`, () => {
+            const file = path.join(EXPORT_DIR, 'assets', name);
+            const actual = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+            expect(actual, `${name} is not the vendored file this packet reviewed`).toBe(digest);
+        });
+    }
+
+    test('the font licence travels with the font', () => {
+        // The OFL requires the licence to accompany any redistribution of the
+        // font file. Shipping the binary without it would be a licence breach,
+        // not a documentation gap.
+        const ofl = fs.readFileSync(path.join(EXPORT_DIR, 'assets', 'PTSans-OFL.txt'), 'utf8');
+        expect(ofl).toContain('SIL OPEN FONT LICENSE');
+        expect(ofl).toContain('ParaType');
+        expect(SHIPPED).toContain('/m/v1/export/assets/PTSans-OFL.txt');
+    });
+
+    test('the two binaries ship but are deliberately NOT precached', () => {
+        // The DDL precedent (app/sw.js): only the native channel reads them,
+        // that channel does not use the service worker, and the web channel
+        // cannot export at all — so precaching would cost an installed web
+        // client ~443 KB of cache it can never use.
+        for (const name of ['PTSans-Regular.ttf', 'sRGB-v2-micro.icc']) {
+            expect(SHIPPED).toContain(`/m/v1/export/assets/${name}`);
+            expect(
+                PRECACHED.has(`/m/v1/export/assets/${name}`),
+                `${name} is precached; the web channel cannot use it`
+            ).toBeFalsy();
+        }
+        // Anti-vacuity: the precache list was parsed and is not empty.
+        expect(PRECACHED.size).toBeGreaterThan(10);
+        expect(PRECACHED.has('/m/v1/export/pdf.js')).toBeTruthy();
+    });
+});
 
 test.describe('the contour actually ships', () => {
     test('the export modules and the declaration are in the ship list', () => {

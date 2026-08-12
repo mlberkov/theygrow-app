@@ -297,6 +297,99 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # L1-P3 — the certifying half of the PDF/A-2b claim.
+      #
+      # WHY HERE AND NOT IN `quality`. veraPDF is a Java application and a ~33 MB
+      # download; this job already sets up Java and is `pull_request` +
+      # `workflow_dispatch` only by the standing owner decision on CI spend, so
+      # the expensive verification reuses the home that decision already built
+      # rather than inventing a second one. The consequence is stated rather
+      # than hidden, and it is the same trade already accepted for the device
+      # layer: a conformance regression is caught at PR or on dispatch, not at
+      # push, so a red result here can arrive several commits after its cause.
+      # The cheap structural half (app/tests/export/test_pdf_structure.py, the
+      # standard library only) does run on every push.
+      #
+      # The fixture is built by the SHIPPED builder through the SAME harness the
+      # pytest suite uses, so the file veraPDF certifies is the file the tests
+      # assert on. It runs before the emulator so a conformance failure reports
+      # in seconds instead of behind a boot.
+      #
+      # THE VALIDATOR IS NOT VERSION-PINNABLE, SO ITS DRIFT IS DETECTED INSTEAD.
+      # Checked before settling for this: `veraPDF/veraPDF-apps` publishes no
+      # GitHub releases at all, `veraPDF/veraPDF-library` tags carry source only
+      # and zero binary assets, and https://verapdf.org/software/ links exactly
+      # two unversioned URLs (/rel/ and /dev/). There is no versioned installer
+      # to pin a URL or a SHA-256 to, the way the font and the ICC profile are
+      # pinned. So the expected version is declared as a knob below and the step
+      # FAILS when the installed one differs: a silent upgrade of the tool that
+      # certifies our public PDF/A claim has to arrive as a red run and a
+      # deliberate decision, not as a line in a log nobody reads.
+      # Recorded as debt in LSC-DL-003 — this is a third party executing in CI
+      # on every run, which the supply-chain rule would not otherwise permit.
+      - name: Build the fixture artifact for validation
+        run: node --version && python3 app/tests/export/emit_fixture.py "${RUNNER_TEMP}/pdfa"
+
+      - name: Install veraPDF
+        env:
+          # changed_in: LSC-DL-003 — the veraPDF version this packet reviewed and
+          # validated the print layer against. Bumping it is a deliberate act:
+          # read the release notes, re-run this job, and only then change the
+          # string. The installer archive reviewed at that version hashed to
+          # sha256 6cc6341cb1af644044054b81f00a6590a7918abb18f762243de115258bcad838
+          # (32 923 960 bytes), recorded as provenance of the bytes seen — not as
+          # a gate, since the URL serves whatever upstream last published.
+          VERAPDF_EXPECTED_VERSION: '1.30.2'
+        run: |
+          curl -sSL -o "${RUNNER_TEMP}/verapdf.zip" https://software.verapdf.org/rel/verapdf-installer.zip
+          unzip -q "${RUNNER_TEMP}/verapdf.zip" -d "${RUNNER_TEMP}/verapdf-src"
+          cat > "${RUNNER_TEMP}/auto-install.xml" <<'XML'
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+            <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+              <installpath>${RUNNER_TEMP}/verapdf</installpath>
+            </com.izforge.izpack.panels.target.TargetPanel>
+            <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select"/>
+            <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          envsubst < "${RUNNER_TEMP}/auto-install.xml" > "${RUNNER_TEMP}/auto-install.resolved.xml"
+          java -jar "$(ls ${RUNNER_TEMP}/verapdf-src/*/verapdf-izpack-installer-*.jar)" \
+            "${RUNNER_TEMP}/auto-install.resolved.xml"
+
+          mkdir -p "${RUNNER_TEMP}/pdfa"
+          "${RUNNER_TEMP}/verapdf/verapdf" --version | tee "${RUNNER_TEMP}/pdfa/verapdf-version.txt"
+          # Substring rather than an exact line: the banner format is upstream's
+          # to change, the version number is what this gate is about.
+          grep -qF "${VERAPDF_EXPECTED_VERSION}" "${RUNNER_TEMP}/pdfa/verapdf-version.txt" || {
+            echo "::error::veraPDF is not ${VERAPDF_EXPECTED_VERSION}. Upstream published a new"\
+                 "version at an unversioned URL. Review it, re-run this job, then update"\
+                 "VERAPDF_EXPECTED_VERSION in .github/workflows/ci.yml (LSC-DL-003)."
+            exit 1
+          }
+
+      # --flavour 2b is the claim the artifact makes about itself, in its XMP
+      # packet and in its own declaration.json. Asking the validator for a
+      # different flavour than the file claims would make this gate decorative.
+      - name: Validate the print layer against PDF/A-2b
+        run: |
+          "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format text \
+            "${RUNNER_TEMP}/pdfa/archive.pdf" | tee "${RUNNER_TEMP}/pdfa/verapdf.txt"
+          "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format mrr \
+            "${RUNNER_TEMP}/pdfa/archive.pdf" > "${RUNNER_TEMP}/pdfa/verapdf.xml"
+          grep -q 'compliant="true"' "${RUNNER_TEMP}/pdfa/verapdf.xml" \
+            || { echo "::error::the print layer is NOT PDF/A-2b conformant"; exit 1; }
+
+      - name: Upload the validated artifact and its report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfa-validation
+          path: ${{ runner.temp }}/pdfa/
+          if-no-files-found: error
+
       # Without KVM the emulator falls back to software rendering and the job
       # times out rather than failing honestly.
       - name: Enable KVM

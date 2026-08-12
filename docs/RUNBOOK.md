@@ -461,6 +461,7 @@ The archive is the family's way out of this device, and it is deliberately the l
 3. Read `text/` for the data in words — participants, children and their current attributes, the whole journal, current skill state, diary records.
 4. Read `index.json` for the same data machine-readably. Its `declaration` section is a verbatim copy of `app/m/v1/export/declaration.json` and carries a plain-language explanation of **every field**, which is what makes the archive interpretable with no access to this repository.
 5. `MANIFEST.json` records what produced it: the app version, the canon (`kb-v1.json`) version, and the schema identifier and version **as the device actually held them** — plus per-dataset row counts and the export time.
+6. `print/archive.pdf` is the same text again, as **PDF/A-2b** — the archival profile: the font is embedded whole, the colour profile travels inside the file, nothing is encrypted and nothing points outside the file. Open it in any PDF reader, or print it. It is the **secondary** copy: a character the embedded font does not cover appears there as `�` (U+FFFD), while the text files and `index.json` always carry the exact character. When the two disagree, the text files are right, and `declaration.json` says so.
 
 **What is in the archive and what is not, stated the way the interface states it.** Photographs, video and audio are **not** included; `attachments/` is empty and says so. There is **no cloud backup** of this data — the archive is not a supplement to one, it is the only copy that exists off the device.
 
