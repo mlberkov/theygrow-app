@@ -127,6 +127,43 @@ function currentMount(html, where = 'app/index.html') {
   return { version, prefix: `/m/${version}/`, dir: version };
 }
 
+// The mount version published BEFORE the one the shell references, read from
+// the mount root on disk. Returns the same shape as currentMount(), or null when
+// the current generation is the only one shipped.
+//
+// WHY THIS EXISTS (EMV-DL-003). A copy-forward bump leaves the previous
+// generation on disk and shipped, which is what an already-installed client is
+// still holding until it updates. The upgrade-path fixture stages that
+// generation from these bytes, so it has to be able to name it — generically,
+// for the same reason currentMount() replaced 35 mount literals in EMV-P1: a
+// fixture pinned to `v1` would keep staging the wrong generation after the next
+// bump, and would then be proving the upgrade path of bytes nobody was on.
+//
+// Fails CLOSED like every parser here: an entry under app/m/ that is not a
+// v{N} directory is a mount topology this function does not model, so it throws
+// rather than being skipped (a skipped entry could silently make the previous
+// generation look absent, which reads as "nothing to upgrade from").
+function previousMount(appRoot, current) {
+  const mountRoot = path.join(appRoot, 'm');
+  const versions = [];
+  for (const entry of fs.readdirSync(mountRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      throw new Error(`ship-list: app/m/${entry.name} is not a directory — mount topology not understood`);
+    }
+    if (!/^v\d+$/.test(entry.name)) {
+      throw new Error(`ship-list: app/m/${entry.name} is not a v{N} mount version — topology not understood`);
+    }
+    versions.push(Number(entry.name.slice(1)));
+  }
+
+  const currentNumber = Number(current.version.slice(1));
+  const earlier = versions.filter((n) => n < currentNumber).sort((a, b) => a - b);
+  if (!earlier.length) return null;
+
+  const version = `v${earlier[earlier.length - 1]}`;
+  return { version, prefix: `/m/${version}/`, dir: version };
+}
+
 // The shell's EXECUTION roots: same-origin `<script type="module" src>` values.
 // This is what direction (3) walks from — deliberately narrower than "every .js
 // the shell names", which since A1-P6 also includes delivery hints.
@@ -270,6 +307,7 @@ module.exports = {
   shippedPaths,
   offlineUrls,
   currentMount,
+  previousMount,
   htmlAssetRefs,
   htmlModuleEntries,
   htmlPreloadHints,

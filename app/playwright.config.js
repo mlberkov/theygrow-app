@@ -131,8 +131,14 @@ module.exports = defineConfig({
       use: { viewport: MOBILE },
     },
     {
+      // EMV-P3 adds upgrade-path.spec.js here and NOT to `native` below: it
+      // stages the previously published generation, installs its service worker
+      // and drives the update path, all of which are inert in the Capacitor
+      // shell — /sw.js is never re-fetched there, so no waiting worker and no
+      // banner can ever appear (LSC-DL-001). Running it under that profile would
+      // assert web-channel delivery against a channel that has none.
       name: 'behavior',
-      testMatch: /behavior\.spec\.js/,
+      testMatch: /(behavior|upgrade-path)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

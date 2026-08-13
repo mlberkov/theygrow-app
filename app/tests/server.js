@@ -16,6 +16,14 @@
 //
 // Nothing here ships: app/Dockerfile COPYs an explicit file list that does not
 // include tests/, and app/.dockerignore keeps this out of the build context.
+//
+// SECOND SWITCH since EMV-P3. The same same-origin argument applies once more,
+// in the other direction: to prove that a client ALREADY INSTALLED on the
+// previous generation ends up on the current mount, that generation has to be
+// installable from this origin. So a second cookie serves the previously
+// published shell and worker (tests/support/prev-generation.js), staged from the
+// bytes on disk rather than committed as a copy. Both switches are cookie-keyed
+// and mutually exclusive; setting both is a 500.
 
 // TWO PROFILES since L1-P1. The server above describes the nginx channel; the
 // Capacitor channel is a different delivery surface serving the same bytes, and
@@ -38,6 +46,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+
+const { PREV_GEN_COOKIE, previousGeneration } = require('./support/prev-generation');
 
 const APP_ROOT = path.resolve(__dirname, '..');
 
@@ -147,9 +157,23 @@ function mutatedServiceWorker() {
 // context that asked for it.
 const SW_BUMP_COOKIE = 'parity_sw_bump';
 
-function wantsBumpedServiceWorker(req) {
+function hasCookie(req, name) {
   const cookie = req.headers.cookie || '';
-  return cookie.split(';').some((c) => c.trim() === `${SW_BUMP_COOKIE}=1`);
+  return cookie.split(';').some((c) => c.trim() === `${name}=1`);
+}
+
+function wantsBumpedServiceWorker(req) {
+  return hasCookie(req, SW_BUMP_COOKIE);
+}
+
+// The SECOND context-scoped switch (EMV-P3). Where the bump cookie serves a
+// byte-different FUTURE worker to the current shell, this one serves the
+// PREVIOUS generation of both — the shell and worker an already-installed
+// client is still running — so a spec can install that generation, then take the
+// switch away and observe what the current build actually delivers to it. See
+// tests/support/prev-generation.js for what is staged and how faithful it is.
+function wantsPreviousGeneration(req) {
+  return hasCookie(req, PREV_GEN_COOKIE);
 }
 
 function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
@@ -182,6 +206,46 @@ function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
     // headers are the web channel's contract, and claiming them here would make
     // the native run assert something the APK does not do.
     const { headers } = isNginx ? resolveHeaders(pathname) : { headers: {} };
+
+    // The two switches are mutually exclusive, and this is a 500 rather than a
+    // precedence rule on purpose: composed, they would serve a worker that is
+    // neither generation — the shape of a test that passes while asserting
+    // something nobody designed.
+    if (isNginx && wantsPreviousGeneration(req) && wantsBumpedServiceWorker(req)) {
+      res
+        .writeHead(500, { 'Content-Type': 'text/plain' })
+        .end(`both ${PREV_GEN_COOKIE} and ${SW_BUMP_COOKIE} are set; they stage different generations`);
+      return;
+    }
+
+    let staged = null;
+    if (isNginx && wantsPreviousGeneration(req)) {
+      try {
+        staged = previousGeneration(APP_ROOT);
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' }).end(String(err.message));
+        return;
+      }
+      if (!staged) {
+        // Not a quiet fallthrough to the current build: a spec that asked for
+        // the previous generation and silently got this one would assert the
+        // upgrade of a client that never existed.
+        res
+          .writeHead(500, { 'Content-Type': 'text/plain' })
+          .end('prev-generation: only one mount generation is shipped — there is nothing to upgrade from');
+        return;
+      }
+    }
+
+    // Derived per request rather than cached in module scope, like the bump
+    // path above: the mutation runs that establish this fixture's soundness edit
+    // app/index.html while the server is already up (reuseExistingServer), and a
+    // memoised copy would keep serving the pre-mutation bytes.
+    if (staged && pathname === '/sw.js') {
+      res.writeHead(200, Object.assign({ 'Content-Type': MIME['.js'] }, headers));
+      res.end(staged.worker);
+      return;
+    }
 
     if (isNginx && pathname === '/sw.js' && wantsBumpedServiceWorker(req)) {
       let body;
@@ -236,6 +300,17 @@ function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
       headers
     );
 
+    // Wherever the shell would be served — the root, a directory index, or the
+    // try_files fallback — the staged generation serves ITS shell instead. Keyed
+    // on the resolved file rather than on the pathname so a service-worker
+    // navigation fetch of a deep route gets the same generation the parent is
+    // looking at, which is what a real client would have.
+    if (staged && filePath === path.join(root, 'index.html')) {
+      res.writeHead(200, finalHeaders);
+      res.end(req.method === 'HEAD' ? undefined : staged.shell);
+      return;
+    }
+
     let body;
     try {
       body = fs.readFileSync(filePath);
@@ -264,6 +339,7 @@ module.exports = {
   resolveHeaders,
   SW_TEST_VERSION,
   SW_BUMP_COOKIE,
+  PREV_GEN_COOKIE,
   APP_ROOT,
   PROFILE,
   SERVE_ROOT,
