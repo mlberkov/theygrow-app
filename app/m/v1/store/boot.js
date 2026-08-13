@@ -45,17 +45,25 @@ export function storeHandle() {
  * the RUNBOOK smoke without inventing a telemetry surface for it (no child PII
  * can appear here: the reason carries an engine message, never family text).
  */
-export async function initNativeStore() {
+export async function initNativeStore({ now = () => Date.now() } = {}) {
     if (!isNativeStore()) {
         return { opened: false, reason: 'not-native' };
     }
+    // Timed here rather than at the call site: this is the only place that knows
+    // where the open began, and L1-P4 declares an `open_ms` signal about it.
+    const startedAt = now();
     try {
         handle = await openStore();
-        return { opened: true, handle };
+        return { opened: true, handle, openMs: now() - startedAt };
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('[store] the local store did not open:', error.name, error.message);
-        return { opened: false, reason: error.name, message: error.message };
+        return {
+            opened: false,
+            reason: error.name,
+            message: error.message,
+            openMs: now() - startedAt,
+        };
     }
 }
 

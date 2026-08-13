@@ -10,8 +10,34 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-v2.png">
 
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W"></script>
     <script>
+      // L1-P4: THE NATIVE CHANNEL CARRIES NO ANALYTICS. Owner decision, taken
+      // with the milestone in view; it closes the standing analytics question
+      // (LSC-DL-001 (o)) for this channel only, and leaves the web channel's
+      // open with its own address.
+      //
+      // Implemented as a RUNTIME BRANCH, not a second file: both channels ship
+      // byte-identical bytes (LSC-P1-INV-002), which is the same shape the
+      // export surface and the store use to behave differently in each. The
+      // Capacitor bridge is injected before the app boots, so this test is
+      // already answerable here in the head.
+      //
+      // The loader tag was STATIC until L1-P4 and is injected here instead,
+      // because stopping the events while still fetching gtag.js would leave the
+      // egress in place: the request itself carries the device address and the
+      // user agent, which is the part that had to stop.
+      window.IS_NATIVE_SHELL = !!(
+        window.Capacitor
+        && typeof window.Capacitor.isNativePlatform === 'function'
+        && window.Capacitor.isNativePlatform()
+      );
+      if (!window.IS_NATIVE_SHELL) {
+        const loader = document.createElement('script');
+        loader.async = true;
+        loader.src = 'https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W';
+        document.head.appendChild(loader);
+      }
+
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
 
@@ -29,11 +55,19 @@
       const GA_MEASUREMENT_ID = 'G-F5Q0JC691W';
 
       // === Init GA ===
-      gtag('js', new Date());
-      gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
+      if (!window.IS_NATIVE_SHELL) {
+        gtag('js', new Date());
+        gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
+      }
 
       // === Event helper: безопасная отправка с обогащением ===
       function trackEvent(name, params) {
+        // Second half of the same decision. The loader is not fetched on the
+        // native channel, so gtag() would only ever fill a queue nobody drains —
+        // but a queue of family-shaped events sitting in memory is not the state
+        // to leave the app in either, and one early return is easier to reason
+        // about than an unreachable one.
+        if (window.IS_NATIVE_SHELL) return;
         if (typeof gtag !== 'function') return;
         try {
           const p = Object.assign({ ui_locale: UI_LOCALE, app_version: APP_VERSION }, params);
@@ -76,6 +110,7 @@
     <link rel="modulepreload" href="/m/v1/core/state.js">
     <link rel="modulepreload" href="/m/v1/core/storage.js">
     <link rel="modulepreload" href="/m/v1/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v1/core/signals.js">
     <link rel="modulepreload" href="/m/v1/core/dom-utils.js">
     <link rel="modulepreload" href="/m/v1/core/format.js">
     <link rel="modulepreload" href="/m/v1/core/zpd.js">

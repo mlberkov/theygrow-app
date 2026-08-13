@@ -28,6 +28,7 @@
 // here, because surfaces/profile.js reads them directly.
 
 import * as localRepo from './repo-local.js';
+import { emitSignal } from './signals.js';
 import { appendChild, appendMark, completedFrom, loadChildren, loadMarks } from '../store/boot.js';
 
 export const BACKEND = Object.freeze({
@@ -68,6 +69,7 @@ export function canRecord() {
  * to reconcile them (ADR-015, ADR-043).
  */
 export async function initHistory(storeOutcome = { opened: false, reason: 'not-native' }) {
+    reportStoreOpen(storeOutcome);
     if (storeOutcome.opened) {
         backend = BACKEND.journal;
         selfParticipantId = storeOutcome.handle.selfParticipantId;
@@ -97,6 +99,40 @@ export async function initHistory(storeOutcome = { opened: false, reason: 'not-n
         ? remembered
         : (profiles[0]?.id ?? null);
     await refreshMarks();
+}
+
+// The typed store failures, as the closed codes the taxonomy declares. Derived
+// from the error CLASS rather than from its message: engine messages carry file
+// paths and statement text, which is not what a diagnostic is allowed to keep.
+const FAILURE_CLASS = Object.freeze({
+    StoreUnavailableError: 'unavailable',
+    StoreDiskFullError: 'disk_full',
+    StoreCorruptError: 'corrupt',
+});
+
+function reportStoreOpen(storeOutcome) {
+    const handle = storeOutcome.handle;
+    if (storeOutcome.opened) {
+        emitSignal('store.open', {
+            outcome: 'opened',
+            failure_class: 'none',
+            freshly_created: handle.freshlyCreated,
+            previous_run_clean: handle.previousRunClean,
+            schema_version: handle.schemaVersion,
+            open_ms: storeOutcome.openMs ?? null,
+        });
+        return;
+    }
+    if (storeOutcome.reason === 'not-native') {
+        emitSignal('store.open', { outcome: 'not_native', failure_class: 'none' });
+        return;
+    }
+    const failureClass = FAILURE_CLASS[storeOutcome.reason] ?? 'other';
+    emitSignal('store.open', {
+        outcome: 'failed',
+        failure_class: failureClass,
+        open_ms: storeOutcome.openMs ?? null,
+    });
 }
 
 /** Recomputes the completed set for the current child from the journal. */

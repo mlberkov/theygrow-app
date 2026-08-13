@@ -21,6 +21,7 @@
 
 import { readProfilesRaw } from '../core/storage.js';
 import { reloadHistory } from '../core/state.js';
+import { emitSignal } from '../core/signals.js';
 import { pendingImport, runImport, storeHandle } from '../store/boot.js';
 
 function el(id) {
@@ -88,6 +89,7 @@ async function runImportFromUi() {
 
     button.disabled = true;
     setStatus('Переношу…');
+    const startedAt = Date.now();
     try {
         const summary = await runImport({
             profiles: legacyProfiles(),
@@ -95,6 +97,16 @@ async function runImportFromUi() {
             authorParticipantId: handle.selfParticipantId,
         });
         await reloadHistory();
+        const importMs = Date.now() - startedAt;
+        emitSignal('history.import', {
+            outcome: 'complete',
+            children: summary.children,
+            attributes: summary.attributes,
+            assertions: summary.assertions,
+            confirmations: summary.confirmations,
+            skipped: summary.skipped,
+            import_ms: importMs,
+        });
         setStatus(
             `Перенесено: детей ${summary.children}, отметок ${summary.assertions}.`
                 + ' Данные в браузере остались на месте.'
@@ -102,6 +114,8 @@ async function runImportFromUi() {
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('[import] the import did not finish:', error?.name, error?.message);
+        const importMs = Date.now() - startedAt;
+        emitSignal('history.import', { outcome: 'interrupted', import_ms: importMs });
         // Честно: часть могла записаться, и именно поэтому повторный запуск
         // безопасен — он допишет остаток, а не задвоит перенесённое.
         setStatus(

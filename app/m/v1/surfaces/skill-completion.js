@@ -5,6 +5,7 @@
 // честная деградация без профиля (ADR-015) живёт здесь.
 
 import { canRecord, getCurrentProfile, getCompletedSkills, markSkill } from '../core/state.js';
+import { emitSignal } from '../core/signals.js';
 import { getSkillRowsForCategory } from '../core/dom-utils.js';
 import { refreshAllZpdReadiness } from '../core/zpd.js';
 import { openCreateProfileModal } from './profile.js';
@@ -85,6 +86,10 @@ export async function toggleSkillCompletion(skillId, isCompleted) {
     // GA-событие не отправляется: действие не состоялось.
     if (canRecord() && !getCurrentProfile()) {
         rejectMark(skillId, isCompleted);
+        // Причина закрытая, навык не передаётся: какие навыки родитель пытался
+        // отметить — это ровно та форма семейных данных, которую диагностике
+        // накапливать нельзя.
+        emitSignal('write.refused', { reason: 'no_subject' });
         openCreateProfileModal();
         return;
     }
@@ -95,6 +100,7 @@ export async function toggleSkillCompletion(skillId, isCompleted) {
     // помирить (ADR-043), поэтому отметка отклоняется и об этом говорится.
     if (!canRecord()) {
         rejectMark(skillId, isCompleted);
+        emitSignal('write.refused', { reason: 'store_unavailable' });
         showStoreUnavailable();
         return;
     }
@@ -102,6 +108,7 @@ export async function toggleSkillCompletion(skillId, isCompleted) {
     const recorded = await markSkill(skillId, isCompleted).catch(() => false);
     if (!recorded) {
         rejectMark(skillId, isCompleted);
+        emitSignal('write.refused', { reason: 'write_failed' });
         showStoreUnavailable();
         return;
     }

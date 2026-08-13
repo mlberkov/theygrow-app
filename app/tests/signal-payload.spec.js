@@ -24,6 +24,7 @@
 // (PDR-027 §2 — egress), so the absence of one is asserted rather than assumed.
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { test, expect } = require('@playwright/test');
@@ -33,6 +34,8 @@ const APP_ROOT = path.resolve(__dirname, '..');
 const SIGNALS_JS = path.join(APP_ROOT, 'm', 'v1', 'core', 'signals.js');
 
 const dynamicImport = new Function('specifier', 'return import(specifier)');
+
+let loadRoot = null;
 
 // Every shipped JavaScript module, so the scan cannot miss an emitter by living
 // in a directory nobody thought to list.
@@ -64,9 +67,26 @@ const FAMILY_TEXT = [
 let signals = null;
 
 test.beforeAll(async () => {
-    // The shipped module is import-safe off the browser by the same rule the
-    // store modules follow, so it is loaded directly rather than copied.
-    signals = await dynamicImport(pathToFileURL(SIGNALS_JS).href);
+    // Node decides ESM-or-CommonJS from the nearest package.json, and
+    // app/package.json cannot say "type":"module" without breaking every
+    // CommonJS spec in this directory — while a marker file inside app/m/ is not
+    // an option either, because everything under m/ SHIPS. So the shipped module
+    // is copied BYTE-FOR-BYTE into a temp directory that carries the marker, and
+    // the copy is verified against the original before it is imported. Same
+    // trap, same answer, as app/tests/store-unit.spec.js documents at length.
+    loadRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'theygrow-signals-'));
+    fs.writeFileSync(path.join(loadRoot, 'package.json'), '{"type":"module"}');
+    const copy = path.join(loadRoot, 'signals.js');
+    fs.copyFileSync(SIGNALS_JS, copy);
+    expect(
+        fs.readFileSync(copy).equals(fs.readFileSync(SIGNALS_JS)),
+        'signals.js was not copied verbatim — this spec would test a different file'
+    ).toBeTruthy();
+    signals = await dynamicImport(pathToFileURL(copy).href);
+});
+
+test.afterAll(() => {
+    if (loadRoot) fs.rmSync(loadRoot, { recursive: true, force: true });
 });
 
 test.describe('the taxonomy is declared, closed and frozen', () => {
@@ -181,19 +201,60 @@ test.describe('the payload guard refuses what it cannot prove safe', () => {
 });
 
 test.describe('every emitter in the shipped surface is provably payload-safe', () => {
-    const CALL = /emitSignal\(\s*([^)]*?)\s*\)/gs;
+    // WHY THIS IS NOT A REGEX. It was, and the regex failed OPEN — which a
+    // mutation test caught while this packet was being written. `[^)]*?` stops
+    // at the first close paren, so a violating call site like
+    //
+    //     emitSignal('write.refused', { reason: getCurrentProfile().name })
+    //
+    // was captured only as far as `getCurrentProfile(`, and the family-text scan
+    // below never saw `.name` at all. A guard that cannot see the very shape a
+    // violation would take is worse than no guard, because it reports green.
+    //
+    // So the arguments are extracted by balancing parens, and — the part that
+    // makes the scan SOUND rather than merely better — a payload containing a
+    // call is refused outright. Compute the value into a local const first. That
+    // is what every emitter already does, and it leaves nothing for a nested
+    // paren to hide behind.
+    const extractArgument = (source, open) => {
+        let depth = 0;
+        for (let at = open; at < source.length; at += 1) {
+            if (source[at] === '(') depth += 1;
+            else if (source[at] === ')') {
+                depth -= 1;
+                if (depth === 0) return source.slice(open + 1, at);
+            }
+        }
+        throw new Error('an emitSignal( call is never closed; this scan cannot read it');
+    };
 
     const callSites = () => {
         const found = [];
         for (const urlPath of SHIPPED_JS) {
-            const source = sourceOf(urlPath);
             if (urlPath.endsWith('/core/signals.js')) continue;
-            for (const match of source.matchAll(CALL)) {
-                found.push({ urlPath, argument: match[1] });
+            const source = sourceOf(urlPath);
+            let at = source.indexOf('emitSignal(');
+            while (at !== -1) {
+                // Skip the import statement, which names the function without
+                // calling it.
+                const open = at + 'emitSignal'.length;
+                found.push({ urlPath, argument: extractArgument(source, open) });
+                at = source.indexOf('emitSignal(', open);
             }
         }
         return found;
     };
+
+    test('no payload computes its value inline, so nothing can hide behind a paren', () => {
+        for (const { urlPath, argument } of callSites()) {
+            const payload = argument.slice(argument.indexOf(',') + 1);
+            expect(
+                payload,
+                `${urlPath}: a signal payload contains a call. Compute it into a local`
+                    + ' const first — an inline call is where family text gets in unseen.'
+            ).not.toContain('(');
+        }
+    });
 
     test('the scan reaches the shipped surface at all', () => {
         expect(SHIPPED_JS.length, 'the ship list found no JavaScript').toBeGreaterThan(10);

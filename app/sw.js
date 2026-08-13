@@ -36,6 +36,7 @@ const OFFLINE_URLS = [
   '/m/v1/core/state.js',
   '/m/v1/core/storage.js',
   '/m/v1/core/repo-local.js',
+  '/m/v1/core/signals.js',
   '/m/v1/core/dom-utils.js',
   '/m/v1/core/format.js',
   '/m/v1/core/zpd.js',
