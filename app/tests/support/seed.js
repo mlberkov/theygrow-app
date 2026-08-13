@@ -74,6 +74,13 @@ const test = base.test.extend({
   // Opt-out for the kb-load error path, which logs a console error by design.
   allowConsoleErrors: [false, { option: true }],
 
+  // Which delivery channel this run exercises (L1-P1). 'nginx' for every
+  // project that predates the Capacitor shell; the `native` project sets
+  // 'capacitor'. It exists so a spec can state WHY it does not apply to a
+  // channel, in the spec, instead of that knowledge living as a testMatch
+  // pattern in the config where the reason cannot be written down.
+  parityProfile: ['nginx', { option: true }],
+
   page: async ({ page, allowConsoleErrors, baseURL }, use) => {
     // 1. Freeze time before any page script evaluates.
     await page.clock.setFixedTime(FIXED_NOW);

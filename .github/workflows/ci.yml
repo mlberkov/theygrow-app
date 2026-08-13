@@ -30,13 +30,25 @@
 # against. It calls scripts/parity-suite.sh, the same entry point developers
 # run locally, so the gate cannot drift into a local shadow of itself; the
 # script pins the browser and font set by running inside a fixed Playwright
-# container. It builds and deploys nothing and touches no GCP.
+# container. It builds and deploys nothing and touches no GCP. Since L1-P1 that
+# suite also covers the CAPACITOR channel: the script stages native/www/ from
+# app/Dockerfile's COPY list and the `native` project boots the app from it.
+#
+# From L1-P1 a fourth job, `android`, assembles the Capacitor debug APK. It is
+# the only gate in this repo that cannot be reproduced on the development
+# machine, which has no JDK, no Android SDK and no Gradle — see the job.
+#
+# From L1-P2 a fifth job, `android-instrumented`, boots an emulator and runs the
+# store's instrumented tests against the real SQLCipher engine. Unlike every
+# other job here it does NOT run on push — see the job for why, and for what
+# that costs.
 
 name: CI
 
 on:
   push:
   pull_request:
+  workflow_dispatch:   # L1-P2 — lets the owner run the emulator job on demand
 
 permissions:
   contents: read
@@ -70,6 +82,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # L1-P3 — the export suite shells out to `node` to build the artifact with
+      # the shipped builder. No npm install: the export modules import nothing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install tools
         run: python -m pip install "ruff==0.9.2" "mypy==1.14.1" "pre-commit==4.0.1"
 
@@ -87,6 +105,21 @@ jobs:
 
       - name: pytest (api)
         run: pytest api
+
+      # L1-P2 — the native store's frozen DDL, applied to the standard library's
+      # SQLite through a faithful port of the Android wrapper's own statement
+      # splitter. Standard library only: no service, no device, no network.
+      - name: pytest (native store schema)
+        run: pytest app/tests/schema
+
+      # L1-P3 — the export artifact's published format. Builds the artifact with
+      # the SHIPPED builder under `node` from a real SQLite database carrying the
+      # real frozen DDL, then reads it back with a reader that imports only the
+      # standard library. Node is set up explicitly rather than relied on from
+      # the runner image, because a missing `node` would make the suite fail
+      # loudly here (harness.py asserts on it) rather than skip silently.
+      - name: pytest (export artifact format)
+        run: pytest app/tests/export
 
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure
@@ -172,3 +205,344 @@ jobs:
             app/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # L1-P1 — the Android shell build gate. Independent of `quality` and `parity`
+  # for the reason those two are independent of each other: one gate must never
+  # be able to hide another.
+  #
+  # This job exists because NOTHING about the native build can be proven on the
+  # development machine — it has no JDK, no Android SDK and no Gradle, and the
+  # Capacitor CLI needs Node >= 22 where that box has 18. Every other check in
+  # this packet runs locally; "the Android shell compiles" is the one claim that
+  # is true only if this job is green.
+  #
+  # It builds a DEBUG APK and nothing else. No release keystore, no signing
+  # secret, no store upload: distribution is direct-APK under dark-build
+  # discipline (PDR-019), and key custody is a later, explicit decision. The
+  # artifact is how the owner gets something installable without a local
+  # toolchain.
+  #
+  # Order matters and is not incidental: stage -> sync -> assemble. The staged
+  # web root is derived from app/Dockerfile's COPY list, `cap sync` copies it
+  # into the Android project (native/android/.gitignore keeps that copy out of
+  # git, so it MUST be regenerated here), and only then can Gradle package it.
+  # It touches no GCP and deploys nothing.
+  # NOT ON workflow_dispatch, and this is a spend fix rather than a scope change
+  # (L1-P3, LSC-DL-003). A dispatch on an already-pushed commit duplicates the
+  # WHOLE workflow: run 31640121268 (dispatch) and 31640121253 (push) were the
+  # same commit and both started this job at 20:56:20Z, building the same APK
+  # twice at the same instant — which is also how the class-B verdict was
+  # established, since one went green and the other red in that same second.
+  # The dispatch path loses nothing: `android-instrumented` already runs
+  # `:app:packageDebug` on its way to the emulator, and now uploads the APK
+  # under the SAME artifact name, so `docs/RUNBOOK.md`'s "download
+  # theygrow-debug-apk" holds whichever path produced it. On `pull_request`
+  # both jobs run, so the upload there is gated to dispatch only — exactly one
+  # job ever publishes that artifact name, which v4 requires.
+  android:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22: @capacitor/cli declares `engines.node >= 22` and hard-fails
+      # below it, rather than warning.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Java 21: native/android/app/capacitor.build.gradle pins
+      # source/targetCompatibility to VERSION_21 (Capacitor 8 / AGP 8.13).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the Capacitor toolchain
+        working-directory: native
+        run: npm ci
+
+      - name: Stage the web root from app/Dockerfile's COPY list
+        run: node native/tools/stage-webdir.js
+
+      - name: Sync the staged web root into the Android project
+        working-directory: native
+        run: npx cap sync android
+
+      - name: Assemble the debug APK
+        working-directory: native/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: theygrow-debug-apk
+          path: native/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  # L1-P2 — the instrumented store gate. `android` proves the shell COMPILES;
+  # this proves the engine underneath it. The schema frozen in this packet stands
+  # on properties no desktop test can establish — that the bundled SQLite
+  # compiles FTS5 in, that STRICT tables and WAL work, that the shipped DDL
+  # applies to SQLCipher, and that the injected Capacitor bridge reaches the
+  # plugin with no bundled JavaScript, which is the premise the whole buildless
+  # decision rests on (LSC-DL-002).
+  #
+  # NOT A PER-PUSH GATE, by owner decision. It runs on pull_request and on
+  # workflow_dispatch only: booting an emulator on every push to a private repo
+  # is billable minutes spent re-proving a schema that changes once. The
+  # consequence is stated rather than hidden — a regression introduced by a later
+  # packet is caught at PR time, not at push time, so a red result here can
+  # arrive several commits after its cause.
+  android-instrumented:
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # L1-P3 — the certifying half of the PDF/A-2b claim.
+      #
+      # WHY HERE AND NOT IN `quality`. veraPDF is a Java application and a ~33 MB
+      # download; this job already sets up Java and is `pull_request` +
+      # `workflow_dispatch` only by the standing owner decision on CI spend, so
+      # the expensive verification reuses the home that decision already built
+      # rather than inventing a second one. The consequence is stated rather
+      # than hidden, and it is the same trade already accepted for the device
+      # layer: a conformance regression is caught at PR or on dispatch, not at
+      # push, so a red result here can arrive several commits after its cause.
+      # The cheap structural half (app/tests/export/test_pdf_structure.py, the
+      # standard library only) does run on every push.
+      #
+      # The fixture is built by the SHIPPED builder through the SAME harness the
+      # pytest suite uses, so the file veraPDF certifies is the file the tests
+      # assert on. It runs before the emulator so a conformance failure reports
+      # in seconds instead of behind a boot.
+      #
+      # THE VALIDATOR IS NOT VERSION-PINNABLE, SO ITS DRIFT IS DETECTED INSTEAD.
+      # Checked before settling for this: `veraPDF/veraPDF-apps` publishes no
+      # GitHub releases at all, `veraPDF/veraPDF-library` tags carry source only
+      # and zero binary assets, and https://verapdf.org/software/ links exactly
+      # two unversioned URLs (/rel/ and /dev/). There is no versioned installer
+      # to pin a URL or a SHA-256 to, the way the font and the ICC profile are
+      # pinned. So the expected version is declared as a knob below and the step
+      # FAILS when the installed one differs: a silent upgrade of the tool that
+      # certifies our public PDF/A claim has to arrive as a red run and a
+      # deliberate decision, not as a line in a log nobody reads.
+      # Recorded as debt in LSC-DL-003 — this is a third party executing in CI
+      # on every run, which the supply-chain rule would not otherwise permit.
+      - name: Build the fixture artifact for validation
+        run: node --version && python3 app/tests/export/emit_fixture.py "${RUNNER_TEMP}/pdfa"
+
+      - name: Install veraPDF
+        env:
+          # changed_in: LSC-DL-003 — the veraPDF version this packet reviewed and
+          # validated the print layer against. Bumping it is a deliberate act:
+          # read the release notes, re-run this job, and only then change the
+          # string. The installer archive reviewed at that version hashed to
+          # sha256 6cc6341cb1af644044054b81f00a6590a7918abb18f762243de115258bcad838
+          # (32 923 960 bytes), recorded as provenance of the bytes seen — not as
+          # a gate, since the URL serves whatever upstream last published.
+          VERAPDF_EXPECTED_VERSION: '1.30.2'
+        run: |
+          curl -sSL -o "${RUNNER_TEMP}/verapdf.zip" https://software.verapdf.org/rel/verapdf-installer.zip
+          unzip -q "${RUNNER_TEMP}/verapdf.zip" -d "${RUNNER_TEMP}/verapdf-src"
+          cat > "${RUNNER_TEMP}/auto-install.xml" <<'XML'
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+            <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+              <installpath>${RUNNER_TEMP}/verapdf</installpath>
+            </com.izforge.izpack.panels.target.TargetPanel>
+            <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select"/>
+            <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          envsubst < "${RUNNER_TEMP}/auto-install.xml" > "${RUNNER_TEMP}/auto-install.resolved.xml"
+          java -jar "$(ls ${RUNNER_TEMP}/verapdf-src/*/verapdf-izpack-installer-*.jar)" \
+            "${RUNNER_TEMP}/auto-install.resolved.xml"
+
+          mkdir -p "${RUNNER_TEMP}/pdfa"
+          "${RUNNER_TEMP}/verapdf/verapdf" --version | tee "${RUNNER_TEMP}/pdfa/verapdf-version.txt"
+          # Substring rather than an exact line: the banner format is upstream's
+          # to change, the version number is what this gate is about.
+          grep -qF "${VERAPDF_EXPECTED_VERSION}" "${RUNNER_TEMP}/pdfa/verapdf-version.txt" || {
+            echo "::error::veraPDF is not ${VERAPDF_EXPECTED_VERSION}. Upstream published a new"\
+                 "version at an unversioned URL. Review it, re-run this job, then update"\
+                 "VERAPDF_EXPECTED_VERSION in .github/workflows/ci.yml (LSC-DL-003)."
+            exit 1
+          }
+
+      # --flavour 2b is the claim the artifact makes about itself, in its XMP
+      # packet and in its own declaration.json. Asking the validator for a
+      # different flavour than the file claims would make this gate decorative.
+      #
+      # THE VERDICT IS PARSED, NOT GREPPED. The first version of this step
+      # grepped for `compliant="true"`, which NEVER MATCHES: veraPDF writes the
+      # attribute as `isCompliant="true"`, with a capital C, so the lowercase
+      # substring does not occur in a passing report either. The gate could only
+      # ever go red — it failed run 31637683475 on a file the validator had just
+      # reported as PASS with 144 rules passed and 0 failed. A gate that cannot
+      # pass is as worthless as one that cannot fail, and a string match is how
+      # both happen, so the report is parsed as XML and every field that carries
+      # the verdict is checked, including the anti-vacuity one: a report with
+      # zero checks performed is not a pass.
+      - name: Validate the print layer against PDF/A-2b
+        run: |
+          "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format text \
+            "${RUNNER_TEMP}/pdfa/archive.pdf" | tee "${RUNNER_TEMP}/pdfa/verapdf.txt"
+          # `|| true` so a non-compliant verdict (exit 1) still writes its report
+          # and reaches the parser below, which is what produces the readable
+          # failure. A crashed validator writes nothing and fails there too.
+          "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format mrr \
+            "${RUNNER_TEMP}/pdfa/archive.pdf" > "${RUNNER_TEMP}/pdfa/verapdf.xml" || true
+          python3 - "${RUNNER_TEMP}/pdfa/verapdf.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          try:
+              root = ET.parse(sys.argv[1]).getroot()
+          except Exception as error:
+              sys.exit(f"::error::the veraPDF report is unreadable ({error}) — the validator did not run")
+
+          reports = root.findall(".//validationReport")
+          if not reports:
+              sys.exit("::error::the veraPDF report contains no validationReport — nothing was validated")
+
+          failures = []
+          checks = 0
+          for report in reports:
+              if report.get("isCompliant") != "true":
+                  failures.append(report.get("statement") or "not compliant")
+              details = report.find("details")
+              if details is None:
+                  failures.append("a validationReport carries no <details>")
+                  continue
+              checks += int(details.get("passedChecks", 0))
+              if details.get("failedRules") != "0" or details.get("failedChecks") != "0":
+                  failures.append(
+                      f"failedRules={details.get('failedRules')}"
+                      f" failedChecks={details.get('failedChecks')}"
+                  )
+
+          # Anti-vacuity: a report that validated nothing must not read as a pass.
+          if checks == 0:
+              failures.append("the validator performed zero checks")
+
+          if failures:
+              for line in failures:
+                  print(f"::error::the print layer is NOT PDF/A-2b conformant: {line}")
+              sys.exit(1)
+
+          print(f"PDF/A-2b conformant: {len(reports)} report(s), {checks} checks passed")
+          PY
+
+      - name: Upload the validated artifact and its report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfa-validation
+          path: ${{ runner.temp }}/pdfa/
+          if-no-files-found: error
+
+      # Without KVM the emulator falls back to software rendering and the job
+      # times out rather than failing honestly.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install the Capacitor toolchain
+        working-directory: native
+        run: npm ci
+
+      # Same order as the `android` job, and for the same reason: the staged web
+      # root is what `cap sync` copies into assets/public/, which is where the
+      # instrumented test reads the DDL from.
+      - name: Stage the web root from app/Dockerfile's COPY list
+        run: node native/tools/stage-webdir.js
+
+      - name: Sync the staged web root into the Android project
+        working-directory: native
+        run: npx cap sync android
+
+      - name: Instrumented store tests (emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: native/android
+          # The logcat dump lives INSIDE this step because the emulator only
+          # exists for its duration: once the action returns, the device is gone
+          # and with it the one place boot.js's console.error reason was ever
+          # written. Without it a store that fails to open reports only a poll
+          # timeout, and the reason costs a whole emulator cycle to learn. The
+          # dump is a whole-device one, taken only ever from an emulator that
+          # holds no family data.
+          #
+          # ONE PHYSICAL LINE, deliberately. This action runs each line of the
+          # script in a shell of its own (`sh -c set +e`, then `sh -c ./gradlew
+          # …` in the run-31612297495 log) and abandons the step as soon as one
+          # line exits non-zero — so a multi-line guard round the dump neither
+          # shares gradle's $? nor ever gets reached. Joined to the gradle
+          # command with `;`, the dump runs whatever gradle did, and the trailing
+          # `exit` keeps the step's own verdict gradle's. The write is
+          # unconditional: an empty log says the capture worked and the device
+          # was quiet, while a missing file says nothing at all.
+          script: |
+            ./gradlew --no-daemon connectedDebugAndroidTest; status=$?; mkdir -p logcat; adb logcat -d > logcat/instrumented-logcat.txt 2>&1 || true; exit $status
+
+      # The installable APK on the dispatch path (LSC-DL-003). `android` is
+      # skipped on workflow_dispatch, and the emulator run has already produced
+      # this file via :app:packageDebug — so it is uploaded here under the same
+      # artifact name, with the same retention, rather than assembled a second
+      # time. `docs/RUNBOOK.md`'s "download theygrow-debug-apk" then holds
+      # whichever path produced it.
+      #
+      # DISPATCH ONLY, and the condition is load-bearing: on `pull_request`
+      # BOTH jobs run, and two uploads sharing one artifact name fail the run in
+      # upload-artifact v4. On a PR the APK comes from `android`; here it comes
+      # from this job; the two never both publish it.
+      #
+      # `always()` so a red instrumented test still leaves an installable build
+      # to reproduce the failure by hand.
+      - name: Upload the debug APK
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: theygrow-debug-apk
+          path: native/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload the emulator logcat
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-logcat
+          path: native/android/logcat/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload the instrumented test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumented-report
+          path: native/android/app/build/reports/androidTests/
+          retention-days: 7
+          if-no-files-found: warn

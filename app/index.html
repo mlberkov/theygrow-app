@@ -10,8 +10,34 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-v2.png">
 
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W"></script>
     <script>
+      // L1-P4: THE NATIVE CHANNEL CARRIES NO ANALYTICS. Owner decision, taken
+      // with the milestone in view; it closes the standing analytics question
+      // (LSC-DL-001 (o)) for this channel only, and leaves the web channel's
+      // open with its own address.
+      //
+      // Implemented as a RUNTIME BRANCH, not a second file: both channels ship
+      // byte-identical bytes (LSC-P1-INV-002), which is the same shape the
+      // export surface and the store use to behave differently in each. The
+      // Capacitor bridge is injected before the app boots, so this test is
+      // already answerable here in the head.
+      //
+      // The loader tag was STATIC until L1-P4 and is injected here instead,
+      // because stopping the events while still fetching gtag.js would leave the
+      // egress in place: the request itself carries the device address and the
+      // user agent, which is the part that had to stop.
+      window.IS_NATIVE_SHELL = !!(
+        window.Capacitor
+        && typeof window.Capacitor.isNativePlatform === 'function'
+        && window.Capacitor.isNativePlatform()
+      );
+      if (!window.IS_NATIVE_SHELL) {
+        const loader = document.createElement('script');
+        loader.async = true;
+        loader.src = 'https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W';
+        document.head.appendChild(loader);
+      }
+
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
 
@@ -29,11 +55,19 @@
       const GA_MEASUREMENT_ID = 'G-F5Q0JC691W';
 
       // === Init GA ===
-      gtag('js', new Date());
-      gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
+      if (!window.IS_NATIVE_SHELL) {
+        gtag('js', new Date());
+        gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
+      }
 
       // === Event helper: безопасная отправка с обогащением ===
       function trackEvent(name, params) {
+        // Second half of the same decision. The loader is not fetched on the
+        // native channel, so gtag() would only ever fill a queue nobody drains —
+        // but a queue of family-shaped events sitting in memory is not the state
+        // to leave the app in either, and one early return is easier to reason
+        // about than an unreachable one.
+        if (window.IS_NATIVE_SHELL) return;
         if (typeof gtag !== 'function') return;
         try {
           const p = Object.assign({ ui_locale: UI_LOCALE, app_version: APP_VERSION }, params);
@@ -51,8 +85,9 @@
     <title>Child Dev Tracker</title>
     <link rel="stylesheet" href="/m/v1/app.css">
 
-    <!-- Module delivery hints (A1-P6, A1-DL-007). The fifteen NON-ENTRY modules
-         of the /m/v1/ graph. Without these the browser discovers them only after
+    <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
+         /m/v1/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
+         store. Without these the browser discovers them only after
          app.js parses, and their own imports only after that — the boot-order
          cost A1-DL-004/005/006 each recorded and declined to pay.
 
@@ -74,6 +109,8 @@
     <link rel="modulepreload" href="/m/v1/core/kb-boot.js">
     <link rel="modulepreload" href="/m/v1/core/state.js">
     <link rel="modulepreload" href="/m/v1/core/storage.js">
+    <link rel="modulepreload" href="/m/v1/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v1/core/signals.js">
     <link rel="modulepreload" href="/m/v1/core/dom-utils.js">
     <link rel="modulepreload" href="/m/v1/core/format.js">
     <link rel="modulepreload" href="/m/v1/core/zpd.js">
@@ -86,6 +123,27 @@
     <link rel="modulepreload" href="/m/v1/surfaces/activities.js">
     <link rel="modulepreload" href="/m/v1/surfaces/onboarding.js">
     <link rel="modulepreload" href="/m/v1/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v1/store/boot.js">
+    <link rel="modulepreload" href="/m/v1/store/store.js">
+    <link rel="modulepreload" href="/m/v1/store/journal.js">
+    <link rel="modulepreload" href="/m/v1/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v1/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v1/store/bridge.js">
+    <link rel="modulepreload" href="/m/v1/store/config.js">
+    <link rel="modulepreload" href="/m/v1/store/errors.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v1/surfaces/import.js">
+    <link rel="modulepreload" href="/m/v1/export/run.js">
+    <link rel="modulepreload" href="/m/v1/export/build.js">
+    <link rel="modulepreload" href="/m/v1/export/readout.js">
+    <link rel="modulepreload" href="/m/v1/export/sink.js">
+    <link rel="modulepreload" href="/m/v1/export/text.js">
+    <link rel="modulepreload" href="/m/v1/export/readme.js">
+    <link rel="modulepreload" href="/m/v1/export/zip.js">
+    <link rel="modulepreload" href="/m/v1/export/pdf.js">
+    <link rel="modulepreload" href="/m/v1/export/ttf.js">
+    <link rel="modulepreload" href="/m/v1/export/config.js">
+    <link rel="modulepreload" href="/m/v1/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -120,15 +178,44 @@
                         <!-- Профили будут добавлены динамически -->
                     </div>
                 </div>
+                <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
+                     файл наружу». Не дискета: дискета означает «сохранить внутри
+                     приложения» и вдобавок мертвый предмет для артефакта, весь
+                     смысл которого — читаться через двадцать лет.
+                     На десктопе иконка + подпись, на мобильном только иконка;
+                     aria-label и title дословно повторяют видимую подпись. -->
+                <button type="button"
+                        class="header-action"
+                        id="exportBtn"
+                        title="Сохранить архив"
+                        aria-label="Сохранить архив">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <path d="M12 3v11"/>
+                        <path d="M8 10l4 4 4-4"/>
+                        <path d="M4 19h16"/>
+                    </svg>
+                    <span class="header-action-label">Сохранить архив</span>
+                </button>
+                <!-- Чат сообщества. Иконка — обычный бумажный самолётик, общее
+                     соглашение «отправить/сообщение». Это НЕ фирменный знак
+                     Telegram: их логотип — их товарный знак, и мы его не
+                     воспроизводим. -->
                 <a href="https://t.me/+c-5y_69kmu8wNDky"
                    target="_blank"
                    rel="noopener noreferrer"
                    class="telegram-button"
-                   title="Чат сообщества - Общайтесь с пользователями и разработчиком, делитесь идеями"
-                   aria-label="Перейти в чат сообщества в Telegram"
+                   title="Чат сообщества"
+                   aria-label="Чат сообщества"
                    onclick="trackEvent('telegram_click')">
-                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM16.64 8.8L15.03 16.59C14.92 17.08 14.64 17.2 14.23 16.97L11.93 15.29L10.82 16.36C10.7 16.48 10.6 16.58 10.37 16.58L10.54 14.23L14.75 10.42C14.94 10.25 14.71 10.16 14.45 10.33L9.28 13.62L7.02 12.92C6.54 12.77 6.53 12.45 7.12 12.22L16.05 8.54C16.46 8.39 16.82 8.63 16.64 8.8Z" fill="currentColor"/>
+                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <path d="M21 3L3 10.5l7 2.5 2.5 7L21 3z"/>
+                        <path d="M10 13l11-10"/>
                     </svg>
                 </a>
             </div>
@@ -180,6 +267,58 @@
                     <button type="submit" class="modal-button modal-button-primary">Создать</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно архива (L1-P3). Два утверждения в нём намеренно
+         несмягчённые и проверяются тестом app/tests/export-contour.spec.js:
+         медиа в архив не входит, и облачной резервной копии этих данных нет.
+         Оба показываются ДО нажатия кнопки, а не после. -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="importModalClose">&times;</span>
+            <h2>Перенести историю в приложение</h2>
+            <p>Раньше отметки хранились в браузере. Приложение может перенести их сюда, на устройство, — вместе с именем и датой рождения ребёнка.</p>
+            <p class="export-plain">Из браузера ничего не удаляется. Всё, что там записано, останется там же и после переноса.</p>
+            <p class="export-plain">Браузерная версия продолжает работать со своим хранилищем. Отметка, поставленная в браузере ПОСЛЕ этого переноса, здесь не появится, пока перенос не будет запущен ещё раз. Отметки, сделанные здесь, в браузере не появятся никогда.</p>
+            <p>У перенесённых отметок нет даты наблюдения: в браузере она не записывалась. Они получат дату переноса, и в архиве будет прямо сказано, что настоящая дата неизвестна.</p>
+            <p>Отметьте, кого перенести. Снятый профиль можно перенести позже — а вот отменить перенос нельзя: журнал только пополняется.</p>
+            <div id="importChoices" class="import-choices"></div>
+            <p id="importStatus" class="export-status" hidden></p>
+            <div class="modal-buttons">
+                <button type="button" class="modal-button modal-button-secondary" id="importCloseBtn">Не сейчас</button>
+                <button type="button" class="modal-button modal-button-primary" id="importRunBtn">Перенести</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="storeUnavailableModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="storeUnavailableClose">&times;</span>
+            <h2>Отметка не сохранена</h2>
+            <p>Хранилище на этом устройстве не открылось, поэтому записать отметку некуда. Галочка снята: показывать её означало бы утверждать, что отметка сохранена.</p>
+            <p class="export-plain">Уже записанные данные не потеряны и не изменены — приложение просто не может их сейчас прочитать.</p>
+            <p>Попробуйте закрыть и открыть приложение. Если это повторяется, сохраните архив при первой возможности, когда хранилище откроется.</p>
+            <div class="modal-buttons">
+                <button type="button" class="modal-button modal-button-secondary" id="storeUnavailableCloseBtn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="exportModalClose">&times;</span>
+            <h2>Сохранить архив</h2>
+            <p>Архив — это обычный zip-файл с текстовыми файлами внутри. Он открывается на любом компьютере без этого приложения, без пароля и без интернета. Создаётся он только тогда, когда вы нажимаете кнопку, и сохраняется туда, куда вы укажете.</p>
+            <p class="export-plain">Фотографии, видео и звукозаписи в архив не входят.</p>
+            <p class="export-plain">Резервной копии этих данных в облаке нет.</p>
+            <p>Архив не зашифрован: ключ теряется быстрее, чем данные. Любой, кто получит этот файл, сможет его прочитать — храните его так же, как хранили бы бумажный семейный альбом.</p>
+            <p id="exportUnavailable" class="export-unavailable" hidden>В браузере архив не создаётся: он собирается из данных приложения на телефоне. Это относится и к данным, которые вы видите сейчас, — резервной копии у них нет.</p>
+            <p id="exportStatus" class="export-status" hidden></p>
+            <div class="modal-buttons">
+                <button type="button" class="modal-button modal-button-secondary" id="exportCloseBtn">Закрыть</button>
+                <button type="button" class="modal-button modal-button-primary" id="exportRunBtn">Создать архив</button>
+            </div>
         </div>
     </div>
 

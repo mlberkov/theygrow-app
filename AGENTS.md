@@ -20,8 +20,9 @@ This file is the in-repo operating contract for any AI agent working on `theygro
 
 ## §3 Architecture invariants (intent-level)
 
-- **Monorepo.** `/app` (the PWA) + `/api` (Python FastAPI). The split lands in M2; the current static PWA at repo root migrates into `/app` then.
-- **Core store = one managed PostgreSQL (single source of truth) (ADR-008).** Vector, lexical, and graph-state are **derived ports within that one database** (pgvector for vectors; embeddings ≤1536 from M3) — not separate stores. No separate graph database is part of the live perimeter.
+- **Monorepo.** `/app` (the PWA) + `/api` (Python FastAPI) + `/native` (the Capacitor Android shell). The `/app` + `/api` split landed in M2-P1; `/native` landed in L1-P1 and ships the same bytes as `/app` rather than a second web app.
+- **Family data lives on the device (ADR-043 / PDR-026).** On the Android channel the family's marks are held in an on-device, encrypted, append-only, schema-bearing store, and **that store is the source of truth** for them. WebView storage is a **losable cache** and never the persistent home of family data. The export contour is produced on the device and needs no key, no account and no subscription.
+- **Core store = one managed PostgreSQL (single source of truth) (ADR-008).** Vector, lexical, and graph-state are **derived ports within that one database** (pgvector for vectors; embeddings ≤1536 from M3) — not separate stores. No separate graph database is part of the live perimeter. **This entry describes the *server* contour and reads as a specification of rung L4, not as a statement about where family data is stored today** — that is the device (previous entry), by decision-layer amendment.
 - **Engine `diary-memory-service` is OUT of perimeter.** It is a **code donor** for the M4 retrieval lift and the **/export migration source** for M3. It is **not** a live dependency of `theygrow-app` and must not become one.
 - **Persona resolution at import = stub.** A real persona / identity model is gated out (see §5).
 
@@ -65,13 +66,14 @@ This is the map, not the spec. Roadmap v2 is the spec.
 ```
 theygrow-app/
 ├── app/        # PWA (landed in M2-P1)
-├── api/        # Python FastAPI (lands in M2)
+├── api/        # Python FastAPI (landed in M2)
+├── native/     # Capacitor Android shell (landed in L1-P1)
 ├── docs/       # decision-log, invariants, runbook, execution-map, product specs
 ├── scripts/    # ops + dev scripts
 └── infra/      # IaC (post-M5)
 ```
 
-**Current.** Static PWA under `/app` (nginx + Docker + Cloud Run via Cloud Build), alongside `/api`. The monorepo split landed in M2-P1. The PWA is no longer a single `index.html`: since the A1 `spa-split` milestone the shell loads its stylesheet and its ES-module graph from the versioned mount `app/m/v{N}/`, served buildless (no bundler, no transpiler).
+**Current.** Static PWA under `/app` (nginx + Docker + Cloud Run via Cloud Build), alongside `/api`. The monorepo split landed in M2-P1. The PWA is no longer a single `index.html`: since the A1 `spa-split` milestone the shell loads its stylesheet and its ES-module graph from the versioned mount `app/m/v{N}/`, served buildless (no bundler, no transpiler). Since the L1 `local structured core` milestone the same bytes ship through **two delivery channels**: the served PWA, and an Android APK built from `native/` — a Capacitor shell whose web root is assembled from `app/Dockerfile`'s `COPY` list, so both channels carry byte-identical assets and the production web path stays buildless in both. `native/www/` is the staged web root; `native/android/` is the generated Android project, committed.
 
 ## §9 Working conventions
 

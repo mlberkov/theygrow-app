@@ -26,10 +26,27 @@ The Python / FastAPI backend (`/api`) skeleton landed in M2-P2; in M2-P3 it gain
 The deploy is fully driven by Cloud Build. There are **three self-contained build-configs** — one per app, plus the `/api` staging sibling — each designed to run on its **own** Cloud Build trigger with an `includedFiles` path filter, so a change in one subtree never rebuilds the other. **Two** of those triggers exist (the PWA and production `/api`); the staging trigger is described below and has not been created. See the build-config files for the canonical build steps; do not duplicate them here.
 
 - **PWA:** `app/cloudbuild.yaml` builds the container from `app/Dockerfile` (build context `app/`), pushes to Artifact Registry, deploys to the PWA Cloud Run service — public (`--allow-unauthenticated`): it is the product's front door. Trigger: push to `main`, `filename = app/cloudbuild.yaml`, `includedFiles = app/**`. Since A3-P1 it carries **two trigger substitutions** — `_API_UPSTREAM_URL` (the prod `/api` base URL, which is both the proxy target and the ID-token audience) and `_PWA_RUNTIME_SA` (the service account the PWA runs as, and the identity that holds `roles/run.invoker` on prod `/api`) — plus a Step 0 that fails the build when either is empty. Both are live identifiers and are **not** in the repo. See **Same-origin `/api` proxy** below.
-- **`/api` (production):** `api/cloudbuild.yaml` builds from `api/Dockerfile` (build context `api/`), pushes to Artifact Registry, deploys to the production `/api` Cloud Run service with `--no-traffic --tag sha-$SHORT_SHA` (A2-P1 — see **Promotion + rollback (`/api`)** below) and, since A3-P1, `--no-allow-unauthenticated`: production `/api` is **private**, invoked only by the PWA container's proxy. Trigger: push to `main`, `filename = api/cloudbuild.yaml`, `includedFiles = api/**`, `ignoredFiles = api/cloudbuild.staging.yaml`. **Since A3-P2 the production deploy is database-wired**: `--add-cloudsql-instances`, `--set-secrets DATABASE_URL`, `--service-account` (a dedicated least-privilege runtime account) and `--max-instances 2`, with the three live identifiers arriving as trigger substitutions behind a Step 0 guard. Before A3-P2 it passed none of them and its whole served surface was `/api/health`, which needs no environment; `GET /api/health/ready` is the route that changed that. Setting up the instance, the secret, the role and the grants is **Production database enablement** below — and note the ordering there: the substitutions are set **after** merge, the same rule **Same-origin `/api` proxy** carries, for the same `MUST_MATCH` reason.
+- **`/api` (production):** `api/cloudbuild.yaml` builds from `api/Dockerfile` (build context `api/`), pushes to Artifact Registry, deploys to the production `/api` Cloud Run service with `--no-traffic --tag sha-$SHORT_SHA` (A2-P1 — see **Promotion + rollback (`/api`)** below) and, since A3-P1, `--no-allow-unauthenticated`: production `/api` is **private**, invoked only by the PWA container's proxy. Trigger: push to `main`, `filename = api/cloudbuild.yaml`, `includedFiles = api/**`, `ignoredFiles = api/cloudbuild.staging.yaml`. **Since A3-P2 the production deploy is database-wired**: `--add-cloudsql-instances`, `--set-secrets DATABASE_URL`, `--service-account` (a dedicated least-privilege runtime account) and `--max-instances 2`, with the three live identifiers arriving as trigger substitutions behind a Step 0 guard. Before A3-P2 it passed none of them and its whole served surface was `/api/health`, which needs no environment; `GET /api/health/ready` is the route that changed that. Setting up the instance, the secret, the role and the grants is **Production database enablement** below — and note the ordering there: the substitutions are set **after** merge, the same rule **Same-origin `/api` proxy** carries. See **Substitution matching — what is not protected** below for why that ordering is now kept as a safe default rather than forced by `MUST_MATCH`.
 - **`/api` (staging) — committed, never run:** `api/cloudbuild.staging.yaml` builds the same `api/Dockerfile` and context, pushes a **distinct image name** (`api-staging`) to the same Artifact Registry repository, and would deploy the staging Cloud Run service — private (`--no-allow-unauthenticated`), Cloud-SQL-attached, `DATABASE_URL` from Secret Manager, its own least-privilege runtime service account, `--max-instances 2`. It carries **no** `--no-traffic`/`--tag`: staging *is* the smoke contour. Trigger **to create**: push to `main`, `filename = api/cloudbuild.staging.yaml`, `includedFiles = api/**`, `ignoredFiles = api/cloudbuild.yaml` — it does not exist, so this build-config has never executed. Live identifiers would arrive as trigger substitutions and are not in the repo. See **Staging contour** below.
 - **Promotion gate (L1, ADR-020).** `app/cloudbuild.yaml` Step 3 deploys the PWA with `--no-traffic --tag sha-$SHORT_SHA`, so each push lands a 0%-traffic, sha-tagged revision and the live revision keeps serving until the owner smoke-tests and promotes. Since A2-P1 `api/cloudbuild.yaml` carries the same gate for production `/api`. The two have separate procedures — see **Promotion + rollback (L1 deploy-safety gate)** and **Promotion + rollback (`/api`)** below.
 - **Staging contour (L2, ADR-020 as amended).** ADR-020 originally rejected a standalone staging service, on the reasoning that a per-revision `--no-traffic --tag` gives an addressable zero-traffic revision of the *same* service (`L1-DL-001`, alternative 2 — history, unamended). That holds for the single-file PWA and does **not** hold for a database-backed backend: a zero-traffic revision of the production service still points at the production database, so there is nowhere to exercise a retrieval or migration change safely. The amendment adds a dedicated staging service on a **separate database on the same Cloud SQL instance**, seeded from synthetic data only. See **Staging contour** below (`L2-DL-001`).
+
+### Substitution matching — what is not protected (corrected in L1-P1)
+
+Three places in this file, and the header comment of all three build-configs, used to state that Cloud Build's `MUST_MATCH` substitution option was **kept deliberately** and would fail the build when a trigger supplied a key the config did not declare — catching a substitution-name typo. **That protection does not exist.** The verifiable fact, checkable in the repository: **no build-config declares `substitutionOption` at all.** `options:` in `app/cloudbuild.yaml`, `api/cloudbuild.yaml` and `api/cloudbuild.staging.yaml` carries only `logging: CLOUD_LOGGING_ONLY`.
+
+- **What does protect the deploys:** the **Step 0 guard** in each config. It fails the build with a named `FATAL:` message when a required substitution is **empty** — and empty is exactly what a mis-named key leaves the declared substitution as. The guard covers the failure the `MUST_MATCH` claim was reaching for; it simply reports it one step later.
+- **Unverified, and recorded as such:** an upstream revision note holds that trigger-invoked builds run under `ALLOW_LOOSE`. It has been confirmed **neither in this repository nor by the owner** as of L1-P1, and it is being re-checked owner-side. Do not build on it. It is listed as open debt below.
+- **The option is deliberately NOT switched to `MUST_MATCH` in this packet.** The PWA delivery channel is currently the only one, and a substitution mismatch would break it outright. **Open debt.** What would close it: confirming the effective option on each live trigger, then adding `substitution_option: MUST_MATCH` to the three `options:` blocks in a packet that can smoke the PWA build immediately afterwards.
+- **The post-merge substitution ordering in the two owner-run sections is unchanged.** It no longer claims a `MUST_MATCH` justification; it is kept because it is the safe sequence and costs nothing.
+
+**What merging a packet that edits these files does — stated per config, because the two answers differ.**
+
+- **`api/cloudbuild.yaml` / `api/cloudbuild.staging.yaml`** → fires the production `/api` trigger (`includedFiles = api/**`; its `ignoredFiles = api/cloudbuild.staging.yaml` suppresses a build only when the staging config is the *only* file changed). **The build is expected to FAIL at Step 0, and that failure is designed.** `_CLOUDSQL_INSTANCE`, `_DB_SECRET_NAME` and `_API_RUNTIME_SA` are unset — **Production database enablement** steps 8–15 have never been executed — so the guard fires by construction. As of **2026-08-11** it is additionally moot: production `/api` is deliberately decommissioned and the Cloud SQL instance behind it was deleted, so a green build would deploy a service with nothing behind it. Nothing to repair.
+- **`app/cloudbuild.yaml`** (and any other `app/**` file) → fires the PWA trigger (`includedFiles = app/**`). **The expected outcome is OPEN and cannot be established from this repository.** It depends on whether `_API_UPSTREAM_URL` and `_PWA_RUNTIME_SA` were set on the trigger after A3-P1 merged — **Same-origin `/api` proxy** step 4 — and this file records neither value nor the fact of setting them (see "Live-infra divergence": the runtime account is still *not recorded yet*). Both branches, so the outcome can be read at a glance:
+  - **If set:** the build succeeds and lands a 0%-traffic `sha-` tagged revision. Live traffic is untouched until an explicit promotion. Normal.
+  - **If not set:** the build fails at Step 0. **For the PWA this is a delivery-channel regression to act on, not a designed state** — unlike the `/api` case above, the PWA is the live front door and this is the path it is promoted through. The remedy is **Same-origin `/api` proxy** step 4, then step 5.
+  - **Determine which before merging**, by reading the trigger's substitutions in the Cloud Build console. It is a ten-second check and it is the only way to know.
 
 ### Promotion + rollback (L1 deploy-safety gate)
 
@@ -87,7 +104,7 @@ This mirrors the PWA gate above, with four deliberate differences — read them 
 
 What A3-P1 changed, in one paragraph: production `/api` deploys `--no-allow-unauthenticated`, and `app/nginx.conf` gained a `location ^~ /api/` block that reverse-proxies to it, replacing the upstream `Authorization` header with an ID token minted at container start from the metadata server (`audience` = the prod `/api` service URL) and refreshed by `app/docker-entrypoint.sh`. The browser reaches `/api` only same-origin; **no CORS header is issued anywhere**, by construction (`A3-P1-INV-001`).
 
-**The steps below are strictly ordered. Steps 1–2 happen BEFORE the packet is merged; the trigger substitutions (step 4) happen AFTER.** The first half is IAM: merging flips production `/api` to authenticated-only immediately, so the invoker binding cannot lag behind it. The second half is Cloud Build's `MUST_MATCH` substitution option, kept deliberately in `app/cloudbuild.yaml`: a trigger that supplies a key the build-config on `main` does not declare fails **every** build until the packet lands, so setting the substitutions early breaks `main`. **Production database enablement** below carries the same ordering rule for the same reason — the two procedures do not differ here.
+**The steps below are strictly ordered. Steps 1–2 happen BEFORE the packet is merged; the trigger substitutions (step 4) happen AFTER.** The first half is IAM and is load-bearing: merging flips production `/api` to authenticated-only immediately, so the invoker binding cannot lag behind it. The second half is **kept as the safe default, not because Cloud Build forces it** — this section previously justified it by a `MUST_MATCH` substitution option that `app/cloudbuild.yaml` does not actually declare (corrected in L1-P1; see **Substitution matching — what is not protected** below). Setting the substitutions after merge still costs nothing and removes a whole class of ordering question, so the order stands. **Production database enablement** below carries the same ordering rule, and the same correction applies to it.
 
 1. **Create or designate the PWA runtime service account, and let Cloud Build act as it.** It must be a **dedicated least-privilege** account — explicitly **not** the project-default compute service account, which is shared by every default-SA workload in the project and would therefore turn step 2's grant into project-wide access to `/api`. This mirrors the staging runtime SA (ADR-020, "Staging contour" step 6), which is the governing precedent. Then let the Cloud Build service account impersonate it, or the deploy fails with an `actAs` permission error rather than anything that names the real cause:
    `gcloud iam service-accounts add-iam-policy-binding <pwa_runtime_sa> --member serviceAccount:<cloudbuild_sa> --role roles/iam.serviceAccountUser`.
@@ -122,7 +139,7 @@ What A3-P1 changed, in one paragraph: production `/api` deploys `--no-allow-unau
 
 What A3-P2 changed, in one paragraph: `api/cloudbuild.yaml` now deploys with `--add-cloudsql-instances`, `--set-secrets DATABASE_URL`, a dedicated `--service-account` and `--max-instances 2`, all behind a Step 0 guard; and `GET /api/health/ready` is the first deployed route that constructs `Settings` and opens a connection. `GET /api/health` is unchanged and stays environment-free.
 
-**The steps below are strictly ordered. Steps 1–7 happen BEFORE the packet is merged; the trigger substitutions (step 9) happen AFTER.** That is the **same** ordering rule **Same-origin `/api` proxy** above carries, and the reason is Cloud Build's `MUST_MATCH` substitution option: a trigger that supplies a key the build-config on `main` does not declare fails **every** build until the packet lands. Setting the substitutions early breaks `main`.
+**The steps below are strictly ordered. Steps 1–7 happen BEFORE the packet is merged; the trigger substitutions (step 9) happen AFTER.** That is the **same** ordering rule **Same-origin `/api` proxy** above carries. Its stated reason — Cloud Build's `MUST_MATCH` substitution option — **was wrong in both sections** and is corrected in L1-P1: no build-config in this repository declares that option. See **Substitution matching — what is not protected** below. The ordering itself is unchanged and is kept as the safe default.
 
 > **Execution state, as of 2026-07-29 — read this before treating a step as pending.** **Steps 1–7 have been executed** by the owner against the live project: the instance, the production database, the `vector` extension, the application role, the `DATABASE_URL` secret, the runtime service account and its grants, and the Cloud Build `actAs` grant all exist. What was created, and the state it is actually in, is recorded under **Live-infra divergence** — including two things this procedure did not originally prescribe and now does: the `sslMode` hardening in step 1, and the application role's `CONNECTION LIMIT` of **30** rather than 10 (step 4).
 >
@@ -361,7 +378,7 @@ The PWA is buildless — no bundler, no transpiler; the files execute as they li
 The three-level parity suite (DOM snapshot + visual regression + behavioural smoke) is the acceptance gate for every `spa-split` packet, and the repo's only frontend CI gate. It is dev/CI-only: it is excluded from the production image (`app/Dockerfile` COPYs an explicit file list) and from the Docker build context (`app/.dockerignore`), so the delivery channel stays buildless.
 
 - **Run it**: `scripts/parity-suite.sh`. CI calls this same script, so the gate cannot drift into a local shadow of itself.
-- **A subset**: `scripts/parity-suite.sh --project=behavior` (projects: `contract`, `dom-desktop`, `dom-mobile`, `behavior`, `visual-desktop`, `visual-mobile`).
+- **A subset**: `scripts/parity-suite.sh --project=behavior` (projects: `contract`, `dom-desktop`, `dom-mobile`, `behavior`, `native`, `visual-desktop`, `visual-mobile`).
 - **Update baselines** — deliberate act, never implicit: `scripts/parity-suite.sh --update-snapshots`. `app/playwright.config.js` sets `updateSnapshots: 'none'`, so without this flag a missing or changed baseline **fails**. Review the resulting diff in `app/tests/__baselines__/` before committing; an unexplained baseline change is a product change.
 - **Requires Docker.** The script runs the suite inside a pinned browser container. Without a Docker daemon: `sudo service docker start` (or the platform equivalent).
 
@@ -374,7 +391,165 @@ The three-level parity suite (DOM snapshot + visual regression + behavioural smo
 
 **Delivery drift guard.** `app/tests/server.js` mirrors `app/nginx.conf` so the suite can serve a `CACHE_VERSION`-mutated `/sw.js` on the same origin (the PWA update flow is untestable otherwise; `app/sw.js` on disk is never modified). `app/tests/delivery-contract.spec.js` parses the real `nginx.conf` and **fails when the two diverge** — so editing `nginx.conf` cache/MIME rules without updating the mirror reds the gate on purpose.
 
+**The Capacitor channel** (L1-P1, the `native` project). The script stages `native/www/` from `app/Dockerfile`'s `COPY` list before running, and a second server serves it under a **Capacitor-shaped** delivery profile: no nginx cache/MIME headers, no `try_files` SPA fallback, no `/api`. The project runs the existing `dom-parity` and `behavior` specs at the mobile viewport against the **committed `dom-mobile` baselines** — deliberately not a baseline set of its own, since the two channels ship byte-identical assets and a second set would only double the re-blessing cost. What it catches is a shell that has come to depend on something only nginx provides. The service-worker block of `behavior.spec.js` **skips** here: in the APK the shell is read from local assets, so `/sw.js` is never re-fetched, the waiting worker never appears and `#updateBanner` can never fire — the update channel is inert and the only update path is APK replacement (`LSC-DL-001`).
+
 **Ship-list drift guard** (A1-P3, a second and different guard). The parity server serves from the `app/` directory **on disk**, so a file `app/Dockerfile` forgets to `COPY` passes the whole suite and 404s only in production — and `app/Dockerfile` has no wildcard `COPY`. `app/tests/delivery-contract.spec.js` therefore parses the real `COPY` list and asserts, in both directions, that everything the shipped shell references is shipped by the image *and* precached by name in `OFFLINE_URLS`. Since A1-P4 it asserts the same two things about a **third** surface — the transitive static `import` graph reached from the shell's `<script type="module">` entries (`A1-P4-INV-001`), which is the only thing standing between a new `core/` or `surfaces/` file and a production 404 that no other test can see. Since A1-P6 there is a **fourth** direction: the `<link rel="modulepreload">` hint set must equal that import graph exactly, in both directions (`A1-P6-INV-001`). That direction is also why the third is rooted where it is — hints are `href=` attributes, so seeding the walk from every `.js` the shell names would make it delete the whole graph as "entries" and assert nothing at all, silently (`A1-DL-007` (d)). The second direction is what keeps a copy-forward mount bump honest: both `/m/v1/` and `/m/v2/` stay shipped, so a shell pointing at `v2` while `OFFLINE_URLS` still lists `v1` would otherwise be invisible. The parser fails **closed** — any `COPY` form it does not fully understand throws rather than guessing. It does **not** consult `app/.dockerignore`: never add a pattern there matching `m/`.
+
+### Android shell (Capacitor) — L1-P1
+
+The Android app is a **shell around the same web assets the PWA ships**, not a second front end. `native/tools/stage-webdir.js` assembles `native/www/` from the `COPY` list in `app/Dockerfile`, and `app/tests/native-shell.spec.js` asserts the two channels are byte-identical (`LSC-P1-INV-002`). There is no bundler and no transpiler in either channel.
+
+- `native/capacitor.config.json` — application id `app.theygrow` (**irreversible once distributed**), and the WebView origin pinned explicitly (`https` / `localhost`). Changing the origin would orphan everything in WebView storage; changing the application id makes it a different app that cannot read the previous one's data.
+- `native/android/` — the generated Android project, **committed**. Its build outputs and the copies `cap sync` writes into it are gitignored, so it must be re-staged and re-synced before every build. **Do not read `native/android/app/src/main/assets/public/` as the shipped set.** It is whatever the last `cap sync` on that machine happened to write, it is gitignored, and on the development machine it is known to be stale — missing `store/` and `export/` entirely. The shipped set is `native/www/`, regenerated by `npm run sync`. Harmless to the build, misleading to a reader; recorded as a side-find in `LSC-DL-004` (debt 2) and **disposed of at the L1 milestone close as documented-not-fixed** (`LSC-DL-005` (f)(3)) — the warning in this paragraph is the disposition. What would fix it properly is a staging step that cleans the directory rather than writing over it.
+- `native/www/` — **not** committed. It is derived; regenerate it.
+
+**Toolchain.** `@capacitor/cli` requires **Node ≥ 22** and hard-fails below it (the development machine has Node 18). Gradle needs **JDK 21** — `native/android/app/capacitor.build.gradle` pins `sourceCompatibility`/`targetCompatibility` to 21 — plus an Android SDK. **None of the three is present on the development machine**, so the APK cannot be built there at all; the `android` CI job is what proves the shell compiles.
+
+**Getting an installable APK (owner-run, in this order).**
+
+1. **Push the branch.** The `android` CI job stages, syncs and runs `./gradlew assembleDebug`.
+2. **Download the artifact** `theygrow-debug-apk` from that job's run page (retention 7 days).
+3. **Install it** on an Android device — `adb install -r app-debug.apk`, or transfer the file and allow installation from unknown sources. It is **debug-signed**: no release keystore exists, and none is created by this packet. That is deliberate — distribution is direct-APK under dark-build discipline (PDR-019) and key custody is a later explicit decision.
+4. **Run the on-device smoke.** Nothing in CI or in the parity suite can observe any of this:
+   - the app launches and the skills table renders (174 rows);
+   - creating or selecting a profile works, and a ticked skill **survives a cold restart** (force-stop, relaunch);
+   - the activities modal and the activity→skill deep link behave as on the web;
+   - **no `/api` request is attempted** — the app is fully local, and production `/api` is decommissioned;
+   - **the service worker inside the WebView is settled as of L1-P4, and no longer needs a human observation here.** The native channel registers none and purges a registration a previously installed APK left behind together with its shell caches, so Cache Storage cannot hold a second copy of the shell. `WebViewStorageTest` measures it on the emulator and prints the probe facts into the instrumented report — whether `serviceWorker` is in `navigator` at all, what `caches.keys()` returns — so the answer is recorded rather than re-asked (`LSC-DL-004` (i), `LSC-P4-INV-004`). It has now been measured: run `31683691498` is green with `android-instrumented` at 8m39s and 16/16 instrumented tests, on head 460bd39 (`LSC-DL-005` (a)). **What that run settles and what it does not:** the emulator is fresh, so it proves no registration and no shell cache exist after a booted native app — it cannot prove a *prior* registration is purged, which is what steps 1 → 2 of the owner sequence below exist to observe. *(This bullet previously read "the one open question the repository cannot settle", and carried the disposition to L1-P4. It could be settled; it needed a device.)*
+   - **since L1-P2, check the local store came up.** With the device attached, `adb logcat | grep -i "\[store\]"` should print **nothing**: the store logs only on failure. To see it positively, use the instrumented job instead (below) — it asserts the same thing without a human reading a log.
+
+**Building locally instead (only on a machine with the full toolchain).**
+
+```
+cd native && npm ci && npm run sync && cd android && ./gradlew assembleDebug
+```
+
+`npm run sync` stages the web root and then runs `cap sync android`; running `cap sync` without staging first would package a stale or missing web root.
+
+### The local store and its instrumented gate — L1-P2
+
+The device holds the family's data in **one SQLCipher-encrypted SQLite file**, created by `app/m/v1/store/store.js` on first launch and keyed by a 256-bit passphrase minted on the device and kept in `EncryptedSharedPreferences` behind an `AndroidKeyStore` master key. Encryption is on **from creation**, so no plaintext database ever exists. The schema is `app/m/v1/store/schema/001-core.sql` — one artifact, shipped in both channels, applied by the app, by the desktop tests and by the instrumented test. **It is frozen** (`LSC-DL-002`): changing it after real records exist means migrating a history that exists nowhere else.
+
+Two rules constrain how that file is written, and both are enforced by test rather than by memory:
+
+- **Every `CREATE TRIGGER` stays on ONE line.** The Android wrapper splits the DDL on `";\n"` and re-joins a trigger body only when a fragment trims to exactly `END`, so a multi-statement trigger written across lines is cut in half and fails **on the device** while passing an ordinary desktop test.
+- **No SQL string literal contains `--` or a lowercase `end;`.** The same splitter strips `--` to end of line inside quotes as well as outside, and uppercases `end;` blindly.
+
+**Running the checks that do not need a device.**
+
+```
+pytest app/tests/schema                       # the DDL, applied through a port of the wrapper's splitter
+scripts/parity-suite.sh --project=contract    # merge semantics, supply chain, store unit tests
+```
+
+**Running the instrumented gate (needs CI, not a local toolchain).** `android-instrumented` boots an emulator and asserts what no desktop test can: that the bundled engine compiles **FTS5** in, that it meets the SQLite floor STRICT tables need, that `PRAGMA cipher_version` is non-empty (the database really is SQLCipher), that the shipped DDL applies and passes `integrity_check`, that WAL works, that the append-only triggers fire, that Russian tokenization behaves as measured — and that the injected Capacitor bridge reaches the SQLite plugin **with no bundled JavaScript**, which is the premise the buildless decision rests on.
+
+**It does not run on push.** By owner decision on CI spend it runs on `pull_request` and on `workflow_dispatch` only. To run it on demand: GitHub → **Actions** → **CI** → **Run workflow**, pick the branch. Do this after any change to the schema, the store modules or the Capacitor toolchain — otherwise the first signal arrives at the milestone PR, possibly several commits after the cause.
+
+**Regenerating the Android project.** Do not delete and re-add it casually: `native/android/app/src/main/AndroidManifest.xml` is **hand-edited** — `allowBackup="false"` plus both backup-rule files, which stop Android from uploading the app sandbox (WebView storage today, the native store from L1-P2) to the user's cloud account or transferring it to a new device. `app/tests/native-shell.spec.js` pins those values, so a regeneration that reverts them reds CI rather than silently restoring the default. Re-apply them, do not re-bless the test.
+
+### The export archive — L1-P3
+
+The archive is the family's way out of this device, and it is deliberately the least clever object in the repository: an ordinary `.zip` holding UTF-8 text files, a JSON sidecar index, an `attachments/` directory that explains why it is empty, and a plain-Russian `README.txt`. It is **unencrypted and needs no key** — a key is lost long before the data is. It is produced entirely on the device: no network, no account, no subscription check, and it would still open if this project no longer existed.
+
+**It is not a restore procedure, and there is deliberately no restore procedure here.** Reading the archive back *into* the app is import, which is L6. What follows is how to read it **without** the app, which is the property the packet actually ships.
+
+**Reading the archive without the app (no tooling beyond an unzip and a text editor).**
+
+1. Unzip it. Any archiver on any operating system will do; nothing inside is compressed, so even a damaged archive is recoverable by hand.
+2. Open `README.txt` first. It explains what the archive is, what opens it, what every dataset holds, how the journal is ordered, how a journal row is joined to its detail row, and what the time fields mean.
+3. Read `text/` for the data in words — participants, children and their current attributes, the whole journal, current skill state, diary records.
+4. Read `index.json` for the same data machine-readably. Its `declaration` section is a verbatim copy of `app/m/v1/export/declaration.json` and carries a plain-language explanation of **every field**, which is what makes the archive interpretable with no access to this repository.
+5. `MANIFEST.json` records what produced it: the app version, the canon (`kb-v1.json`) version, and the schema identifier and version **as the device actually held them** — plus per-dataset row counts and the export time.
+6. `print/archive.pdf` is the same text again, as **PDF/A-2b** — the archival profile: the font is embedded whole, the colour profile travels inside the file, nothing is encrypted and nothing points outside the file. Open it in any PDF reader, or print it. It is the **secondary** copy: a character the embedded font does not cover appears there as `�` (U+FFFD), while the text files and `index.json` always carry the exact character. When the two disagree, the text files are right, and `declaration.json` says so.
+
+**What is in the archive and what is not, stated the way the interface states it.** Photographs, video and audio are **not** included; `attachments/` is empty and says so. There is **no cloud backup** of this data — the archive is not a supplement to one, it is the only copy that exists off the device.
+
+**Scope.** The archive carries every child-shared entry plus the private entries of the participant who created it. Another participant's private entries never travel; at L7, each participant exports their own.
+
+**Running the checks that do not need a device.**
+
+```
+pytest app/tests/export                       # the published format: built by the shipped builder under node,
+                                              # then read back by a reader that imports only the stdlib
+scripts/parity-suite.sh --project=contract    # no network, no scheduling, the one-method sink, the plain sentences
+```
+
+**On-device smoke (owner-run, after installing the APK).** The instrumented gate covers the byte path and plugin registration but deliberately does **not** drive the system file picker — automating another app's UI is the kind of assertion that goes green on one Android build and flaky on the next. So check the picker by hand, once:
+
+1. Open the app, press **Сохранить архив**, and read the modal. Both plain sentences must be visible **before** the button.
+2. Press **Создать архив**. The system file picker opens with a suggested name of the form `theygrow-archive-<date>.zip`. Note that it carries no child's name, by decision.
+3. Choose a location and confirm. The status line reports the number of journal entries written.
+4. Close the picker without choosing, on a second run: the app must say **nothing at all**. A closed picker is a decision, not a failure.
+5. Copy the file off the device and walk steps 1–5 of "Reading the archive without the app" above on a desktop.
+6. Export twice without changing anything. The two archives must differ **only** in `MANIFEST.json` — that is the determinism guarantee, and it is the cheapest place to notice it breaking.
+7. **Before L1-P4** the archive was correct and nearly empty, by design: the contour existed before the records did, so the first records were recoverable before they were written. **L1-P4 lands the write path, so it is no longer empty** — see *The write path and the legacy import* below, whose step 8 says what to look for in it. *(Corrected in L1-P4: this step read as a standing expectation and would have told the owner an archive with records in it was wrong.)*
+
+**Note for the web channel.** In a browser the export action opens the same modal but offers no button: there is no native store off Capacitor and therefore no journal to project. That is stated in the modal rather than hidden, because a missing button teaches a parent nothing about where their data actually lives.
+
+
+### The write path and the legacy import — L1-P4
+
+From L1-P4 the app **writes**. A tick is an attributed assertion in the encrypted journal, not a
+string in a browser array, and the family's existing history moves across by an explicit act. Two
+things about that act matter more than any step below:
+
+- **The import never touches `localStorage`.** It reads it and nothing else. Nothing in this packet
+  removes, rewrites or marks the source consumed, and **clearing it is a separate owner action that
+  does not exist yet**. Until you take it deliberately, the live PWA still holds its own copy.
+- **The two channels diverge from here, and this milestone does not resolve it.** The browser keeps
+  writing to its own storage. A mark made in the browser after an import will not appear on the phone
+  until the import is run again — the app offers it again, because the offer is keyed on what is
+  missing. A mark made on the phone never reaches the browser at all. The import is a one-way bridge,
+  not a reconciliation; reconciliation is L7's. The import modal states this in Russian before the
+  parent presses anything.
+
+**The owner-run sequence, in order.** Steps 1–2 need an APK built from a commit *before* this packet
+if you want to see the service-worker purge do anything; from step 3 on, any L1-P4 APK will do.
+
+1. **Install the pre-P4 APK and open it once**, so a service worker registers and populates Cache
+   Storage. This is the state an existing installation is in. (Skip 1–2 if you have never installed a
+   pre-P4 build; there will simply be nothing to purge.)
+2. **Install the L1-P4 APK over it and open it.** With the device attached,
+   `adb logcat | grep -i "\[signal\]"` should print a `store.open` line. Confirm the second copy of
+   the shell is gone. **This step is the only place the purge itself can be seen, and no CI run
+   substitutes for it:** `android-instrumented` boots a fresh emulator with no prior installation, so
+   what it asserts — and observed in run `31683691498` — is that no registration and no shell cache
+   exist after a booted native app, not that an existing one was removed (`LSC-DL-005` (b)).
+   **Expect `previous_run_clean` to read `false` on every launch but the first, and do not treat it
+   as a store fault.** `closeStore()` is defined and never called, so `clean_shutdown` is never set
+   back to 1 and each launch after the first pays an `integrity_check`. The signal is reporting the
+   true state; the defect is upstream of it. Known side-find, `LSC-DL-004` (debt 1); the L1 milestone
+   close weighed it and **left it OPEN** (`LSC-DL-005` (f)(2)) — it turns on whether the WebView
+   reliably fires `pagehide` before process death, which needs its own evidence rather than a guess,
+   and that evidence is what would close it.
+3. **Run the import.** With browser history present in `localStorage`, the import modal appears after
+   the table is built. It lists each profile by name with its mark count, everything ticked. Read the
+   modal — the divergence paragraph is the point of it — then press *Перенести*. Confirm the table
+   still shows the same marks afterwards.
+4. **Run it again.** Reopen the app. The modal should **not** appear: nothing is left to carry across.
+   If you force it by adding a new mark in the browser, it appears again and imports only that one.
+   Nothing is ever appended twice.
+5. **Interrupt it.** With a large history, force-stop the app mid-import (`adb shell am force-stop
+   app.theygrow`). Reopen: the modal appears again, and running it **completes** the remainder rather
+   than duplicating what landed. This is the property derived ids exist for.
+6. **Revoke and re-import.** Un-tick a skill on the phone, then run the import again. The skill must
+   stay un-ticked: the imported assertion is already in the journal under its derived id, so nothing
+   is re-asserted and the later revocation still wins the projection.
+7. **Confirm the browser is untouched.** Open the PWA in a browser on the same account/device. Every
+   profile and every mark is still there, exactly as before the import.
+8. **Export, and read the archive.** Save the archive and open it on a computer. For the first time it
+   is **not empty**. In `text/skills.txt`, an imported mark carries `origin: migrated_legacy` and
+   `event_date_basis: import_date_unknown` beside its date, and `README.txt` has a section explaining
+   that those dates are import dates and not observations. Confirm that section is present — it is the
+   only thing standing between a future reader and a story in which a child mastered three hundred
+   skills in one afternoon.
+
+**What no step above can show.** The parity suite serves `native/www` over plain HTTP with no
+Capacitor bridge injected, so **both of its channels run the localStorage path**. Everything the
+journal backend does on a real device is covered by `android-instrumented` — which is a
+`pull_request` / `workflow_dispatch` job, not a per-push gate — and by this sequence. If you change
+the write path and only the parity suite is green, you have not tested the write path.
 
 ### `/api` (FastAPI)
 

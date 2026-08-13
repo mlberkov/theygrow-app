@@ -7,7 +7,6 @@
 import {
     profiles,
     currentProfileId,
-    initProfileStore,
     setCurrentProfile,
     getCurrentProfile,
     createProfile,
@@ -18,11 +17,13 @@ import { calculateAge, formatAge } from '../core/format.js';
 // до неё switchProfile недостижим (dropdown ещё не построен).
 let onProfileSwitched = () => {};
 
-// Инициализация профилей: хранилище и миграции — в core/state.js, обновление
-// UI остаётся здесь, за владельцем этих элементов.
+// Инициализация профилей: обновление UI за владельцем этих элементов.
+//
+// L1-P4: загрузка семьи ушла в core/state.js initHistory(), которую entry
+// вызывает раньше — источник данных теперь зависит от того, открылось ли
+// нативное хранилище, а этой поверхности такой выбор не принадлежит.
 export function initProfiles(rebuildTable) {
     onProfileSwitched = rebuildTable;
-    initProfileStore();
     updateProfileButton();
     updateProfileDropdown();
 }
@@ -75,8 +76,11 @@ function updateProfileDropdown() {
     dropdown.appendChild(createItem);
 }
 
-function switchProfile(profileId) {
-    setCurrentProfile(profileId);
+// Асинхронна с L1-P4: на нативном канале смена ребёнка перепроецирует отметки
+// из журнала. UI обновляется после того, как проекция готова, — иначе таблица
+// перестроилась бы по отметкам предыдущего ребёнка.
+async function switchProfile(profileId) {
+    await setCurrentProfile(profileId);
     updateProfileButton();
     updateProfileDropdown();
     closeProfileDropdown();
@@ -113,9 +117,10 @@ function closeCreateProfileModal() {
     document.getElementById('createProfileForm').reset();
 }
 
-function createNewProfile(name, birthdate) {
-    const newProfile = createProfile(name, birthdate);
-    switchProfile(newProfile.id);
+async function createNewProfile(name, birthdate) {
+    const newProfile = await createProfile(name, birthdate);
+    if (!newProfile) return;
+    await switchProfile(newProfile.id);
 }
 
 export function wireProfile() {

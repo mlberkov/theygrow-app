@@ -197,6 +197,28 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
 });
 
 test.describe('service worker: registration, offline boot, update flow', () => {
+  // NOT RUN under the Capacitor profile, and the reason is a finding rather
+  // than a convenience (L1-P1, LSC-DL-001).
+  //
+  // In the APK the shell is read from local assets, so /sw.js is never
+  // re-fetched from a network origin: a bumped CACHE_VERSION can never be
+  // discovered, the waiting worker can never appear, and #updateBanner can
+  // never fire. The whole update channel these three tests describe is INERT
+  // there — the only update path is APK replacement. Running them under
+  // 'capacitor' would assert web-channel behaviour against a channel that does
+  // not have it, and a green result would be meaningless in both directions.
+  //
+  // The consequence that is NOT inert — a registered worker turning Cache
+  // Storage into a second, stale copy of the shell inside WebView storage — is
+  // knowingly uncovered here and is L1-P2's to dispose of (see the Scope of
+  // LSC-P1-INV-001). What this packet does assert is the weaker, checkable
+  // thing: the app BOOTS without depending on the service worker at all, which
+  // the native project proves by running every other flow in this file.
+  test.skip(
+    ({ parityProfile }) => parityProfile === 'capacitor',
+    'the service-worker update channel is inert in the Capacitor shell — see LSC-DL-001'
+  );
+
   test('registers and reaches activated', async ({ page }) => {
     await gotoApp(page, { state: STATES.seeded });
     const state = await page.evaluate(async () => {

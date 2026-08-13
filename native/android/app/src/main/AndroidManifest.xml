@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        L1-P1 / LSC-P1-INV-002 — family data does not leave the device.
+
+        The three backup attributes below are a HAND EDIT of the Capacitor
+        template, which ships android:allowBackup="true". Left at the default,
+        Android Auto Backup would upload the app sandbox — today the WebView's
+        localStorage, from L1-P2 the native store — to the user's Google Drive.
+        That is family data crossing a network boundary by platform default,
+        with no export contour, no key scope and no grant model behind it (all
+        L7). Fail closed instead; the deliberate export contour is L1-P4.
+
+        All three are needed, and none is redundant:
+          * allowBackup="false"     — cloud backup, every API level;
+          * fullBackupContent       — the API 24..30 rule format;
+          * dataExtractionRules     — the API 31+ format, and the ONLY one that
+                                      also covers device-to-device transfer,
+                                      which allowBackup does not disable.
+
+        The value of allowBackup is asserted by app/tests/native-shell.spec.js,
+        so a Capacitor upgrade that regenerates this file reds CI rather than
+        silently restoring the default.
+    -->
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

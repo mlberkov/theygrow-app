@@ -1,0 +1,17 @@
+{
+  "appId": "app.theygrow",
+  "appName": "TheyGrow",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": true
+    }
+  }
+}

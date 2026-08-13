@@ -1,0 +1,25 @@
+# Capacitor shell — derived and local-only artifacts (L1-P1).
+#
+# native/android/ IS committed: it carries the application id, the backup
+# hardening that holds half of LSC-P1-INV-002, and the Gradle pins. None of
+# that survives regeneration, so it is source, not output. Its own generated
+# .gitignore (native/android/.gitignore) already excludes the build outputs and
+# the copies `cap sync` writes into it.
+#
+# www/ is NOT committed: it is a byte-identical copy of files that already live
+# in app/, assembled by tools/stage-webdir.js. Committing it would duplicate
+# every shipped byte and create a second place for them to drift. `cap sync`
+# must therefore be preceded by a stage run — `npm run sync` does both.
+
+node_modules/
+www/
+
+# Gradle / APK output that native/android/.gitignore does not already cover
+# from this level.
+*.apk
+*.aab
+
+# Signing material. Nothing in this packet produces a release key (debug
+# signing only), and nothing ever commits one.
+*.jks
+*.keystore

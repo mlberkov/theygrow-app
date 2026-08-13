@@ -1,0 +1,72 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'com.google.gms:google-services:4.4.4'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// L1-P2 (LSC-DL-002) — an inherited defect of the GENERATED Cordova-plugins
+// module, fixed from here because here is the only place a fix survives.
+//
+// `capacitor-cordova-android-plugins` resolves kotlin-stdlib 1.8.22 (through
+// androidx.appcompat) next to the kotlin-stdlib-jdk7/jdk8 1.6.21 shims (through
+// org.apache.cordova:framework). Kotlin folded the jdk7/jdk8 classes INTO
+// kotlin-stdlib at 1.8, so the two carry ~20 identical classes and
+// `:capacitor-cordova-android-plugins:checkDebugAndroidTestDuplicateClasses`
+// fails the whole `connectedDebugAndroidTest` run — after every one of this
+// packet's assertions has already passed (run 31612297495).
+//
+// PLACEMENT. That module's own build.gradle is rewritten by @capacitor/cli on
+// every `cap sync` (handleCordovaPluginsGradle) and is not committed at all, so
+// a fix written there would disappear on the next sync while still looking
+// green. This file is generated once by `cap add` and never touched by the CLI
+// afterwards, so the constraint is stated here and re-applied on every build.
+//
+// SCOPE. androidTest configurations only, and only for the module that carries
+// the defect. Nothing here reaches the shipped APK's dependency graph: the
+// `android` job assembles it green and :app's own duplicate check passes.
+subprojects { subproject ->
+    if (subproject.name != 'capacitor-cordova-android-plugins') return
+
+    // A constraint rather than an exclude: the shims are legitimately on the
+    // test classpath and something asked for them — the version is what is
+    // wrong. Constraining raises them to the stdlib line, where they are empty
+    // stubs that delegate, and no class is defined twice. An exclude would
+    // instead delete them from the graph and quietly dare every caller compiled
+    // against them to not need them at runtime.
+    subproject.plugins.withId('com.android.library') {
+        subproject.dependencies {
+            constraints {
+                androidTestImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22') {
+                    because 'kotlin-stdlib absorbed the jdk7 shim at 1.8; a 1.6.21 shim duplicates every class it still carries'
+                }
+                androidTestImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22') {
+                    because 'kotlin-stdlib absorbed the jdk8 shim at 1.8; a 1.6.21 shim duplicates every class it still carries'
+                }
+            }
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

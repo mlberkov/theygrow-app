@@ -25,16 +25,28 @@
 
 import { kbReady, initData, showKbLoadError } from './core/kb-boot.js';
 import { removeOrphanedAgeFilter } from './core/storage.js';
+import { initHistory } from './core/state.js';
 import { loadCategoryStates } from './surfaces/accordion.js';
 import { initProfiles, wireProfile } from './surfaces/profile.js';
 import { restoreZpdFilter, wireZpdFilter } from './surfaces/zpd-filter.js';
 import { buildTableHeader, buildTableBody, setFixedSkillColumnWidth } from './surfaces/table.js';
 import { checkAndShowOnboarding, wireOnboarding } from './surfaces/onboarding.js';
+import { wireSkillCompletion } from './surfaces/skill-completion.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
+import { wireExport } from './surfaces/export.js';
+import { offerImportIfPending, wireImport } from './surfaces/import.js';
+import { initNativeStore } from './store/boot.js';
 
-// Инициализация приложения
-function init() {
+// Инициализация приложения.
+//
+// L1-P4: асинхронна, потому что семья теперь может лежать в нативном хранилище.
+// Порядок операторов сохранён — регистрация слушателей относительно
+// buildTableBody() это поведение, — а загрузка данных встала перед ними: до неё
+// у поверхностей нет модели, из которой строить DOM.
+async function init(storeOutcome) {
+    await initHistory(storeOutcome);
+
     initProfiles(buildTableBody);
 
     // Загрузить сохранённые состояния UI
@@ -58,14 +70,33 @@ function init() {
     wireSkillModal();
     wireActivities();
     wireOnboarding();
+    wireExport();
+    wireSkillCompletion();
+    wireImport();
+
+    // Предложить перенос — последним, когда интерфейс уже собран: модалка
+    // ложится поверх готовой таблицы, а не поверх пустого экрана. Не
+    // ожидается: перенос — решение родителя, а не часть загрузки.
+    offerImportIfPending();
 }
 
 // Запуск при загрузке страницы: ждём kb-артефакт, затем строим UI
 document.addEventListener('DOMContentLoaded', () => {
-    kbReady.then((kb) => {
-        initData(kb);
-        init();
-    }).catch(showKbLoadError);
+    // L1-P2 opened the native store here without awaiting it. L1-P4 AWAITS it,
+    // because the answer decides where the family is read from and written to:
+    // a store that is still opening would be indistinguishable from one that
+    // failed, and the app would boot onto the wrong side of the seam.
+    //
+    // It still cannot throw — on the web it returns 'not-native' before touching
+    // anything, and on the device a store that fails to open returns its reason
+    // rather than taking the tracker down. The two waits run together because
+    // neither needs the other.
+    Promise.all([kbReady, initNativeStore()])
+        .then(([kb, storeOutcome]) => {
+            initData(kb);
+            return init(storeOutcome);
+        })
+        .catch(showKbLoadError);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

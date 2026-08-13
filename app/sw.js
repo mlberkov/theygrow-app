@@ -8,7 +8,7 @@
 // worker activates, and activate() purges every non-current cache (one-time
 // migration off theygrow-v1). Typed-config home (api parameters.py) is in /api,
 // not touched this milestone, so a typed knob is justifiably deferred.
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -35,6 +35,8 @@ const OFFLINE_URLS = [
   '/m/v1/core/kb-boot.js',
   '/m/v1/core/state.js',
   '/m/v1/core/storage.js',
+  '/m/v1/core/repo-local.js',
+  '/m/v1/core/signals.js',
   '/m/v1/core/dom-utils.js',
   '/m/v1/core/format.js',
   '/m/v1/core/zpd.js',
@@ -47,6 +49,52 @@ const OFFLINE_URLS = [
   '/m/v1/surfaces/activities.js',
   '/m/v1/surfaces/onboarding.js',
   '/m/v1/surfaces/accordion.js',
+  // L1-P2: the native store. These ship to BOTH channels byte-identically
+  // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
+  // anything when there is no Capacitor bridge. They are precached because the
+  // import graph reaches them, and an installed client must not boot offline
+  // with a broken graph. The DDL artifact they read
+  // (/m/v1/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // channel ever fetches it, and that channel does not use this worker.
+  //
+  // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
+  // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
+  // quotes — an apostrophe swallows every entry after it and the guard then
+  // reports the icons as unprecached.
+  '/m/v1/store/boot.js',
+  '/m/v1/store/store.js',
+  '/m/v1/store/journal.js',
+  '/m/v1/store/repo-journal.js',
+  '/m/v1/store/import-legacy.js',
+  '/m/v1/store/bridge.js',
+  '/m/v1/store/config.js',
+  '/m/v1/store/errors.js',
+  // L1-P3: the export contour. Precached for the same reason the store modules
+  // are — the import graph reaches them, and an installed client must not boot
+  // offline with a broken graph. Like the DDL above, the artifacts these modules
+  // FETCH at runtime are deliberately NOT here: the declaration
+  // (/m/v1/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v1/export/assets/. Only the
+  // native channel ever reads them, that channel does not use this worker, and
+  // the web channel cannot export at all — so precaching them would spend
+  // roughly 443 KB of an installed web client cache budget on bytes it can
+  // never use. See LSC-DL-003.
+  //
+  // (Note the wording above avoids an apostrophe on purpose — see the trap
+  // named further down this comment block.)
+  '/m/v1/surfaces/export.js',
+  '/m/v1/surfaces/import.js',
+  '/m/v1/export/run.js',
+  '/m/v1/export/build.js',
+  '/m/v1/export/readout.js',
+  '/m/v1/export/sink.js',
+  '/m/v1/export/text.js',
+  '/m/v1/export/readme.js',
+  '/m/v1/export/zip.js',
+  '/m/v1/export/pdf.js',
+  '/m/v1/export/ttf.js',
+  '/m/v1/export/config.js',
+  '/m/v1/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

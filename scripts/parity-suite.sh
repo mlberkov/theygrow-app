@@ -16,9 +16,17 @@
 # exactly — Playwright refuses to run on a mismatch, which is the guard we want.
 #
 # Usage:
+# Since L1-P1 the suite also covers the CAPACITOR channel. This script stages
+# native/www/ from app/Dockerfile's COPY list before running, so the `native`
+# project boots the app from the same asset set the APK carries. That staging is
+# part of the gate, not a developer convenience: app/tests/native-shell.spec.js
+# reads native/www/ as it stands and asserts it against the ship list.
+#
+# Usage:
 #   scripts/parity-suite.sh                      # full suite
 #   scripts/parity-suite.sh --update-snapshots   # rewrite baselines (explicit only)
 #   scripts/parity-suite.sh --project=behavior   # any playwright flag passes through
+#   scripts/parity-suite.sh --project=native     # the Capacitor channel only
 #   PARITY_NO_DOCKER=1 scripts/parity-suite.sh --project=dom-desktop
 #                                                # host run; visual baselines will
 #                                                # NOT match unless the host is the
@@ -48,6 +56,15 @@ if [ "${DECLARED}" != "${PLAYWRIGHT_VERSION}" ]; then
   echo "parity-suite: update both together; the container tag and the npm package must match exactly." >&2
   exit 1
 fi
+
+# Stage the Capacitor web root before anything runs (L1-P1). The `native`
+# project boots the app from native/www/, and app/tests/native-shell.spec.js
+# asserts that directory against app/Dockerfile's COPY list — deliberately
+# WITHOUT staging it itself, so that a hand-added file is still there to be
+# caught. Staging here, in the gate, is what keeps that assertion meaningful and
+# the run reproducible. The stager has no dependencies, so it needs no install.
+echo "parity-suite: staging the Capacitor web root"
+node "${REPO_ROOT}/native/tools/stage-webdir.js"
 
 if [ "${PARITY_NO_DOCKER:-0}" = "1" ]; then
   echo "parity-suite: running on the host (PARITY_NO_DOCKER=1) — visual baselines are container-only." >&2
