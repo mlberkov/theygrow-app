@@ -313,13 +313,35 @@ test.describe('service worker: registration, offline boot, update flow', () => {
     test('boots offline from the precache', async ({ page, context }) => {
       await gotoApp(page, { state: STATES.seeded });
       await page.evaluate(() => navigator.serviceWorker.ready);
-      // Give the precache (OFFLINE_URLS) time to settle before cutting the network.
-      await page.waitForFunction(async () => {
-        const keys = await caches.keys();
-        if (!keys.length) return false;
-        const cache = await caches.open(keys[0]);
-        return (await cache.match('/kb-v1.json')) !== undefined;
-      });
+      // Let the precache (OFFLINE_URLS) settle before cutting the network.
+      //
+      // expect.poll, NOT page.waitForFunction, and the difference is a
+      // measurement rather than a style preference (EMV-DL-003 side-find,
+      // retired in EMV-DL-004). waitForFunction given an ASYNC predicate
+      // resolves on the FIRST call whatever the predicate computes — the
+      // predicate returns a Promise, and a Promise is truthy. Measured with a
+      // predicate that sleeps 1.5 s and then returns false: it resolved after
+      // one iteration instead of timing out. This wait therefore did not wait,
+      // and passed only because the precache settles quickly on this host —
+      // a property of the timing, not of the arrangement, which is exactly the
+      // class of green AGENTS.md §11 exists against. expect.poll awaits the
+      // value it polls, so the pin below cannot race the precache; re-measured
+      // with the same sleeping-false predicate, it now times out as it should.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(async () => {
+              const keys = await caches.keys();
+              if (!keys.length) return false;
+              const cache = await caches.open(keys[0]);
+              return (await cache.match('/kb-v1.json')) !== undefined;
+            }),
+          {
+            message: 'the precache never settled: /kb-v1.json is in no cache generation',
+            timeout: 30_000,
+          }
+        )
+        .toBe(true);
 
       await context.setOffline(true);
       await page.reload();
