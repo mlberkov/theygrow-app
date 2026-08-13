@@ -28,10 +28,14 @@ const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { test, expect } = require('@playwright/test');
-const { shippedPaths, expandShippedFiles } = require('./support/ship-list');
+const { shippedPaths, expandShippedFiles, currentMount } = require('./support/ship-list');
 
 const APP_ROOT = path.resolve(__dirname, '..');
-const SIGNALS_JS = path.join(APP_ROOT, 'm', 'v1', 'core', 'signals.js');
+const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8'));
+// The mount the SHELL references, never the literal 'v1' (EMV-DL-001): a
+// copy-forward bump leaves the old generation on disk and shipped, so a pinned
+// literal would keep guarding bytes nothing runs.
+const SIGNALS_JS = path.join(APP_ROOT, 'm', MOUNT.dir, 'core', 'signals.js');
 
 const dynamicImport = new Function('specifier', 'return import(specifier)');
 

@@ -6,12 +6,12 @@ The artifact's format is a public commitment, so what has to be proven is the
 artifact the SHIPPED code writes — not a Python re-implementation of it that
 could agree with the tests and disagree with the app. So the read-out runs here,
 against a real SQLite database carrying the real frozen DDL, and the bytes are
-built by `node` running the shipped `app/m/v1/export/build.js` unchanged. The
+built by `node` running the shipped mount's `export/build.js` unchanged. The
 same discipline as `app/tests/schema/harness.py`, which applies the DDL through a
 port of the wrapper's own splitter rather than through a convenient shortcut.
 
 The read-out is not hand-written either: every query comes out of
-`app/m/v1/export/declaration.json`, the same file the builder reads and the same
+the mount's `export/declaration.json`, the same file the builder reads and the same
 file a verbatim copy of which lands inside every artifact. One artifact, three
 readers — the `001-core.sql` arrangement applied to the export.
 """
@@ -25,10 +25,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from schema.harness import apply_schema, connect
+from schema.harness import apply_schema, connect, current_mount
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-EXPORT_DIR = REPO_ROOT / "app" / "m" / "v1" / "export"
+# Derived from the shell, never pinned — see schema.harness.current_mount
+# (EMV-DL-001): the frozen generation is still on disk after a copy-forward
+# bump, and building the artifact with its builder would prove the wrong bytes.
+EXPORT_DIR = REPO_ROOT / "app" / "m" / current_mount(REPO_ROOT) / "export"
 DECLARATION_PATH = EXPORT_DIR / "declaration.json"
 BUILD_DRIVER = Path(__file__).resolve().parent / "build-artifact.mjs"
 

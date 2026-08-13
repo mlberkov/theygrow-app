@@ -110,7 +110,11 @@ module.exports = defineConfig({
       // legacy import's four properties, and the signal-payload guard. Those
       // first two drive a recorder rather than a database — what the SQL MEANS
       // is `pytest app/tests/schema`, against the real frozen DDL.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|write-path|import-legacy|signal-payload)\.spec\.js/,
+      // EMV-P1 adds one more: the show-rule coverage guard, which reads the
+      // shipped mount's CSS and modules and drives no browser. Its runtime
+      // twin — the click that proves the export modal is actually visible —
+      // lives in behavior.spec.js, deliberately not here.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|write-path|import-legacy|signal-payload|show-rule-coverage)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

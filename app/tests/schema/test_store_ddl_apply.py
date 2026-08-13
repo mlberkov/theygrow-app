@@ -81,7 +81,7 @@ def test_the_single_line_rule_is_what_keeps_a_trigger_whole() -> None:
 
     A trigger whose body holds MORE THAN ONE statement across lines is torn in
     half by the wrapper (the END-rejoin only reattaches the last fragment), and
-    the app/m/v1/store/schema DDL has exactly such a trigger — record_fts_after_update.
+    the mount's store/schema DDL has exactly such a trigger — record_fts_after_update.
     """
     one_line = (
         "CREATE TABLE t (a TEXT);\n"
@@ -131,7 +131,7 @@ def test_sqlite_version_floor_is_met_and_matches_the_store_config() -> None:
     declared = re.search(r"sqliteVersionFloor:\s*'([0-9.]+)'", config)
     assert declared is not None, "config.js declares no sqliteVersionFloor"
     assert tuple(int(p) for p in declared.group(1).split(".")) == SQLITE_VERSION_FLOOR, (
-        "the floor in app/m/v1/store/config.js and the floor in harness.py disagree"
+        "the floor in the mount's store/config.js and the floor in harness.py disagree"
     )
 
 

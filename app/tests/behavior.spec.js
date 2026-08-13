@@ -196,6 +196,81 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
   });
 });
 
+test.describe('the export control opens a modal that is actually visible', () => {
+  // WHY THIS TEST EXISTS, AND WHY IT CLICKS (EMV-DL-001).
+  //
+  // `.modal { display: none }` shipped without a `.modal.show` rule, so
+  // `openExportModal()` ran to completion — status cleared, availability
+  // computed, button hidden, class added — and the parent saw nothing. Every
+  // guard over this surface was green throughout, because every one of them
+  // read source text: the sentences were in the shell, the control was in the
+  // header, the class was added by the handler. The property none of them
+  // could see is the one a parent experiences.
+  //
+  // So this test clicks #exportBtn and reads the COMPUTED style of the result.
+  // Empty openExportModal()'s body, or delete the CSS rule, and it reds; that
+  // is the whole point of it, and the reason app/tests/show-rule-coverage.spec.js
+  // is not allowed to stand in for it.
+  //
+  // CHANNEL BOUNDARY. This runs in `behavior` (nginx channel) and in `native`
+  // (the staged APK web root). Neither injects a Capacitor bridge, so BOTH take
+  // the WEB branch of isExportSinkAvailable() — the run button is absent and
+  // the honest "no archive in a browser" line is shown. What the native branch
+  // renders behind that same class is android-instrumented's to observe; it is
+  // not claimed here.
+  test('clicking #exportBtn shows the modal, and closing it hides it again', async ({ page }) => {
+    await gotoApp(page, { state: STATES.seeded });
+
+    // Not visible before the click — otherwise "visible after" proves nothing.
+    await expect(page.locator('#exportModal')).toBeHidden();
+
+    await page.locator('#exportBtn').click();
+
+    // The two assertions are different claims and both are wanted: the element
+    // resolves to a displayed box, AND the box is the one the rule specifies.
+    await expect(page.locator('#exportModal')).toBeVisible();
+    await expect(page.locator('#exportModal')).toHaveCSS('display', 'block');
+
+    // The web branch, stated by the surface rather than hidden: no run button,
+    // and the sentence that says where the archive actually comes from.
+    await expect(page.locator('#exportUnavailable')).toBeVisible();
+    await expect(page.locator('#exportRunBtn')).toBeHidden();
+
+    // The close control returns it to display: none — the rule is a toggle, not
+    // a one-way door.
+    await page.locator('#exportModalClose').click();
+    await expect(page.locator('#exportModal')).toBeHidden();
+    await expect(page.locator('#exportModal')).toHaveCSS('display', 'none');
+  });
+
+  // THE CLAIM HERE IS NARROWER THAN THE ONE ABOVE, AND IS WORDED TO MATCH.
+  //
+  // #importModal and #storeUnavailableModal are the other two bare-.modal
+  // elements opened by classList.add('show'), and the same rule covers them.
+  // Neither trigger is reachable on the web branch: offerImportIfPending()
+  // returns before touching the DOM without a native store handle, and
+  // showStoreUnavailable() sits behind canRecord() === false, which the web
+  // channel never reaches (core/state.js puts it on the localStorage backend).
+  //
+  // So what is asserted is that THE RULE RESOLVES TO display: block FOR THESE
+  // ELEMENTS — a real property of the shipped stylesheet, executed by a real
+  // browser against the real element. It is NOT a claim that either modal
+  // becomes visible in use: the handler paths are not exercised here and would
+  // not red if they broke. Those belong to android-instrumented and remain
+  // residual debt (LSC-DL-005 debt 13).
+  for (const id of ['importModal', 'storeUnavailableModal']) {
+    test(`the .modal.show rule resolves #${id} to display: block`, async ({ page }) => {
+      await gotoApp(page, { state: STATES.seeded });
+
+      await expect(page.locator(`#${id}`)).toHaveCSS('display', 'none');
+      await page.evaluate((el) => document.getElementById(el).classList.add('show'), id);
+      await expect(page.locator(`#${id}`)).toHaveCSS('display', 'block');
+      await page.evaluate((el) => document.getElementById(el).classList.remove('show'), id);
+      await expect(page.locator(`#${id}`)).toHaveCSS('display', 'none');
+    });
+  }
+});
+
 test.describe('service worker: registration, offline boot, update flow', () => {
   // NOT RUN under the Capacitor profile, and the reason is a finding rather
   // than a convenience (L1-P1, LSC-DL-001).

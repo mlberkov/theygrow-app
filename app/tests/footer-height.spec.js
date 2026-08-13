@@ -5,7 +5,7 @@
 // THE JUMP IS REAL, AND THIS FILE IS WHAT ESTABLISHED IT. When the ZPD filter
 // is on, the filter button's label shortens to «Показать все навыки»; in the
 // pinned container that label stops wrapping and the footer drops from
-// 68.78 px to 55 px, taking the whole page above it along. `app/m/v1/app.css`
+// 68.78 px to 55 px, taking the whole page above it along. The mount's `app.css`
 // reserves exactly two lines (`height: calc(2lh + 16px)`) so the control height
 // no longer depends on how many lines a label takes.
 //
@@ -68,7 +68,7 @@ test.describe('the footer holds its height across filter states', () => {
         // copy edit, a translation, or a font change in the container is enough
         // to cause it. So it reds here instead, with the numbers that say by
         // how much. Do not relax this assertion; raise the reserve in
-        // app/m/v1/app.css or shorten the label.
+        // the mount's app.css or shorten the label.
         expect(
           control.scrollHeight,
           `#${control.id} ("${control.text}") is clipped vertically:`

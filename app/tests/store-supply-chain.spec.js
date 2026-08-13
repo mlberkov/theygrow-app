@@ -18,7 +18,12 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
-const { shippedPaths, expandShippedFiles, moduleSpecifiers } = require('./support/ship-list');
+const {
+    shippedPaths,
+    expandShippedFiles,
+    moduleSpecifiers,
+    currentMount,
+} = require('./support/ship-list');
 
 const APP_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(APP_ROOT, '..');
@@ -29,7 +34,11 @@ const SHIPPED = expandShippedFiles(
     APP_ROOT
 );
 
-const STORE_DIR = path.join(APP_ROOT, 'm', 'v1', 'store');
+const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8'));
+// The mount the SHELL references, never the literal 'v1' (EMV-DL-001): a
+// copy-forward bump leaves the old generation on disk and shipped, so a pinned
+// literal would keep guarding bytes nothing runs.
+const STORE_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'store');
 const STORE_SOURCES = fs
     .readdirSync(STORE_DIR)
     .filter((name) => name.endsWith('.js'))
@@ -42,10 +51,10 @@ const TEST_ONLY_PACKAGES = ['@automerge/automerge', 'loro-crdt'];
 test.describe('nothing from node_modules reaches the shipped asset set', () => {
     test('the store modules and the DDL are actually shipped', () => {
         // Anti-vacuity: the scans below prove nothing if the store never ships.
-        expect(SHIPPED).toContain('/m/v1/store/store.js');
-        expect(SHIPPED).toContain('/m/v1/store/journal.js');
-        expect(SHIPPED).toContain('/m/v1/store/bridge.js');
-        expect(SHIPPED).toContain('/m/v1/store/schema/001-core.sql');
+        expect(SHIPPED).toContain(`${MOUNT.prefix}store/store.js`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}store/journal.js`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}store/bridge.js`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}store/schema/001-core.sql`);
     });
 
     for (const pkg of TEST_ONLY_PACKAGES) {

@@ -94,6 +94,39 @@ function htmlAssetRefs(html) {
     .filter((v) => v.startsWith('/'));
 }
 
+// The mount version the SHELL currently references, as a URL prefix
+// ("/m/v2/") and as a directory name ("v2").
+//
+// WHY THIS EXISTS (EMV-DL-001). A mount bump is copy-forward: `/m/v1/` stays on
+// disk byte-untouched while the shell moves to `/m/v2/`. Every guard that named
+// the mount as a LITERAL therefore kept asserting against the frozen generation
+// after the bump — shipped, present on disk, and no longer the bytes anyone
+// runs. That is a guard staying green for the wrong reason, which is the exact
+// failure class the export-modal defect belonged to, so the literal is replaced
+// by a derivation from the one artifact that decides the answer: the shell.
+//
+// Derived from the stylesheet <link>, not from any `/m/` reference: the shell
+// names exactly one stylesheet, it is the first mount asset the browser
+// resolves, and it cannot be a delivery hint. Fails CLOSED like every parser in
+// this file — no match, or more than one distinct mount version among the
+// shell's own references, throws rather than picking one.
+function currentMount(html, where = 'app/index.html') {
+  const link = /<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>/i.exec(html);
+  if (!link) throw new Error(`${where}: no stylesheet <link> — the mount cannot be derived`);
+  const href = /\bhref\s*=\s*["'](\/m\/(v\d+)\/[^"']+)["']/.exec(link[0]);
+  if (!href) throw new Error(`${where}: the stylesheet <link> names no /m/v{N}/ asset`);
+
+  const versions = new Set(Array.from(html.matchAll(/\/m\/(v\d+)\//g)).map((m) => m[1]));
+  if (versions.size !== 1) {
+    throw new Error(
+      `${where}: references ${versions.size} mount versions (${[...versions].sort().join(', ')}) — a bump is half-applied, or a hint points at the frozen generation`
+    );
+  }
+
+  const version = href[2];
+  return { version, prefix: `/m/${version}/`, dir: version };
+}
+
 // The shell's EXECUTION roots: same-origin `<script type="module" src>` values.
 // This is what direction (3) walks from — deliberately narrower than "every .js
 // the shell names", which since A1-P6 also includes delivery hints.
@@ -236,6 +269,7 @@ module.exports = {
   WEB_ROOT,
   shippedPaths,
   offlineUrls,
+  currentMount,
   htmlAssetRefs,
   htmlModuleEntries,
   htmlPreloadHints,

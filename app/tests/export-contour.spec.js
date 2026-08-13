@@ -16,10 +16,21 @@ const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 
-const { shippedPaths, expandShippedFiles, offlineUrls } = require('./support/ship-list');
+const {
+    shippedPaths,
+    expandShippedFiles,
+    offlineUrls,
+    currentMount,
+} = require('./support/ship-list');
 
 const APP_ROOT = path.resolve(__dirname, '..');
-const EXPORT_DIR = path.join(APP_ROOT, 'm', 'v1', 'export');
+const SHELL = fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8');
+
+// The mount the SHELL references, never the literal 'v1' (EMV-DL-001): a
+// copy-forward bump leaves the old generation on disk and shipped, so a pinned
+// literal would keep guarding bytes nothing runs.
+const MOUNT = currentMount(SHELL);
+const EXPORT_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'export');
 const SHIPPED = expandShippedFiles(
     shippedPaths(fs.readFileSync(path.join(APP_ROOT, 'Dockerfile'), 'utf8')),
     APP_ROOT
@@ -32,8 +43,10 @@ const EXPORT_SOURCES = fs
     .map((name) => ({ name, source: fs.readFileSync(path.join(EXPORT_DIR, name), 'utf8') }));
 
 const CONFIG_SOURCE = fs.readFileSync(path.join(EXPORT_DIR, 'config.js'), 'utf8');
-const SHELL = fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8');
-const SURFACE = fs.readFileSync(path.join(APP_ROOT, 'm', 'v1', 'surfaces', 'export.js'), 'utf8');
+const SURFACE = fs.readFileSync(
+    path.join(APP_ROOT, 'm', MOUNT.dir, 'surfaces', 'export.js'),
+    'utf8'
+);
 const DECLARATION = JSON.parse(
     fs.readFileSync(path.join(EXPORT_DIR, 'declaration.json'), 'utf8')
 );
@@ -89,7 +102,7 @@ test.describe('the print layer binaries are pinned', () => {
     // from the APK at export time, and copies of both end up inside every
     // artifact a family keeps. A changed byte is a supply-chain event, so it
     // reds here rather than travelling silently. Provenance and licences are in
-    // app/m/v1/export/assets/PROVENANCE.txt.
+    // the mount's export/assets/PROVENANCE.txt.
     const PINNED = {
         'PTSans-Regular.ttf':
             '9cc831490532009bae2b3ce0d39c62adfc889060beb421593bfd9d2396d0f10a',
@@ -113,7 +126,7 @@ test.describe('the print layer binaries are pinned', () => {
         const ofl = fs.readFileSync(path.join(EXPORT_DIR, 'assets', 'PTSans-OFL.txt'), 'utf8');
         expect(ofl).toContain('SIL OPEN FONT LICENSE');
         expect(ofl).toContain('ParaType');
-        expect(SHIPPED).toContain('/m/v1/export/assets/PTSans-OFL.txt');
+        expect(SHIPPED).toContain(`${MOUNT.prefix}export/assets/PTSans-OFL.txt`);
     });
 
     test('the two binaries ship but are deliberately NOT precached', () => {
@@ -122,15 +135,15 @@ test.describe('the print layer binaries are pinned', () => {
         // cannot export at all — so precaching would cost an installed web
         // client ~443 KB of cache it can never use.
         for (const name of ['PTSans-Regular.ttf', 'sRGB-v2-micro.icc']) {
-            expect(SHIPPED).toContain(`/m/v1/export/assets/${name}`);
+            expect(SHIPPED).toContain(`${MOUNT.prefix}export/assets/${name}`);
             expect(
-                PRECACHED.has(`/m/v1/export/assets/${name}`),
+                PRECACHED.has(`${MOUNT.prefix}export/assets/${name}`),
                 `${name} is precached; the web channel cannot use it`
             ).toBeFalsy();
         }
         // Anti-vacuity: the precache list was parsed and is not empty.
         expect(PRECACHED.size).toBeGreaterThan(10);
-        expect(PRECACHED.has('/m/v1/export/pdf.js')).toBeTruthy();
+        expect(PRECACHED.has(`${MOUNT.prefix}export/pdf.js`)).toBeTruthy();
     });
 });
 
@@ -138,11 +151,11 @@ test.describe('the contour actually ships', () => {
     test('the export modules and the declaration are in the ship list', () => {
         // Anti-vacuity: every scan below is about shipped bytes, and proves
         // nothing if these files reach neither channel.
-        expect(SHIPPED).toContain('/m/v1/export/build.js');
-        expect(SHIPPED).toContain('/m/v1/export/sink.js');
-        expect(SHIPPED).toContain('/m/v1/export/zip.js');
-        expect(SHIPPED).toContain('/m/v1/export/declaration.json');
-        expect(SHIPPED).toContain('/m/v1/surfaces/export.js');
+        expect(SHIPPED).toContain(`${MOUNT.prefix}export/build.js`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}export/sink.js`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}export/zip.js`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}export/declaration.json`);
+        expect(SHIPPED).toContain(`${MOUNT.prefix}surfaces/export.js`);
         expect(EXPORT_SOURCES.length).toBeGreaterThan(5);
     });
 });

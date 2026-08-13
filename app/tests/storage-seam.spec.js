@@ -9,7 +9,7 @@
 // localStorage" — today it still is, which is exactly the state P2/P3 fix.
 //
 // What CAN be enforced now, and is: every access to Web Storage from the
-// shipped surface goes through ONE module, `m/v1/core/storage.js`, plus two
+// shipped surface goes through ONE module, the mount's `core/storage.js`, plus two
 // sites in the shell that are named here individually. A new access anywhere
 // else is red. That is the seam P2 swaps out — and the reason it is worth a
 // gate rather than a paragraph is that the swap is only tractable if the set of
@@ -37,9 +37,15 @@ const { test, expect } = require('@playwright/test');
 const {
   htmlModuleEntries,
   moduleDependencies,
+  currentMount,
 } = require('./support/ship-list');
 
 const APP_ROOT = path.resolve(__dirname, '..');
+
+// The mount the SHELL references, never the literal 'v1' (EMV-DL-001): a
+// copy-forward bump leaves the old generation on disk and shipped, so a pinned
+// literal would keep guarding bytes nothing runs.
+const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8'));
 
 // The Web Storage surfaces this invariant governs, in property-access form.
 // `openDatabase` is the legacy WebSQL entry point: removed from Chromium, but
@@ -49,7 +55,7 @@ const STORAGE_ACCESS = /\b(localStorage|sessionStorage|indexedDB|openDatabase)\s
 
 // The one door. Every persistent key the app reads or writes is declared here
 // (A1-P4), which is what makes it swappable in one place in L1-P2.
-const STORAGE_MODULE = '/m/v1/core/storage.js';
+const STORAGE_MODULE = `${MOUNT.prefix}core/storage.js`;
 
 // The two accesses that are NOT behind the door, declared individually rather
 // than by file. Both predate the module split and both were left inline on
