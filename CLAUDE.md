@@ -75,7 +75,10 @@ Every plan contains exactly these sections:
 - **Escalations** — batched owner questions from the escalation list.
   Omit the section if there are none.
 - **Validation** — how the result will be checked (commands, diff scope,
-  manual checks).
+  manual checks), and for every claim about **runtime** behaviour the test
+  that executes it (`AGENTS.md` §11). A packet with no runtime claim states
+  that outright — "no runtime claims this packet" — rather than leaving the
+  section silent about them.
 
 ## No autonomous git
 
@@ -103,6 +106,6 @@ Every plan contains exactly these sections:
 Every execution returns a report with exactly these sections:
 
 - **What changed** — files touched and the change shape (added / rewritten / prepended / etc.).
-- **How it was validated** — commands run and their relevant output (diff scopes, grep checks, etc.).
+- **How it was validated** — commands run and their relevant output (diff scopes, grep checks, etc.); each runtime claim named with the test that executed it, and source/markup scans labelled as the static evidence they are (`AGENTS.md` §11).
 - **Anything deferred or surprising** — items pushed to a later packet, anomalies found, side-finds the owner should know about.
 - **Ready for git checkpoint** — yes / no. "Yes" means the diff matches the plan, validations passed, and the owner can checkpoint with no follow-up changes from the agent first.

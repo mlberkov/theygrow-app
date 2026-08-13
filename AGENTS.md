@@ -88,7 +88,21 @@ theygrow-app/
 - `docs/INVARIANTS.md` is **enforced-only**. An invariant goes there only when a packet enforces it in code (test, lint rule, schema constraint, runtime guard).
 - Intent-level invariants — what the contract says we will do — live here in §2 and §3, **not** in `INVARIANTS.md`. This keeps `INVARIANTS.md` from becoming a wish list.
 
-## §11 Historical artifacts
+## §11 Evidence bar
+
+- **A claim about runtime behaviour counts only once a test that executes that behaviour has executed it.** Executing means the product runs: a page loads and a control is clicked, an app boots, a process runs, a query runs against a real engine. A guard is **static** when its own code never starts the product — no page, no emulator, no process — and a static guard cannot carry a runtime claim however precisely it reads the source that would produce it.
+- **Scanning for static properties stays legitimate and remains preferred where it fits**: presence of a file, absence of an import, shape of markup, composition of the ship list, provenance of a knob. Those are properties of the tree, and reading the tree is the right instrument for them.
+- **Detector.** An obligation without a detector is an intention, so this rule carries all three parts.
+  - **Check.** Of every guard behind a claim, ask: could it stay green with the handler body emptied, or with the shipped rule deleted? Does its own code start the product? If it cannot execute and boots nothing, what it carries is a static property, whatever the claim says.
+  - **Admissible hits.** The static list above. Naming what is legitimately static is what makes a negative result provable rather than merely absent.
+  - **Moment.** Run at plan authoring — the Validation section names, per runtime claim, the test that executes it, and a packet with none says so explicitly ("no runtime claims this packet") rather than leaving the section silent — at plan review, and at acceptance of the execution report.
+- **Where this came from.** Four claims in milestone L1 passed for the wrong reason, and the fourth cost the milestone its traffic promotion:
+  1. the answer map passed as the options object (`createFakeBridge({ answer })`, `app/tests/support/fake-bridge.js`), so `answer` stayed empty, every scripted read returned `[]` and the assertions held — **vacuous fixture**;
+  2. `includes('INSERT INTO child')` also matched `INSERT INTO child_attribute` — **over-matching substring** (`app/tests/import-legacy.spec.js`, now `'INSERT INTO child ('`);
+  3. the signal-payload guard's `/emitSignal\(\s*([^)]*?)\s*\)/` stopped at the first close paren, so a payload reading family text through a call was never seen — **a regex failing open** (`LSC-P4-INV-003`, `LSC-DL-004`);
+  4. the export guard asserted markup substrings for a surface no user could reach, because no `.modal.show` rule was ever declared — **a static guard standing in for a runtime claim** (`EMV-P1-INV-001`, `EMV-DL-001`).
+
+## §12 Historical artifacts
 
 - `data/mvp_masterplan.md` (dated 11 February 2026, "TheyGrow MVP — Мастер-план разработки") is **SUPERSEDED** as plan of record on 2026-06-19. It is preserved as a reference artifact, not a task source. See `docs/decision-log.md` entry `M1-DL-001`.
 - `.cursor/rules/masterplan.mdc` has been neutralized to a redirect stub that points at this file.
