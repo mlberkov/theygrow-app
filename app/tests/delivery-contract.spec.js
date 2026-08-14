@@ -15,8 +15,18 @@ const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { HEADER_RULES } = require('./server');
+const { currentMount } = require('./support/ship-list');
 
 const NGINX_CONF = path.resolve(__dirname, '..', 'nginx.conf');
+
+// The mount the SHELL references, never the literal 'v1' (EMV-DL-001). The
+// live-response assertions below are about the generation the app actually
+// boots from: after a copy-forward bump the frozen one is still shipped and
+// still answers 200, so a pinned URL would keep this contract green while
+// saying nothing about the bytes in use.
+const MOUNT = currentMount(
+  fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8')
+);
 
 // Extracts the body of `location <loc> { ... }` by brace matching.
 function locationBlock(conf, location) {
@@ -190,7 +200,7 @@ test.describe('delivery contract — live responses', () => {
   test('ES module MIME is correct (load-bearing for the split)', async ({ request }) => {
     // A1-P3 extracted the first native ES module; a wrong MIME would make it
     // fail to load outright. Asserted against the real module, not a stand-in.
-    const res = await request.get('/m/v1/sw-register.js');
+    const res = await request.get(`${MOUNT.prefix}sw-register.js`);
     expect(res.status()).toBe(200);
     expect(JS_MIME_ESSENCES.has(essence(res.headers()['content-type']))).toBe(true);
   });
@@ -204,7 +214,7 @@ test.describe('delivery contract — live responses', () => {
   // static rule already yields the semantics version-in-path wants. These
   // assertions pin that, so a later narrowing of the generic rule cannot
   // silently drop the mount out of the immutable contract.
-  for (const assetPath of ['/m/v1/app.css', '/m/v1/sw-register.js']) {
+  for (const assetPath of [`${MOUNT.prefix}app.css`, `${MOUNT.prefix}sw-register.js`]) {
     test(`${assetPath} is served immutable by the generic static rule`, async ({ request }) => {
       const res = await request.get(assetPath);
       expect(res.status()).toBe(200);
@@ -212,8 +222,8 @@ test.describe('delivery contract — live responses', () => {
     });
   }
 
-  test('/m/v1/app.css carries the stylesheet content type', async ({ request }) => {
-    const res = await request.get('/m/v1/app.css');
+  test(`${MOUNT.prefix}app.css carries the stylesheet content type`, async ({ request }) => {
+    const res = await request.get(`${MOUNT.prefix}app.css`);
     // toContain, not equality: the mirror sends `; charset=utf-8`, production
     // nginx sends it bare. Equality would encode a mirror-only fact as contract.
     expect(res.headers()['content-type']).toContain('text/css');

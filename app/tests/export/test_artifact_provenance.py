@@ -32,7 +32,7 @@ from pathlib import Path
 import pytest
 
 from .blind_reader import Artifact
-from .harness import CHILD, SELF, build_artifact, seeded_store
+from .harness import CHILD, DECLARATION_PATH, SELF, build_artifact, seeded_store
 
 IMPORT_DATE = "2026-08-13"
 OBSERVED_DATE = "2026-02-01"
@@ -231,9 +231,5 @@ def test_the_declaration_in_the_artifact_is_the_declaration_on_disk(
     """The new columns must reach the archive through the file the app reads,
     not through a build-time addition the device would never make."""
     archive = Artifact(mixed_artifact)
-    on_disk = json.loads(
-        (Path(__file__).resolve().parents[3] / "app/m/v1/export/declaration.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    on_disk = json.loads(DECLARATION_PATH.read_text(encoding="utf-8"))
     assert archive.declaration == on_disk

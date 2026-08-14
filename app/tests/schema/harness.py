@@ -20,13 +20,38 @@ END-rejoin and the trailing-empty trim.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCHEMA_PATH = REPO_ROOT / "app" / "m" / "v1" / "store" / "schema" / "001-core.sql"
 
-# Mirrors STORE_CONFIG.sqliteVersionFloor in app/m/v1/store/config.js. STRICT
+
+def current_mount(repo_root: Path = REPO_ROOT) -> str:
+    """The module-mount version the shipped shell references, e.g. ``"v2"``.
+
+    Derived, never pinned (``EMV-DL-001``). A mount bump is copy-forward: the
+    old generation stays on disk and stays shipped, so a hardcoded ``"v1"``
+    would keep applying the FROZEN DDL — green, and about bytes no device runs.
+
+    Fails closed, like the JavaScript twin in
+    ``app/tests/support/ship-list.js``: anything other than exactly one mount
+    version among the shell's references raises rather than picking one.
+    """
+    shell = (repo_root / "app" / "index.html").read_text(encoding="utf-8")
+    versions: set[str] = {m.group(1) for m in re.finditer(r"/m/(v\d+)/", shell)}
+    if len(versions) != 1:
+        raise RuntimeError(
+            f"app/index.html references {len(versions)} mount versions "
+            f"({sorted(versions)}) — a bump is half-applied"
+        )
+    return versions.pop()
+
+
+MOUNT = current_mount()
+SCHEMA_PATH = REPO_ROOT / "app" / "m" / MOUNT / "store" / "schema" / "001-core.sql"
+
+# Mirrors STORE_CONFIG.sqliteVersionFloor in the mount's store/config.js. STRICT
 # tables need 3.37; the floor is the same number in both places by hand, and
 # test_store_ddl_apply.py asserts they agree.
 SQLITE_VERSION_FLOOR = (3, 37, 0)

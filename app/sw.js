@@ -8,7 +8,12 @@
 // worker activates, and activate() purges every non-current cache (one-time
 // migration off theygrow-v1). Typed-config home (api parameters.py) is in /api,
 // not touched this milestone, so a typed knob is justifiably deferred.
-const CACHE_VERSION = 'v11';
+//
+// changed_in: EMV-DL-001 — v11 -> v12 with the /m/v2/ mount bump. The bump is
+// what refills the precache from the NEW mount URLs; on its own it would not
+// refresh an existing one, which is exactly why the mount moved (A1-DL-004,
+// docs/RUNBOOK.md "Module mount").
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -20,8 +25,8 @@ const OFFLINE_URLS = [
   // they are precached by name. Content changes ship as a NEW mount version
   // (/m/v2/...), never as new bytes at these URLs — inside the 30-day immutable
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
-  '/m/v1/app.css',
-  '/m/v1/sw-register.js',
+  '/m/v2/app.css',
+  '/m/v2/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
   // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
@@ -31,50 +36,50 @@ const OFFLINE_URLS = [
   // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
   // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
-  '/m/v1/app.js',
-  '/m/v1/core/kb-boot.js',
-  '/m/v1/core/state.js',
-  '/m/v1/core/storage.js',
-  '/m/v1/core/repo-local.js',
-  '/m/v1/core/signals.js',
-  '/m/v1/core/dom-utils.js',
-  '/m/v1/core/format.js',
-  '/m/v1/core/zpd.js',
-  '/m/v1/core/urgency.js',
-  '/m/v1/surfaces/table.js',
-  '/m/v1/surfaces/skill-completion.js',
-  '/m/v1/surfaces/zpd-filter.js',
-  '/m/v1/surfaces/skill-modal.js',
-  '/m/v1/surfaces/profile.js',
-  '/m/v1/surfaces/activities.js',
-  '/m/v1/surfaces/onboarding.js',
-  '/m/v1/surfaces/accordion.js',
+  '/m/v2/app.js',
+  '/m/v2/core/kb-boot.js',
+  '/m/v2/core/state.js',
+  '/m/v2/core/storage.js',
+  '/m/v2/core/repo-local.js',
+  '/m/v2/core/signals.js',
+  '/m/v2/core/dom-utils.js',
+  '/m/v2/core/format.js',
+  '/m/v2/core/zpd.js',
+  '/m/v2/core/urgency.js',
+  '/m/v2/surfaces/table.js',
+  '/m/v2/surfaces/skill-completion.js',
+  '/m/v2/surfaces/zpd-filter.js',
+  '/m/v2/surfaces/skill-modal.js',
+  '/m/v2/surfaces/profile.js',
+  '/m/v2/surfaces/activities.js',
+  '/m/v2/surfaces/onboarding.js',
+  '/m/v2/surfaces/accordion.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the
   // import graph reaches them, and an installed client must not boot offline
   // with a broken graph. The DDL artifact they read
-  // (/m/v1/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // (/m/v2/store/schema/001-core.sql) is deliberately NOT here: only the native
   // channel ever fetches it, and that channel does not use this worker.
   //
   // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
   // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
   // quotes — an apostrophe swallows every entry after it and the guard then
   // reports the icons as unprecached.
-  '/m/v1/store/boot.js',
-  '/m/v1/store/store.js',
-  '/m/v1/store/journal.js',
-  '/m/v1/store/repo-journal.js',
-  '/m/v1/store/import-legacy.js',
-  '/m/v1/store/bridge.js',
-  '/m/v1/store/config.js',
-  '/m/v1/store/errors.js',
+  '/m/v2/store/boot.js',
+  '/m/v2/store/store.js',
+  '/m/v2/store/journal.js',
+  '/m/v2/store/repo-journal.js',
+  '/m/v2/store/import-legacy.js',
+  '/m/v2/store/bridge.js',
+  '/m/v2/store/config.js',
+  '/m/v2/store/errors.js',
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
   // FETCH at runtime are deliberately NOT here: the declaration
-  // (/m/v1/export/declaration.json) plus the two print-layer binaries, the
-  // embedded font and the ICC profile under /m/v1/export/assets/. Only the
+  // (/m/v2/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v2/export/assets/. Only the
   // native channel ever reads them, that channel does not use this worker, and
   // the web channel cannot export at all — so precaching them would spend
   // roughly 443 KB of an installed web client cache budget on bytes it can
@@ -82,19 +87,19 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
-  '/m/v1/surfaces/export.js',
-  '/m/v1/surfaces/import.js',
-  '/m/v1/export/run.js',
-  '/m/v1/export/build.js',
-  '/m/v1/export/readout.js',
-  '/m/v1/export/sink.js',
-  '/m/v1/export/text.js',
-  '/m/v1/export/readme.js',
-  '/m/v1/export/zip.js',
-  '/m/v1/export/pdf.js',
-  '/m/v1/export/ttf.js',
-  '/m/v1/export/config.js',
-  '/m/v1/export/errors.js',
+  '/m/v2/surfaces/export.js',
+  '/m/v2/surfaces/import.js',
+  '/m/v2/export/run.js',
+  '/m/v2/export/build.js',
+  '/m/v2/export/readout.js',
+  '/m/v2/export/sink.js',
+  '/m/v2/export/text.js',
+  '/m/v2/export/readme.js',
+  '/m/v2/export/zip.js',
+  '/m/v2/export/pdf.js',
+  '/m/v2/export/ttf.js',
+  '/m/v2/export/config.js',
+  '/m/v2/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

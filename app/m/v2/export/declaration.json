@@ -1,0 +1,284 @@
+{
+  "format": "theygrow-archive",
+  "format_version": 1,
+  "schema_contract": "lsc-journal-v1",
+  "declared_in": "LSC-DL-003",
+  "title_ru": "Архив семейной истории TheyGrow",
+  "about_ru": "Это самоописывающийся архив. Всё, что нужно для чтения текстовых файлов и файла index.json, описано здесь же: список наборов данных, список полей и объяснение каждого поля. Приложение для чтения не требуется.",
+  "authoritative_ru": "Первоисточник — журнал записей (набор journal_entry и его три таблицы деталей). Производные наборы вычислены из журнала и приведены для удобства чтения; при расхождении верен журнал.",
+  "scope": {
+    "kind": "requesting_participant",
+    "statement_ru": "В архив входят все общие записи о ребёнке и личные записи того участника, который создал архив. Личные записи других участников семьи в этот архив не входят и никогда не войдут: у каждого участника свой архив.",
+    "statement_en": "The archive carries every child-shared entry plus the private entries of the participant who requested it. Another participant's private entries are never included; each participant exports their own.",
+    "parameter": "self_participant_id"
+  },
+  "media": {
+    "included": false,
+    "statement_ru": "Фотографии, видео и звукозаписи в архив не входят. Каталог attachments/ существует, но пуст."
+  },
+  "provenance": {
+    "statement_ru": "У каждой записи журнала есть поле origin. Записи с origin = migrated_legacy перенесены из ранней версии приложения, которая хранила отметки без дат. У них дата события равна дате переноса, а момент события пуст: настоящая дата неизвестна, и в этом архиве её нет. В наборе child_skill_state то же самое сказано полем event_date_basis. Если у большой группы навыков стоит одна дата с такой пометкой, это день переноса, а не день, когда ребёнок освоил их все.",
+    "origin_field": "origin",
+    "basis_field": "event_date_basis"
+  },
+  "determinism": {
+    "statement_ru": "Один и тот же журнал и одно и то же значение exported_at_utc дают побайтово одинаковый архив. При разном exported_at_utc расходятся только два файла: MANIFEST.json и print/archive.pdf — формат PDF/A обязывает записывать дату создания внутрь файла. Всё остальное совпадает побайтово.",
+    "entry_order": "fixed",
+    "compression": "stored"
+  },
+  "join": {
+    "comment_ru": "Как связать записи журнала с их деталями: взять строку из journal_entry, посмотреть её поле kind — это имя набора с деталями, — и найти в нём строку, у которой journal_id равен id записи журнала.",
+    "spine": "journal_entry",
+    "spine_key": "id",
+    "detail_selector": "kind",
+    "detail_key": "journal_id",
+    "detail_datasets": ["assertion", "confirmation", "child_attribute"]
+  },
+  "files": [
+    {
+      "path": "README.txt",
+      "title_ru": "Что это такое и чем это открыть"
+    },
+    {
+      "path": "MANIFEST.json",
+      "title_ru": "Версии и количества записей"
+    },
+    {
+      "path": "index.json",
+      "title_ru": "Полный набор данных плюс дословная копия этого описания"
+    },
+    {
+      "path": "text/participants.txt",
+      "title_ru": "Участники семейного контура",
+      "dataset": "participant"
+    },
+    {
+      "path": "text/children.txt",
+      "title_ru": "Дети и их текущие атрибуты",
+      "dataset": "child_attribute_current"
+    },
+    {
+      "path": "text/journal.txt",
+      "title_ru": "Журнал записей целиком, по времени внесения",
+      "dataset": "journal_entry"
+    },
+    {
+      "path": "text/skills.txt",
+      "title_ru": "Текущее состояние навыков",
+      "dataset": "child_skill_state"
+    },
+    {
+      "path": "text/diary.txt",
+      "title_ru": "Записи дневника",
+      "dataset": "record"
+    },
+    {
+      "path": "print/archive.pdf",
+      "title_ru": "Печатный слой: те же тексты в формате PDF/A-2b, пригодном для долгого хранения и печати"
+    },
+    {
+      "path": "attachments/README.txt",
+      "title_ru": "Почему этот каталог пуст"
+    }
+  ],
+  "print_layer": {
+    "path": "print/archive.pdf",
+    "conformance": "PDF/A-2b",
+    "statement_ru": "PDF собран так, чтобы читаться через десятилетия: шрифт вложен в файл целиком, цветовой профиль тоже, файл не зашифрован и не ссылается ни на что снаружи.",
+    "authority_ru": "Печатный слой ВТОРИЧЕН. Если символ отсутствует в вложенном шрифте, в PDF на его месте стоит знак замены U+FFFD; в текстовых файлах и в index.json всегда стоит исходный символ. При расхождении верны текстовые файлы и index.json."
+  },
+  "datasets": [
+    {
+      "name": "participant",
+      "kind": "source",
+      "title_ru": "Участники",
+      "description_ru": "Участники семейного контура. Имён здесь нет намеренно: авторство требует идентификатора, а не личности.",
+      "params": [],
+      "query": "SELECT id, is_self, created_at_utc FROM participant ORDER BY created_at_utc, id",
+      "columns": [
+        { "name": "id", "type": "text", "description_ru": "Идентификатор участника (UUID), выдан один раз и навсегда." },
+        { "name": "is_self", "type": "integer", "description_ru": "1 — это владелец устройства, на котором создан архив; 0 — остальные." },
+        { "name": "created_at_utc", "type": "integer", "description_ru": "Когда участник появился. Миллисекунды с 1 января 1970 года UTC." }
+      ]
+    },
+    {
+      "name": "child",
+      "kind": "source",
+      "title_ru": "Дети",
+      "description_ru": "Ребёнок — это только идентификатор. Каждый его атрибут, включая имя, является записью журнала, поэтому у профиля есть история.",
+      "params": [],
+      "query": "SELECT id, created_at_utc FROM child ORDER BY created_at_utc, id",
+      "columns": [
+        { "name": "id", "type": "text", "description_ru": "Идентификатор ребёнка (UUID)." },
+        { "name": "created_at_utc", "type": "integer", "description_ru": "Когда запись о ребёнке была создана. Миллисекунды с 1 января 1970 года UTC." }
+      ]
+    },
+    {
+      "name": "area",
+      "kind": "source",
+      "title_ru": "Области",
+      "description_ru": "Область — это то, к чему относятся записи дневника. Общая область принадлежит ребёнку, личная — одному участнику.",
+      "params": ["self_participant_id"],
+      "query": "SELECT id, title, visibility_class, owner_participant_id, created_at_utc FROM area WHERE visibility_class = 'child_shared' OR owner_participant_id = ? ORDER BY created_at_utc, id",
+      "columns": [
+        { "name": "id", "type": "text", "description_ru": "Идентификатор области (UUID)." },
+        { "name": "title", "type": "text", "description_ru": "Название области, как его задал участник." },
+        { "name": "visibility_class", "type": "text", "description_ru": "child_shared — общая область ребёнка; participant_private — личная область одного участника." },
+        { "name": "owner_participant_id", "type": "text", "description_ru": "Владелец личной области; для общей области пусто." },
+        { "name": "created_at_utc", "type": "integer", "description_ru": "Когда область создана. Миллисекунды с 1 января 1970 года UTC." }
+      ]
+    },
+    {
+      "name": "area_child",
+      "kind": "source",
+      "title_ru": "Связь областей и детей",
+      "description_ru": "Одна область может относиться к нескольким детям.",
+      "params": ["self_participant_id"],
+      "query": "SELECT ac.area_id AS area_id, ac.child_id AS child_id FROM area_child ac JOIN area a ON a.id = ac.area_id WHERE a.visibility_class = 'child_shared' OR a.owner_participant_id = ? ORDER BY ac.area_id, ac.child_id",
+      "columns": [
+        { "name": "area_id", "type": "text", "description_ru": "Идентификатор области." },
+        { "name": "child_id", "type": "text", "description_ru": "Идентификатор ребёнка." }
+      ]
+    },
+    {
+      "name": "record",
+      "kind": "source",
+      "title_ru": "Записи дневника",
+      "description_ru": "Текстовые записи дневника. Дневник появляется на более поздней ступени продукта, поэтому в архиве этого времени набор может быть пустым — это ожидаемо, а не потеря.",
+      "params": ["self_participant_id"],
+      "query": "SELECT r.id AS id, r.area_id AS area_id, r.author_participant_id AS author_participant_id, r.kind AS kind, r.body AS body, r.media_ref AS media_ref, r.sensitivity AS sensitivity, r.event_date_local AS event_date_local, r.event_at_utc AS event_at_utc, r.event_utc_offset_min AS event_utc_offset_min, r.entry_at_utc AS entry_at_utc, r.entry_utc_offset_min AS entry_utc_offset_min, r.updated_at_utc AS updated_at_utc FROM record r JOIN area a ON a.id = r.area_id WHERE a.visibility_class = 'child_shared' OR a.owner_participant_id = ? ORDER BY r.entry_at_utc, r.id",
+      "columns": [
+        { "name": "id", "type": "text", "description_ru": "Идентификатор записи (UUID)." },
+        { "name": "area_id", "type": "text", "description_ru": "Область, к которой относится запись." },
+        { "name": "author_participant_id", "type": "text", "description_ru": "Кто написал запись." },
+        { "name": "kind", "type": "text", "description_ru": "text — текстовая запись; media — запись о медиафайле. Сам медиафайл в архив не входит." },
+        { "name": "body", "type": "text", "description_ru": "Текст записи. Заполнен только у kind = text." },
+        { "name": "media_ref", "type": "text", "description_ru": "Ссылка на медиафайл на устройстве. Заполнена только у kind = media. Файл в архив не входит." },
+        { "name": "sensitivity", "type": "text", "description_ru": "sensitive или not_sensitive. Пусто означает, что участник никогда не отмечал чувствительность этой записи, — это не то же самое, что отметил её как обычную." },
+        { "name": "event_date_local", "type": "text", "description_ru": "Дата события по местному календарю, ГГГГ-ММ-ДД." },
+        { "name": "event_at_utc", "type": "integer", "description_ru": "Момент события, миллисекунды с 1 января 1970 года UTC. Может быть пусто, если известна только дата." },
+        { "name": "event_utc_offset_min", "type": "integer", "description_ru": "Сдвиг местного времени от UTC в минутах в момент события." },
+        { "name": "entry_at_utc", "type": "integer", "description_ru": "Момент внесения записи, миллисекунды с 1 января 1970 года UTC." },
+        { "name": "entry_utc_offset_min", "type": "integer", "description_ru": "Сдвиг местного времени от UTC в минутах в момент внесения." },
+        { "name": "updated_at_utc", "type": "integer", "description_ru": "Момент последнего изменения записи. Записи дневника, в отличие от журнала, можно править." }
+      ]
+    },
+    {
+      "name": "journal_entry",
+      "kind": "source",
+      "title_ru": "Журнал записей",
+      "description_ru": "Основа всего архива. Журнал пополняется только добавлением: исправление — это новая запись поверх старой, а старая остаётся навсегда. Каждая строка журнала имеет ровно одну строку деталей в наборе assertion, confirmation или child_attribute — по значению поля kind.",
+      "params": ["self_participant_id"],
+      "query": "SELECT id, kind, author_participant_id, subject_child_id, visibility_class, origin, event_date_local, event_at_utc, event_utc_offset_min, entry_at_utc, entry_utc_offset_min FROM journal_entry WHERE visibility_class = 'child_shared' OR author_participant_id = ? ORDER BY entry_at_utc, id",
+      "columns": [
+        { "name": "id", "type": "text", "description_ru": "Идентификатор записи журнала (UUID). По нему находится строка деталей." },
+        { "name": "kind", "type": "text", "description_ru": "assertion — утверждение о навыке или заметка; confirmation — подтверждение или спор о чужом утверждении; child_attribute — изменение атрибута ребёнка." },
+        { "name": "author_participant_id", "type": "text", "description_ru": "Кто внёс запись. Пустым не бывает: запись всегда чья-то, а не безличный факт." },
+        { "name": "subject_child_id", "type": "text", "description_ru": "О каком ребёнке запись." },
+        { "name": "visibility_class", "type": "text", "description_ru": "child_shared — общая запись; participant_private — личная запись автора." },
+        { "name": "origin", "type": "text", "description_ru": "authored — внесено участником вручную; migrated_legacy — перенесено из ранней версии приложения, где отметка хранилась без даты, поэтому её дата события равна дате переноса; imported — ввезено извне." },
+        { "name": "event_date_local", "type": "text", "description_ru": "Дата наблюдения по местному календарю, ГГГГ-ММ-ДД. ВАЖНО: если origin равен migrated_legacy, это НЕ дата наблюдения, а дата переноса записи из ранней версии приложения. Настоящая дата там не сохранялась и неизвестна." },
+        { "name": "event_at_utc", "type": "integer", "description_ru": "Момент наблюдения, миллисекунды с 1 января 1970 года UTC. Может быть пусто. У записей с origin = migrated_legacy это поле всегда пусто: момент наблюдения не сохранялся и восстановить его неоткуда." },
+        { "name": "event_utc_offset_min", "type": "integer", "description_ru": "Сдвиг местного времени от UTC в минутах в момент наблюдения." },
+        { "name": "entry_at_utc", "type": "integer", "description_ru": "Момент внесения записи, миллисекунды с 1 января 1970 года UTC. Вместе с id задаёт порядок записей в архиве." },
+        { "name": "entry_utc_offset_min", "type": "integer", "description_ru": "Сдвиг местного времени от UTC в минутах в момент внесения." }
+      ]
+    },
+    {
+      "name": "assertion",
+      "kind": "source",
+      "title_ru": "Утверждения",
+      "description_ru": "Детали записей журнала с kind = assertion. Связаны с журналом по journal_id.",
+      "params": ["self_participant_id"],
+      "query": "SELECT a.journal_id AS journal_id, a.kind AS kind, a.skill_id AS skill_id, a.effective_from_date AS effective_from_date, a.prerequisite_propagation AS prerequisite_propagation, a.source_record_id AS source_record_id, a.supersedes_assertion_id AS supersedes_assertion_id FROM assertion a JOIN journal_entry je ON je.id = a.journal_id WHERE je.visibility_class = 'child_shared' OR je.author_participant_id = ? ORDER BY je.entry_at_utc, a.journal_id",
+      "columns": [
+        { "name": "journal_id", "type": "text", "description_ru": "Идентификатор записи журнала, к которой относятся эти детали." },
+        { "name": "kind", "type": "text", "description_ru": "skill_observed — навык замечен; skill_revoked — наблюдение отозвано; note — заметка без навыка." },
+        { "name": "skill_id", "type": "text", "description_ru": "Идентификатор навыка из справочника навыков. Пусто у заметок." },
+        { "name": "effective_from_date", "type": "text", "description_ru": "С какой даты утверждение считается действующим, ГГГГ-ММ-ДД." },
+        { "name": "prerequisite_propagation", "type": "text", "description_ru": "implies_prerequisites — автор считал, что предшествующие навыки тоже освоены; none — не считал. Это запись намерения автора: предшествующие навыки НЕ добавлены в журнал как отдельные утверждения." },
+        { "name": "source_record_id", "type": "text", "description_ru": "Запись дневника, на которой основано утверждение, если она была." },
+        { "name": "supersedes_assertion_id", "type": "text", "description_ru": "Какое утверждение это заменяет. Заменённое остаётся в журнале." }
+      ]
+    },
+    {
+      "name": "confirmation",
+      "kind": "source",
+      "title_ru": "Подтверждения и споры",
+      "description_ru": "Детали записей журнала с kind = confirmation. Спор не стирает утверждение, а ложится поверх него.",
+      "params": ["self_participant_id"],
+      "query": "SELECT cf.journal_id AS journal_id, cf.target_assertion_id AS target_assertion_id, cf.status AS status, cf.note AS note FROM confirmation cf JOIN journal_entry je ON je.id = cf.journal_id WHERE je.visibility_class = 'child_shared' OR je.author_participant_id = ? ORDER BY je.entry_at_utc, cf.journal_id",
+      "columns": [
+        { "name": "journal_id", "type": "text", "description_ru": "Идентификатор записи журнала, к которой относятся эти детали." },
+        { "name": "target_assertion_id", "type": "text", "description_ru": "Какое утверждение подтверждается или оспаривается." },
+        { "name": "status", "type": "text", "description_ru": "confirmed — согласен; disputed — не согласен; needs_refresh — нужно перепроверить." },
+        { "name": "note", "type": "text", "description_ru": "Пояснение участника, если он его оставил." }
+      ]
+    },
+    {
+      "name": "child_attribute",
+      "kind": "source",
+      "title_ru": "Изменения атрибутов ребёнка",
+      "description_ru": "Детали записей журнала с kind = child_attribute. Каждое изменение атрибута — отдельная запись, поэтому видна вся история значений, а не только текущее.",
+      "params": ["self_participant_id"],
+      "query": "SELECT ca.journal_id AS journal_id, ca.attribute AS attribute, ca.value AS value, ca.sensitive AS sensitive FROM child_attribute ca JOIN journal_entry je ON je.id = ca.journal_id WHERE je.visibility_class = 'child_shared' OR je.author_participant_id = ? ORDER BY je.entry_at_utc, ca.journal_id",
+      "columns": [
+        { "name": "journal_id", "type": "text", "description_ru": "Идентификатор записи журнала, к которой относятся эти детали." },
+        { "name": "attribute", "type": "text", "description_ru": "name — имя; birthdate — дата рождения; gestational_age_weeks и gestational_age_days — срок при рождении в неделях и днях; stopped_time — режим остановленного времени; marker_bilingual, marker_atypical_development, marker_unknown_early_history — объявленные родителем признаки, которые меняют то, что продукт вправе утверждать, и никогда не меняют ни одного числа." },
+        { "name": "value", "type": "text", "description_ru": "Значение атрибута в виде текста." },
+        { "name": "sensitive", "type": "integer", "description_ru": "1 — атрибут чувствительный по построению; 0 — обычный." }
+      ]
+    },
+    {
+      "name": "assertion_quote",
+      "kind": "source",
+      "title_ru": "Цитаты-основания",
+      "description_ru": "Фрагмент записи дневника, скопированный в момент подтверждения утверждения. Хранится только у автора и входит только в его собственный архив.",
+      "params": ["self_participant_id"],
+      "query": "SELECT journal_id, private_to_participant_id, source_record_id, quote_text, copied_at_utc FROM assertion_quote WHERE private_to_participant_id = ? ORDER BY copied_at_utc, journal_id",
+      "columns": [
+        { "name": "journal_id", "type": "text", "description_ru": "Утверждение, к которому относится цитата." },
+        { "name": "private_to_participant_id", "type": "text", "description_ru": "Участник, которому принадлежит цитата." },
+        { "name": "source_record_id", "type": "text", "description_ru": "Запись дневника, из которой скопирован фрагмент." },
+        { "name": "quote_text", "type": "text", "description_ru": "Сам фрагмент. Копируется один раз, поэтому правка записи дневника его не меняет." },
+        { "name": "copied_at_utc", "type": "integer", "description_ru": "Когда фрагмент скопирован. Миллисекунды с 1 января 1970 года UTC." }
+      ]
+    },
+    {
+      "name": "child_attribute_current",
+      "kind": "derived",
+      "title_ru": "Текущие атрибуты ребёнка",
+      "description_ru": "Вычислено из журнала: для каждой пары ребёнок-атрибут берётся последнее событие. Последнее определяется по паре (entry_at_utc, id), а не по порядку появления на устройстве, — иначе два устройства с одной и той же историей разошлись бы в том, какое значение считать текущим.",
+      "params": ["self_participant_id", "self_participant_id"],
+      "query": "SELECT je.subject_child_id AS child_id, ca.attribute AS attribute, ca.value AS value, ca.sensitive AS sensitive, ca.journal_id AS journal_id, je.entry_at_utc AS entry_at_utc FROM child_attribute ca JOIN journal_entry je ON je.id = ca.journal_id WHERE (je.visibility_class = 'child_shared' OR je.author_participant_id = ?) AND NOT EXISTS (SELECT 1 FROM child_attribute ca2 JOIN journal_entry je2 ON je2.id = ca2.journal_id WHERE je2.subject_child_id = je.subject_child_id AND ca2.attribute = ca.attribute AND (je2.visibility_class = 'child_shared' OR je2.author_participant_id = ?) AND (je2.entry_at_utc, je2.id) > (je.entry_at_utc, je.id)) ORDER BY je.subject_child_id, ca.attribute",
+      "columns": [
+        { "name": "child_id", "type": "text", "description_ru": "Идентификатор ребёнка." },
+        { "name": "attribute", "type": "text", "description_ru": "Имя атрибута; значения те же, что в наборе child_attribute." },
+        { "name": "value", "type": "text", "description_ru": "Текущее значение атрибута." },
+        { "name": "sensitive", "type": "integer", "description_ru": "1 — атрибут чувствительный по построению; 0 — обычный." },
+        { "name": "journal_id", "type": "text", "description_ru": "Запись журнала, из которой взято текущее значение." },
+        { "name": "entry_at_utc", "type": "integer", "description_ru": "Момент внесения этой записи. Миллисекунды с 1 января 1970 года UTC." }
+      ]
+    },
+    {
+      "name": "child_skill_state",
+      "kind": "derived",
+      "title_ru": "Текущее состояние навыков",
+      "description_ru": "Вычислено из журнала: для каждой пары ребёнок-навык берётся последнее утверждение по паре (entry_at_utc, id). Предшествующие навыки, которые автор считал освоенными, здесь НЕ показаны: продукт не выдумывает утверждений, которых родитель не делал. Признак намерения автора лежит в поле prerequisite_propagation набора assertion. У части утверждений дата события — это дата переноса из ранней версии приложения, а не дата наблюдения; такие строки помечены полем event_date_basis.",
+      "params": ["self_participant_id", "self_participant_id"],
+      "query": "SELECT je.subject_child_id AS child_id, a.skill_id AS skill_id, a.kind AS state, je.visibility_class AS visibility_class, je.author_participant_id AS asserted_by, a.effective_from_date AS effective_from_date, a.prerequisite_propagation AS prerequisite_propagation, a.journal_id AS assertion_id, je.origin AS origin, CASE WHEN je.origin = 'migrated_legacy' THEN 'import_date_unknown' ELSE 'observed' END AS event_date_basis FROM assertion a JOIN journal_entry je ON je.id = a.journal_id WHERE a.skill_id IS NOT NULL AND (je.visibility_class = 'child_shared' OR je.author_participant_id = ?) AND NOT EXISTS (SELECT 1 FROM assertion a2 JOIN journal_entry je2 ON je2.id = a2.journal_id WHERE je2.subject_child_id = je.subject_child_id AND a2.skill_id = a.skill_id AND a2.skill_id IS NOT NULL AND (je2.visibility_class = 'child_shared' OR je2.author_participant_id = ?) AND (je2.entry_at_utc, je2.id) > (je.entry_at_utc, je.id)) ORDER BY je.subject_child_id, a.skill_id",
+      "columns": [
+        { "name": "child_id", "type": "text", "description_ru": "Идентификатор ребёнка." },
+        { "name": "skill_id", "type": "text", "description_ru": "Идентификатор навыка из справочника навыков." },
+        { "name": "state", "type": "text", "description_ru": "skill_observed — навык замечен; skill_revoked — наблюдение отозвано." },
+        { "name": "visibility_class", "type": "text", "description_ru": "child_shared или participant_private — видимость утверждения, которое победило." },
+        { "name": "asserted_by", "type": "text", "description_ru": "Кто сделал это утверждение." },
+        { "name": "effective_from_date", "type": "text", "description_ru": "С какой даты утверждение действует, ГГГГ-ММ-ДД." },
+        { "name": "prerequisite_propagation", "type": "text", "description_ru": "Намерение автора относительно предшествующих навыков." },
+        { "name": "assertion_id", "type": "text", "description_ru": "Запись журнала, из которой взято это состояние." },
+        { "name": "origin", "type": "text", "description_ru": "Откуда взялось это утверждение: authored — родитель отметил навык в приложении; migrated_legacy — утверждение перенесено из ранней версии, хранившей отметки без дат." },
+        { "name": "event_date_basis", "type": "text", "description_ru": "Чем является дата в поле effective_from_date. observed — это дата, когда родитель отметил навык освоенным. import_date_unknown — это дата ПЕРЕНОСА записи в приложение, а не дата наблюдения: ранняя версия дат не сохраняла, поэтому настоящая дата неизвестна и восстановить её неоткуда. Если у многих навыков стоит одна и та же дата с пометкой import_date_unknown, это день переноса, а не день, когда ребёнок освоил их все." }
+      ]
+    }
+  ]
+}

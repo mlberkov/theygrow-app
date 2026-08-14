@@ -40,8 +40,21 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class StoreEngineTest {
 
-    private static final String SCHEMA_ASSET = "public/m/v1/store/schema/001-core.sql";
     private static final int[] SQLITE_VERSION_FLOOR = {3, 37, 0};
+
+    /**
+     * The DDL the SHELL's mount carries, never a written-down mount version
+     * (EMV-DL-005). Until this packet this named the PREVIOUS generation's asset
+     * path literally, and it went on passing after EMV-P1 moved the shell
+     * forward — because a copy-forward bump leaves the frozen generation
+     * shipped, and the two generations' DDL differed only in a comment naming
+     * its own path. A green test reading the generation nobody runs is the same
+     * defect as the red one beside it, found by the same scan; it is only
+     * luckier.
+     */
+    private static String schemaAsset() {
+        return MountAddress.assetPrefix() + "store/schema/001-core.sql";
+    }
 
     private File databaseFile;
     private SQLiteDatabase database;
@@ -232,11 +245,12 @@ public class StoreEngineTest {
     }
 
     private String readAsset() {
+        String asset = schemaAsset();
         try (InputStream in =
                 InstrumentationRegistry.getInstrumentation()
                         .getTargetContext()
                         .getAssets()
-                        .open(SCHEMA_ASSET)) {
+                        .open(asset)) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buffer = new byte[8192];
             int read;
@@ -246,7 +260,7 @@ public class StoreEngineTest {
             return out.toString(StandardCharsets.UTF_8.name());
         } catch (Exception e) {
             throw new IllegalStateException(
-                    "the DDL is not in the APK at " + SCHEMA_ASSET + " — cap sync stages the web"
+                    "the DDL is not in the APK at " + asset + " — cap sync stages the web"
                             + " root into assets/public/",
                     e);
         }

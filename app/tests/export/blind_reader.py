@@ -2,7 +2,7 @@
 
 THIS MODULE IS THE POINT OF THE PACKET, so it is kept honest by construction:
 it imports only the Python standard library, it never touches
-`app/m/v1/export/declaration.json` on disk, and every structural fact it uses
+the mount's `export/declaration.json` on disk, and every structural fact it uses
 comes out of the artifact's own embedded copy. It is what a person in 2044 with
 a zip file and no app would have to be able to write.
 

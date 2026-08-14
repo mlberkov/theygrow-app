@@ -17,8 +17,14 @@ const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { test, expect } = require('@playwright/test');
+const { currentMount } = require('./support/ship-list');
 
-const STORE_DIR = path.resolve(__dirname, '..', 'm', 'v1', 'store');
+const APP_ROOT = path.resolve(__dirname, '..');
+const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8'));
+// The mount the SHELL references, never the literal 'v1' (EMV-DL-001): a
+// copy-forward bump leaves the old generation on disk and shipped, so a pinned
+// literal would keep guarding bytes nothing runs.
+const STORE_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'store');
 
 // TWO PIECES OF PLUMBING, both load-bearing, both about Node rather than about
 // the store:

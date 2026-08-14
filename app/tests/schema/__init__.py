@@ -1,6 +1,6 @@
 """Desktop schema tests for the native store (L1-P2).
 
-These tests execute `app/m/v1/store/schema/001-core.sql` — the SAME file the JS
+These tests execute the mount's `store/schema/001-core.sql` — the SAME file the JS
 store fetches inside the WebView and the Android instrumented test reads out of
 `assets/public/` — against the standard library's SQLite. They are the fast
 layer of the three-layer validation described in `LSC-DL-002`: schema shape and
