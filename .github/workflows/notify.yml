@@ -1,0 +1,38 @@
+name: Notify
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram message
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          case "$CONCLUSION" in
+            success)   ICON="✅" ;;
+            failure)   ICON="❌" ;;
+            cancelled) ICON="⚪" ;;
+            *)         ICON="⚠️" ;;
+          esac
+          TEXT="$ICON [GitHub Actions · theygrow-app] CI: $CONCLUSION
+          ветка: $BRANCH
+          $TITLE
+          $RUN_URL"
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            -o /dev/null
