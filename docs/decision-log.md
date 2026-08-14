@@ -2136,3 +2136,83 @@ The reset is a separate tool rather than part of the stager, deliberately: `scri
 ### (h) Side-find (carried, not fixed here)
 
 Capacitor's own injected bootstrap logs `Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')` on every activity launch (logcat 67907, 68696), in both the passing and the failing test. It is upstream's script, not a shipped file of ours, and nothing in the app depends on it. Carried for the next native packet rather than chased inside this one.
+
+## EMV-DL-006 — EMV-P6 `store-probe-anchor`: the store probe had never waited for the app, so its anchor was read mid-parse — an invariant about a FILE was taken for a promise about the DOM
+
+- **Date.** 2026-08-14
+- **Type.** Packet — EMV-P6 of the **EMV "export-contour reachability + L1 promotion"** track.
+
+### (a) The handoff's cause did not survive the code, and the invariant was never falsified
+
+The handoff read run `31764386329` — `the_app_opens_its_encrypted_store_at_boot` failing in ~10 s with `err: the shell hints no store/boot.js modulepreload` — as evidence that **there is no such hint in the shipped shell**, and offered a reading: the store subgraph is reached through a dynamic `import()` and is therefore legitimately unhinted, so `A1-P6-INV-001` never covered it.
+
+Read from the code instead, that is refuted three ways:
+
+- `app/index.html:126` carries `<link rel="modulepreload" href="…/store/boot.js">`, in the shipped shell, at the current generation.
+- `app/m/v2/app.js:39` imports `./store/boot.js` **statically**. Direction (b) of `A1-P6-INV-001` — every module the walk reaches carries a hint — therefore forces that hint, and `app/tests/delivery-contract.spec.js:394` reds without it on every push. A dynamic store import is not even expressible today: `moduleSpecifiers()` throws on `import(` anywhere in a shipped module.
+- `native/www/index.html` is byte-identical to `app/index.html`, asserted per-file by `native-shell.spec.js` claim (a), and the APK's `public/index.html` is `cap sync`'s copy of it.
+
+**The invariant is true, held throughout, and is not amended.** What `A1-P6-INV-001` asserts is a set equality over `app/index.html` — a property of the **file**. EMV-P5 inferred from it that the hint would be in the DOM at the instant a probe read it. It never said that. This is `AGENTS.md` §11 one layer in from where the milestone found it: not a static guard standing in for a runtime claim, but an invariant about a file standing in for the runtime state of a document.
+
+### (b) What was actually wrong: the probe had never waited for anything
+
+`the_app_opens_its_encrypted_store_at_boot` called `evaluate(...)` on the line after `ActivityScenario.launch(...)`, with no wait of any kind. The shell's `<head>` is ~147 lines and the store's delivery hints are its last block, behind a large inline script; `document.querySelector` part-way through a parse legitimately answers `null`. The `EMV-DL-005` logcat dates the old probe at **16 ms** after the shell's first module request — inside the parse. Whether any given element was in the DOM at that instant was a coin flip, and `31764386329` lost it.
+
+Its sibling passes because `pollFor("typeof window.Capacitor.nativePromise")` **throws** until the bridge is injected, and `pollFor` waits on null. That is an accidental page-load wait, not a stated one — see (e).
+
+**This defect class had already been found, fixed and device-executed in this repo, and this test did not inherit the fix.** `WebViewStorageTest`'s javadoc records run `31680204645` measuring "a document that had not booted", and gates every probe behind a sentinel the app itself produces. It passed in `31764386329`, the same run that reds this test.
+
+### (c) The previous red is re-read as NOT ESTABLISHED, which is not the same as wrong
+
+`EMV-DL-005` attributed run `31750267059` to the stale `/m/v1/` specifier: the import succeeded against the frozen generation and returned a never-initialised module record. That mechanism is real and the stale specifier was a real defect — as was its `StoreEngineTest` sibling, which was green while reading the generation nobody runs.
+
+What cannot be separated on that run's evidence is whether it **caused** the red. The old probe resolved `new URL('…/store/boot.js', document.baseURI)`, which **throws** on an `about:blank` base (demonstrated in Validation); `evaluate()` reports a thrown expression as `null` and the old code discarded that return. A probe that never dispatched and a probe that dispatched against the frozen generation produce the identical 31.4-second silence. Both fit. The entry is left byte-untouched and amended from here, per this log's convention; the claim is downgraded to *not established*, not restated as refuted.
+
+### (d) The fix: gate first, anchor second
+
+1. **The boot gate.** `BOOTED` — `#tableBody tr[data-skill-id]`, the same sentinel `WebViewStorageTest` uses — polled before the probe dispatches. Rows come from `surfaces/table.js` and `app/m/v2/app.js:94` renders them only after `Promise.all([kbReady, initNativeStore()])` resolves, so a row proves the module graph **evaluated** and the store's own boot call already returned. `readyState` would not do: it says the parser finished, and the parser finishing is not the app having run.
+2. **The cross-check.** The gate returns the `src` the **live document** executes and it is asserted equal to `MountAddress.prefix() + "app.js"` — the mount read out of the APK. This is the one thing the document is still needed for: proof that the WebView is running that shell at that generation, and not `offline.html`, a cached response, or the frozen mount a copy-forward bump leaves shipped. A parsed document with no module entry answers `'no-module-entry'` and reds by name instead of consuming the clock.
+3. **The anchor.** The specifier is composed in Java as `MountAddress.prefix() + "store/boot.js"` — from the APK, not from the DOM, and not written down. `MountAddress` derives the volatile half (the mount **version**); the stable half (`store/boot.js` under it) is stable *by construction, not by convention*: `app.js` names it as a static relative specifier, and `A1-P4-INV-001` walks that graph every push and asserts the resolved path is both shipped and precached. A bump copies the tree forward; only the version segment moves. `StoreEngineTest` composes its DDL path the same way and **executed it on this device** in `31764386329`.
+4. **The dispatch is checked.** `evaluate()` cannot distinguish a JS `null` from a thrown expression. One `assertEquals` on the `'dispatched'` return removes the silence that made both prior reds harder to read than they needed to be — and that, per (c), may be the whole of the first one.
+5. **The diagnostic is kept and relabelled.** It gains `readyState`, `entrySrc` and `mountFromApk`; `shellHint` stays as **reported state**, no longer the anchor, because a hint disagreeing with `probeUrl` still names a real defect.
+
+Resolution of the escalation, taken **outside the packet** by the orchestrator on plan review (recorded here because it is an owner-side call, not an agent call): **Branch A** — the boot gate lands together with the re-anchor. The prescribed change alone would have left the job red, and the gate is a transplant of a pattern already device-executed in this repo rather than a new invention.
+
+### (e) The sibling's accidental wait, settled rather than observed
+
+A green-for-the-wrong-reason in the same file and the same class as the red one is exactly what this milestone exists to stop leaving in place. It is **not** given the boot gate, and the reason is now in the code rather than left for the next reader to assume was designed:
+
+- **What it waits for, and why that is the right precondition.** Only that `window.Capacitor` exists. Its claim is that the *injected bridge* reaches the plugin with no bundled JS — a property of the native layer that must hold whether or not a single shipped module ever evaluates. Gating it on the app's boot would make a bridge-level claim depend on the very thing the bridge is supposed to be independent of.
+- **Why the accidental wait is sound.** It cannot go green early, which is the property `WebViewStorageTest` lost in `31680204645`. Before injection the expression throws and the poll retries; after injection with the method absent it answers `"undefined"`, which is non-null, so the poll returns it and the assertion reds with its own message. There is no early state in which `"function"` comes back from a bridge that is not there. Every failure mode is false-**red**.
+- **What would end that.** Any rewrite making the polled expression **total** — `String(...)`, or `window.Capacitor?.nativePromise` — removes the throw and with it the wait. That is the exact shape that produced the false green in `WebViewStorageTest`; here it would produce an immediate red instead, but the wait would be gone either way. If the expression ever stops being able to throw, the test needs an explicit gate on `window.Capacitor` — **not** on `BOOTED`.
+
+### (f) No static guard was extended, and that is the finding rather than an omission
+
+This defect had **no statically checkable shape**. The only static assumption the probe made about the shell's markup — that `store/boot.js` carries a hint — was **true**, and is already machine-checked every push by `A1-P6-INV-001`. Nothing readable in `app/index.html` distinguishes the green run from the red one; the variable was *when* the DOM was read, which no scan of the tree can see. `EMV-P5-INV-001` is byte-untouched and stays green: the new code writes no mount version down, composing it from `MountAddress` instead. Bolting a guard on here for appearance would be the `EMV-DL-001` mistake with the sign flipped.
+
+**No new invariant.** The packet enforces nothing new in code — it corrects a test's synchronisation and its anchor. `AGENTS.md` §10 is enforced-only.
+
+### (g) Files
+
+- **Changed (native tests):** `native/android/app/src/androidTest/java/app/theygrow/BridgeSmokeTest.java` only — the boot gate, the cross-check, the re-anchor, the dispatch assertion, the extended diagnostic, the sibling's javadoc, and two comments the code had falsified (below).
+- **Changed (spine):** `docs/execution-map.md` (the P6 line), this log.
+- **Untouched, and verified so:** every shipped byte — `app/**` in full, both mount generations included — plus `docs/INVARIANTS.md`, `app/tests/native-shell.spec.js`, `WebViewStorageTest.java`, `MountAddress.java`, `StoreEngineTest.java`, `.github/workflows/ci.yml`, `AGENTS.md`, `CLAUDE.md`, `api/**`, `scripts/**`, `.pre-commit-config.yaml`.
+- **Two false statements fixed in a file already being edited**, statement-scoped and not section-scoped: the probe's "the app opens the store from `DOMContentLoaded` and does not await it", false since L1-P4 wired `Promise.all([kbReady, initNativeStore()])`; and the EMV-P5 paragraph reasoning from `A1-P6-INV-001` to a DOM guarantee, which is the inference this packet retires.
+- **§4-safe.** No family datum, credential, host or live identifier enters any file. **Net egress change: zero.**
+- **No new knobs and no new signals.** The store-open outcome already lands as a declared, payload-safe signal (`store.open`, `changed_in: LSC-DL-004`). The gap was a test's synchronisation, not a missing product surface, so nothing reaches `app/`.
+- **No new Python runtime import**, so the mypy hook's `additional_dependencies` are unchanged.
+
+### (h) What none of this proves
+
+**Nothing runnable on this machine is evidence about the central claim.** There is no Android SDK here — no `ANDROID_HOME`, no `local.properties` — so the changed file has not even been **compiled**, let alone executed. What was checked off-device is weaker and is named as such: the JS was extracted from the Java concatenation, syntax-checked, and rendered against stubbed `window`/`document` in the states it is written for, including the mid-parse state that reds `31764386329`. **That is a shape check under stubs, not an execution.**
+
+**The claim "the app opens its encrypted store at boot on the native channel" is executed only by `BridgeSmokeTest` on the emulator, and the next `android-instrumented` run on this branch is the only evidence about it** — including about whether this fix works. Nothing before that run is proof, this entry included. Per ADR-020 that run must be green **before** merge; a merge deploys a zero-traffic revision and nothing here reaches users.
+
+**The diagnostics remain unexecuted on a green run**, `EMV-DL-005` (d) restated and now covering the boot diagnostic too: if the job returns 16/16, no device has run that code path. What would execute them is the next real timeout, or one deliberate run with a broken specifier. Neither is in this packet.
+
+### (i) Deferred
+
+- Retiring the `BOOTED` duplication between `BridgeSmokeTest` and `WebViewStorageTest` into a shared `androidTest` helper. Not done here: it would edit a test that passes, and this packet's claim is about the file that fails. The two copies point at each other.
+- Everything `EMV-DL-005` deferred, unchanged: the import-offer and store-unavailable trigger paths, retiring `/m/v1/`, deriving the mount from `import.meta.url`, when `android-instrumented` runs (`LSC-DL-005` debt 13 — the structural blindness that let this reach PR time), the other stale repo docs, and the promotion itself.
+- `ExportSinkTest` was checked for the same defect class and is **clear**: it gates on the bridge and calls the plugin directly, reading no app DOM and importing no shipped module.
+- `ci-artifacts/` is untracked working-tree residue from the **previous** run and must not be committed. Flagged, not removed — it is the owner's.

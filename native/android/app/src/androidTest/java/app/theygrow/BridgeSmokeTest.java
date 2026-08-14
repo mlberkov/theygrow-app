@@ -35,18 +35,86 @@ public class BridgeSmokeTest {
     private static final long POLL_MS = 250;
 
     /**
+     * The boot sentinel: a DOM fact the app's OWN modules produce (EMV-DL-006).
+     *
+     * <p>Deliberately identical to {@code WebViewStorageTest.BOOTED}, and
+     * deliberately duplicated rather than extracted: pulling it into a shared
+     * helper would edit a test that passes, and this packet's claim is about this
+     * file. The two copies point at each other; retiring the duplication is
+     * recorded as deferred in {@code EMV-DL-006}.
+     *
+     * <p>Rows carry {@code data-skill-id} from {@code surfaces/table.js}, and
+     * {@code app.js} renders them only after {@code Promise.all([kbReady,
+     * initNativeStore()])} resolves — so a row proves the module graph EVALUATED
+     * and the store's own boot call already returned. {@code document.readyState}
+     * would not do: it says the parser finished, and the parser finishing is not
+     * the app having run.
+     */
+    private static final String BOOTED =
+            "document.querySelectorAll('#tableBody tr[data-skill-id]').length > 0";
+
+    /**
+     * The gate the store probe waits on: null until the app has booted, then the
+     * {@code src} the LIVE document executes — which is checked against the mount
+     * {@code MountAddress} read out of the APK.
+     *
+     * <p>A parsed document with no module entry answers {@code 'no-module-entry'}
+     * rather than null, so that state reds immediately with its own name instead
+     * of consuming the whole 30 s clock as a silence.
+     */
+    private static final String SHELL_ENTRY =
+            "(function () {"
+                + "if (!(" + BOOTED + ")) { return null; }"
+                + "var entry ="
+                + " document.querySelector('script[type=\"module\"][src$=\"app.js\"]');"
+                + "return entry ? entry.getAttribute('src') : 'no-module-entry';"
+                + "})()";
+
+    /**
+     * What the boot gate was looking at, evaluated ONLY if the gate times out.
+     * Distinguishes the three states the gate's silence would otherwise merge: a
+     * document that never committed, a document that committed but whose shipped
+     * head script never ran, and an app that booted far enough to parse but never
+     * rendered a row.
+     */
+    private static final String BOOT_DIAGNOSTIC =
+            "JSON.stringify({"
+                + "readyState: document.readyState,"
+                + "baseURI: document.baseURI,"
+                + "isNativeShell: !!window.IS_NATIVE_SHELL,"
+                + "rows: document.querySelectorAll('#tableBody tr[data-skill-id]').length,"
+                + "moduleEntries: Array.prototype.map.call("
+                + "document.querySelectorAll('script[type=\"module\"][src]'),"
+                + " function (s) { return s.getAttribute('src'); })"
+                + "})";
+
+    /**
      * What the store probe was actually looking at, evaluated ONLY when the poll
      * times out. Every field here answers a question the bare timeout could not:
-     * which URL the probe imported, which URL the shell hints (the two differing
-     * IS the wrong-generation bug), whether the module ever loaded, and whether
-     * its handle is null because the store failed or because nothing on that
-     * copy was ever initialised.
+     * which URL the probe imported and which mount that came from, which mount
+     * the live document actually executes, what the shell hints, whether the
+     * module ever loaded, and whether its handle is null because the store failed
+     * or because nothing on that copy was ever initialised.
+     *
+     * <p>{@code shellHint} is REPORTED STATE, not the anchor. EMV-P5 made it the
+     * anchor on the strength of {@code A1-P6-INV-001}, which asserts a set
+     * equality over {@code app/index.html} — a property of the FILE, and not a
+     * promise that any particular element is in the DOM at the instant a probe
+     * reads it. It is kept here because a hint that disagrees with
+     * {@code probeUrl} still names a real defect.
+     *
+     * <p>A method rather than a constant because {@code MountAddress} reads the
+     * APK, so the mount is not known until the instrumentation is running.
      */
-    private static final String STORE_PROBE_DIAGNOSTIC =
-            "JSON.stringify({"
+    private static String storeProbeDiagnostic() {
+        return "JSON.stringify({"
                 + "probeUrl: window.__storeProbeUrl,"
+                + "mountFromApk: '" + MountAddress.prefix() + "',"
+                + "entrySrc: (document.querySelector("
+                + "'script[type=\"module\"][src$=\"app.js\"]') || {}).src || null,"
                 + "shellHint: (document.querySelector("
                 + "'link[rel=\"modulepreload\"][href$=\"/store/boot.js\"]') || {}).href || null,"
+                + "readyState: document.readyState,"
                 + "baseURI: document.baseURI,"
                 + "moduleLoaded: !!window.__storeModule,"
                 + "storeHandleType: window.__storeModule"
@@ -56,7 +124,46 @@ public class BridgeSmokeTest {
                 + " ? window.__storeModule.storeHandle() : null,"
                 + "importError: window.__storeImportError"
                 + "})";
+    }
 
+    /**
+     * WHY THIS TEST TAKES NO BOOT GATE, WRITTEN DOWN RATHER THAN LEFT TO BE
+     * REDISCOVERED (EMV-DL-006).
+     *
+     * <p>Its sibling below needs one. This one waits too — but by a side effect
+     * of {@code pollFor}'s contract rather than by a stated gate, and that
+     * difference was found while diagnosing the sibling's red. Left unsaid, the
+     * next reader would take the asymmetry for a design.
+     *
+     * <p><b>The wait.</b> {@code typeof window.Capacitor.nativePromise} THROWS
+     * while {@code window.Capacitor} is undefined; {@code evaluateJavascript}
+     * reports a thrown expression as {@code null}, and {@code pollFor} waits on
+     * null. So the first assertion polls until the bridge has been injected, and
+     * that is the only precondition this test has. It deliberately does NOT wait
+     * for the app: the claim is that the INJECTED BRIDGE reaches the plugin with
+     * no bundled JS, which is a property of the native layer and must hold
+     * whether or not a single shipped module ever evaluates. Gating it on the
+     * app's boot would make a bridge-level claim depend on the very thing the
+     * bridge is supposed to be independent of.
+     *
+     * <p><b>Why the accidental wait is nonetheless SOUND.</b> This test cannot go
+     * green early, which is the property that matters and the one
+     * {@code WebViewStorageTest} lost in run {@code 31680204645}. Evaluated
+     * before injection it throws and polls again; evaluated after injection but
+     * with the method absent it answers {@code "undefined"} — non-null, so the
+     * poll returns it and the assertion reds with its own message. There is no
+     * early state in which {@code "function"} is returned by a bridge that is not
+     * there. Its failure modes are all false-RED, never false-green.
+     *
+     * <p><b>What would end that, and what to do then.</b> Any rewrite that makes
+     * the polled expression TOTAL — wrapping it in {@code String(...)}, or
+     * reaching through {@code window.Capacitor?.nativePromise} — removes the
+     * throw and with it the wait. That is the exact shape that produced the false
+     * green in {@code WebViewStorageTest}; here it would produce an immediate red
+     * instead, but the wait would be gone either way. If the polled expression
+     * ever stops being able to throw, this test needs an explicit gate on
+     * {@code window.Capacitor} — not on {@link #BOOTED}.
+     */
     @Test
     public void the_injected_bridge_reaches_the_sqlite_plugin_without_any_bundled_js() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -83,68 +190,106 @@ public class BridgeSmokeTest {
     @Test
     public void the_app_opens_its_encrypted_store_at_boot() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            // THE SPECIFIER IS WHAT DECIDES THIS, NOT THE BASE URL (EMV-DL-005).
+            // THE PROBE IS SYNCHRONISED TO THE APP, AND ONLY THEN ANCHORED
+            // (EMV-DL-006).
             //
-            // A script handed to evaluateJavascript has no base URL of its own —
-            // Chromium reports it as about:blank — so a path-absolute specifier
-            // cannot be resolved from here, while the identical specifier
-            // resolves normally inside app.js, which is a page module. Resolving
-            // against document.baseURI fixes that much, and this probe still
-            // does it. What it does NOT do, and what the earlier version of this
-            // comment wrongly claimed it did, is guarantee the module instance
-            // the app booted with: an absolute URL naming the FROZEN mount
-            // resolves perfectly well against the same base, because a bump is
-            // copy-forward and leaves the previous generation shipped. It then
-            // returns a second, never-initialised copy of boot.js whose
-            // module-scoped handle is null forever — which is exactly what this
-            // test did after EMV-P1 moved the shell forward while this line
-            // still named the previous generation, and exactly why it polled out
-            // in silence (run 31750267059) while the app under test had opened
-            // its store in 884 ms.
+            // This test had never waited for anything. It probed on the line
+            // after the activity launched, and the shell's <head> is long: the
+            // store's delivery hints are the last block in it, behind an inline
+            // script. document.querySelector mid-parse legitimately answers null,
+            // and the EMV-DL-005 logcat dates the old probe at 16 ms after the
+            // shell's first module request — inside the parse. Whether any given
+            // element was in the DOM at that instant was a coin flip.
             //
-            // So the URL is taken from the document instead of written here. The
-            // modulepreload hint is the anchor because A1-P6-INV-001 asserts the
-            // hint set equals the shell's import graph EXACTLY, in both
-            // directions — so the hint cannot go stale while boot.js is in the
-            // graph, and it is already the very URL app.js resolved to. A
-            // missing hint is reported as an error rather than thrown into a
-            // dropped promise.
-            evaluate(
-                    scenario,
-                    "(function () {"
-                        + "window.__storeModule = null; window.__storeImportError = null;"
-                        + "window.__storeProbeUrl = null;"
-                        + "var hint = document.querySelector("
-                        + "'link[rel=\"modulepreload\"][href$=\"/store/boot.js\"]');"
-                        + "if (!hint) {"
-                        + "window.__storeImportError = 'err: the shell hints no store/boot.js"
-                        + " modulepreload — the mount cannot be derived from the document';"
-                        + "return 'dispatched';"
-                        + "}"
-                        + "window.__storeProbeUrl = hint.href;"
-                        + "import(hint.href)"
-                        + ".then(function (m) { window.__storeModule = m; })"
-                        + ".catch(function (e) { window.__storeImportError = 'err:' + e; });"
-                        + "return 'dispatched';"
-                        + "})()");
+            // EMV-P5 read that as a missing hint and re-anchored on the hint,
+            // citing A1-P6-INV-001. The invariant is true and holds: boot.js is
+            // imported statically by app.js, so the hint is present in the
+            // shipped shell and the ship-list guard reds without it. What the
+            // invariant asserts is a set equality over app/index.html — a
+            // property of the FILE. It never promised that a given element is
+            // reachable from a probe fired mid-parse, and that inference is what
+            // failed (run 31764386329), not the invariant.
+            //
+            // So: gate first, anchor second.
+            //
+            // (1) Wait for the app to have BOOTED, not merely parsed. The gate
+            //     returns the src the live document executes, which is checked
+            //     against the mount read out of the APK — proof that the WebView
+            //     is running that shell at that generation, and not offline.html,
+            //     a cached response, or the frozen mount a copy-forward bump
+            //     leaves shipped.
+            String entrySrc = pollFor(scenario, SHELL_ENTRY, BOOT_DIAGNOSTIC);
+            assertEquals(
+                    "the running document does not execute the mount the APK's own shell names"
+                            + " — a probe resolved against it would address a generation nobody"
+                            + " runs, which is the EMV-DL-005 defect one layer up",
+                    MountAddress.prefix() + "app.js",
+                    entrySrc);
 
-            // The app opens the store from DOMContentLoaded and does not await
-            // it, so the handle appears some time after the module does. Poll
-            // for the handle itself; reading it once races the open and would
-            // report an empty handle as a store that never opened. An import
-            // failure is reported immediately instead of waiting out the clock.
+            // (2) The specifier is composed from the APK, not from the document
+            //     and not written down. MountAddress derives the mount VERSION
+            //     from the shipped shell; "store/boot.js" under it is stable by
+            //     construction rather than by convention — app.js names it as a
+            //     static relative specifier, and A1-P4-INV-001 walks that graph
+            //     every push and asserts the resolved path is both shipped and
+            //     precached. A bump copies the tree forward; only the version
+            //     segment moves. StoreEngineTest composes its DDL path the same
+            //     way and executed it on this device.
             //
-            // A timeout now reports WHY rather than restating the expression it
-            // waited on: a module that loaded from a URL the shell does not hint
-            // is a wrong-generation import, and that is the one state the old
-            // failure text could not tell apart from a store that never opened.
+            //     Resolution is still against document.baseURI, because a script
+            //     handed to evaluateJavascript has no base URL of its own —
+            //     Chromium reports about:blank, and a path-absolute specifier
+            //     cannot be resolved from there. That is a property of this
+            //     probe, not of the shipped web root. Past the gate the base is
+            //     the shell's, so this yields the very URL app.js resolved to and
+            //     therefore the module record the app booted with.
+            String dispatched =
+                    evaluate(
+                            scenario,
+                            "(function () {"
+                                + "window.__storeModule = null; window.__storeImportError = null;"
+                                + "window.__storeProbeUrl = null;"
+                                + "var url = new URL('" + MountAddress.prefix() + "store/boot.js',"
+                                + " document.baseURI).href;"
+                                + "window.__storeProbeUrl = url;"
+                                + "import(url)"
+                                + ".then(function (m) { window.__storeModule = m; })"
+                                + ".catch(function (e) { window.__storeImportError = 'err:' + e; });"
+                                + "return 'dispatched';"
+                                + "})()");
+
+            // (3) The dispatch is CHECKED. evaluate() cannot tell a JS null from
+            //     a thrown exception — evaluateJavascript reports both as null —
+            //     so a probe that threw before reaching its import used to look
+            //     exactly like a store that never opened, and the poll below
+            //     would spend the full clock proving nothing. That silence is
+            //     half of why the previous two reds were harder to read than they
+            //     needed to be; it costs one assertion to remove.
+            assertEquals(
+                    "the probe script did not run to completion — evaluateJavascript reports a"
+                            + " thrown expression as null, so this is a probe that never"
+                            + " dispatched, not a store that never opened",
+                    "dispatched",
+                    dispatched);
+
+            // (4) Poll for the handle. Past the gate app.js has already resolved
+            //     Promise.all([kbReady, initNativeStore()]) — the store's boot
+            //     call has returned — so this is no longer a race against the
+            //     open; it is one microtask turn for the dynamic import of an
+            //     already-loaded module record. It stays a poll rather than a
+            //     single read because that turn is still asynchronous, and an
+            //     import failure is reported immediately instead of waiting out
+            //     the clock.
+            //
+            //     A timeout here now means the store genuinely did not open, and
+            //     the diagnostic says which of the ways it can mean that.
             String probe =
                     pollFor(
                             scenario,
                             "window.__storeImportError ? window.__storeImportError"
                                 + " : (window.__storeModule && window.__storeModule.storeHandle()"
                                 + " ? JSON.stringify(window.__storeModule.storeHandle()) : null)",
-                            STORE_PROBE_DIAGNOSTIC);
+                            storeProbeDiagnostic());
 
             assertTrue("the store never opened at boot: " + probe, probe.contains("\"journalMode\""));
             assertTrue("the store did not come up in WAL: " + probe, probe.toLowerCase().contains("wal"));
