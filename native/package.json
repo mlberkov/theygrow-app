@@ -5,7 +5,8 @@
   "description": "Dev/CI-only Capacitor Android shell for the theygrow PWA (L1-P1). Not part of either delivery channel's web assets: the APK's web root is assembled by tools/stage-webdir.js from app/Dockerfile's COPY list, and nothing in node_modules/ is ever copied into it. No bundler, no transpiler — the web path stays buildless in both channels.",
   "scripts": {
     "stage": "node tools/stage-webdir.js",
-    "sync": "node tools/stage-webdir.js && cap sync android"
+    "reset-sync-target": "node tools/reset-sync-target.js",
+    "sync": "node tools/stage-webdir.js && node tools/reset-sync-target.js && cap sync android"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "8.1.1",

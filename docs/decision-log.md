@@ -2070,3 +2070,69 @@ Each is false today, none is in this packet's diff, and each names the venue tha
 **The measurements, as measurements rather than as intentions.** *Measurement A, which corrected this packet's own premise:* the corrected wait with `cache.match('/kb-v1.json')` retained **passes in 1.3 s**, so the key-set read the plan intended to adopt alongside the form change was **not taken** and the predicate ships byte-identical — see (e). *Mutation B1:* the corrected wait, handed a predicate that sleeps 1.5 s and returns `false`, **reds at 30.3 s** with `the precache never settled: /kb-v1.json is in no cache generation` and `Test timeout of 30000ms exceeded`. *Mutation B2:* the **old** form with the **same** predicate returned after **1537 ms** — one predicate duration, one evaluation — and the test passed **green**. Both mutations were reverted and the file verified byte-identical to its pre-mutation state by diff.
 
 **What none of this proves.** Nothing here is evidence about rendered geometry: the `visual-*` projects did not run and cannot on this host (block A item 5). Nothing here is evidence about a device: no shipped byte changes, so the device layer cannot move — the `android-instrumented` job is `pull_request` + `workflow_dispatch` only and the PR event re-runs it, with nothing in this packet gating on the result (`LSC-DL-005` (c)). The Python suites were not run and the reason is the diff: no Python file, no mount asset and no schema is touched. The suite continues to prove the **web** branch only, on both of its channels (`EMV-DL-001` (h)), which is why block A items 3 and 4 stay open. And the narrowed goal sentence in (a) closes an overstatement in the record — it does not make the import offer reachable, which remains `android-instrumented`'s to establish.
+
+## EMV-DL-005 — EMV-P5 `native-webroot-integrity`: the red emulator job was a mount address written down in a test, not a staging fault — the app had opened its store 30 seconds before the assertion failed
+
+- **Date.** 2026-08-14
+- **Type.** Packet — EMV-P5 of the **EMV "export-contour reachability + L1 promotion"** track.
+
+### (a) The packet's premise was wrong, and the evidence that settled it
+
+The handoff named a hypothesis — the staged web root carrying a stale generation, since the L1 close-out had recorded that the sync target is written over rather than cleared — and instructed that it be **confirmed from evidence before any fix was designed**. It was not confirmed. It was refuted, and so was the alternative the handoff offered (`LSC-DL-005`'s journal-mode race).
+
+The evidence is the failing run's own logcat, uploaded by the job itself (`android-instrumented-logcat`, run 31750267059). Inside the failing test:
+
+- **22:57:29.180** — `Handling local request: https://localhost/m/v2/store/config.js`: the app boots the current mount's graph.
+- **22:57:29.196** — the *test's* dynamic import fetches the **previous** generation's `store/boot.js` and its whole subgraph. Every URL is served. **There is no 404 anywhere in the log.**
+- **22:57:30.223** — `[signal] store.open outcome=opened failure_class=none freshly_created=false previous_run_clean=true schema_version=1 open_ms=884`, emitted from the current mount's `core/signals.js`.
+
+**The app opened its encrypted store at boot, in WAL, at schema 1, in 884 ms — while the test that asserts it opens was polling for a handle that would never appear.** `BridgeSmokeTest` imported the frozen generation's `boot.js`, which a copy-forward bump leaves shipped, so the import **succeeded** on a second module record whose module-scoped `handle` is null and whose `initNativeStore()` nobody calls. Neither poll branch could ever resolve: no handle, and no import error, because nothing failed. Its sibling test passed because it imports nothing.
+
+Staging was refuted three independent ways: `native/tools/stage-webdir.js` has cleared `native/www` from empty since L1-P1 (`resetWebDir()`); the sync target is gitignored and therefore **absent** from a CI checkout, so `cap sync` already writes into an empty directory there; and no request in the log 404s. The journal-mode race was refuted by `previous_run_clean=true` and by the open completing — a lock produces a reason, not silence.
+
+### (b) Both escalations were resolved outside the packet, by the orchestrator, on the evidence above
+
+Recorded here because the resolutions arrived through the plan-review channel and are owner-side decisions, not agent calls:
+
+1. **Scope items 1–2 are re-aimed (Branch A).** They were premised on the refuted cause. Item 1 (clearing the sync target) ships **demoted to a side-find closure**, labelled as such in the tool itself, because it fixes nothing about the red run. Item 2 as worded — "the current mount and only it" — would contradict the copy-forward invariant that keeps both generations shipped; the property landed is the **inverse**: nothing *outside* the mount root may name the frozen generation. See `EMV-P5-INV-001`.
+2. **`StoreEngineTest`'s stale DDL path is fixed here (Branch A).** It is the same defect found by the same scan, and it was **green while reading the generation nobody runs** — the two generations' DDL differ only in a comment naming their own path, which is the only reason it passed.
+
+### (c) What the fix actually is
+
+The two instrumented sources stop writing a mount version down. `BridgeSmokeTest` resolves `boot.js` from the document's `modulepreload` hint — anchored there because `A1-P6-INV-001` asserts the hint set equals the shell's import graph exactly, so the hint cannot go stale while `boot.js` is in the graph, and it is already the URL `app.js` resolved to. `StoreEngineTest` reads the mount out of the APK's own `public/index.html` through a new `MountAddress`, a faithful mirror of `currentMount()` including its fail-closed posture. A third site, `ExportSinkPlugin`'s javadoc, named the frozen generation in prose and was found by the new guard.
+
+**The comment that had to go.** `BridgeSmokeTest` carried a paragraph asserting that resolving against `document.baseURI` "returns the module instance the app booted with rather than a second copy of it." That reasoning is exactly what the bug falsified — the base was never the problem, the **specifier** was — and it was rewritten in the same pass rather than left standing beside its own counterexample.
+
+### (d) The diagnostic is UNEXECUTED, and that is stated rather than glossed
+
+The packet adds a timeout diagnostic to the store probe: on the deadline only, it reports the URL the probe imported, the URL the shell hints, whether the module loaded, and the handle's state — so that a probe importing the wrong generation is distinguishable from a store that failed to open, which is the one distinction the old 31.4-second silence could not make.
+
+**Nothing has executed it.** Its firing is itself a runtime behaviour, and a green emulator run leaves it unexecuted by construction: if `android-instrumented` returns 16/16, the diagnostic never printed and no device has ever run that code path. What was checked off-device is weaker and is named as such: the JS was extracted from the Java string concatenation and syntax-checked under `node`, and rendered against stubbed `window`/`document` objects in the three states it is written for — including the exact wrong-generation state, where it produces `probeUrl` and `shellHint` differing. **That is a shape check under stubs, not an execution.** What would execute it: the next real timeout, or one deliberate run on the emulator with a broken specifier. Neither is in this packet. `AGENTS.md` §11 applied to the packet's own instrument, which is where it is easiest to skip.
+
+### (e) The side-find that closed, and what it was worth
+
+`LSC-DL-005` side-find (2) — the sync target is written over rather than cleared — is closed by `native/tools/reset-sync-target.js`, wired into `npm run sync` and into both CI sync steps. It is a **local-hop** fix and changes nothing in CI, where the directory is gitignored and absent from a fresh checkout; it therefore cannot confound the run that verifies the real fix, for the same reason it cannot fix it.
+
+Its value was measured rather than argued. The development machine's sync target held a **41-file, v1-only generation** predating the store and export subtrees entirely. A `cap sync` onto that would have written the current generation **alongside** a tree the ship list no longer describes — a local APK carrying files no delivery guard, ship list or precache list knows about. Right in CI, wrong on the developer's box, silent in both.
+
+The reset is a separate tool rather than part of the stager, deliberately: `scripts/parity-suite.sh` calls the stager directly and never runs `cap sync`, so folding the reset in would empty the Android web root on every parity run with nothing to refill it.
+
+### (f) Files
+
+- **Changed (native tests):** `native/android/app/src/androidTest/java/app/theygrow/MountAddress.java` (new), `BridgeSmokeTest.java`, `StoreEngineTest.java`.
+- **Changed (native source):** `native/android/app/src/main/java/app/theygrow/ExportSinkPlugin.java` — javadoc only, no behaviour.
+- **Changed (tooling):** `native/tools/reset-sync-target.js` (new), `native/package.json`, `.github/workflows/ci.yml` (the sync step in both Android jobs).
+- **Changed (harness):** `app/tests/native-shell.spec.js` — third claim, plus its header corrected from "TWO CLAIMS" to three.
+- **Changed (spine):** `docs/INVARIANTS.md` (`EMV-P5-INV-001`), this log.
+- **Untouched, and verified so:** every shipped byte — `app/m/**` (both generations), `app/index.html`, `app/sw.js`, `app/Dockerfile`, `app/manifest.json`, `app/kb-v1.json` — plus `AGENTS.md`, `CLAUDE.md`, `api/**`, `scripts/**`, `.pre-commit-config.yaml`. **`app/m/v2/**` was in play by the packet boundary and the evidence did not call for it:** the boot graph is healthy end to end, so `LSC-P1-INV-002` holds by construction rather than by argument — the packet changes nothing about what gets staged, only what gets cleared before the sync.
+- **§4-safe.** No family datum, credential, host or live identifier enters any file. **Net egress change: zero.**
+- **No new knobs and no new signals.** The store-open outcome already lands as a declared, payload-safe signal (`store.open`, `changed_in: LSC-DL-004`), observed emitting in the failing run's logcat. `__storeImportError` was never unreachable — a rejected dynamic import lands in its `.catch`; it did not fire because the import *succeeded*, on the wrong generation. The gap was never a missing product surface, so the fix is diagnostic in the test rather than a new client-side signal.
+- **No new Python runtime import**, so the mypy hook's `additional_dependencies` are unchanged.
+
+### (g) What none of this proves
+
+**No claim about the device is established by anything in this packet.** Java is not compiled here — the development machine has no JDK, no Android SDK and no Gradle, which is why `android-instrumented` exists — so `MountAddress` has never been compiled, let alone run. The static guard was executed locally against the real tree and mutation-tested four ways; that is a property of the tree and nothing more. **The claim "the app opens its encrypted store at boot on the native channel" is executed only by `BridgeSmokeTest` on the emulator, and the next `android-instrumented` run on this branch is the only evidence about it.** Nothing before that run is proof, this entry included.
+
+### (h) Side-find (carried, not fixed here)
+
+Capacitor's own injected bootstrap logs `Error injecting safe area CSS: TypeError: Cannot read properties of null (reading 'style')` on every activity launch (logcat 67907, 68696), in both the passing and the failing test. It is upstream's script, not a shipped file of ours, and nothing in the app depends on it. Carried for the next native packet rather than chased inside this one.

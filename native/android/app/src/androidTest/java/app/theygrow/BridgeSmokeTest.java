@@ -34,6 +34,29 @@ public class BridgeSmokeTest {
     private static final long TIMEOUT_MS = 30_000;
     private static final long POLL_MS = 250;
 
+    /**
+     * What the store probe was actually looking at, evaluated ONLY when the poll
+     * times out. Every field here answers a question the bare timeout could not:
+     * which URL the probe imported, which URL the shell hints (the two differing
+     * IS the wrong-generation bug), whether the module ever loaded, and whether
+     * its handle is null because the store failed or because nothing on that
+     * copy was ever initialised.
+     */
+    private static final String STORE_PROBE_DIAGNOSTIC =
+            "JSON.stringify({"
+                + "probeUrl: window.__storeProbeUrl,"
+                + "shellHint: (document.querySelector("
+                + "'link[rel=\"modulepreload\"][href$=\"/store/boot.js\"]') || {}).href || null,"
+                + "baseURI: document.baseURI,"
+                + "moduleLoaded: !!window.__storeModule,"
+                + "storeHandleType: window.__storeModule"
+                + " ? typeof window.__storeModule.storeHandle : 'no-module',"
+                + "storeHandle: (window.__storeModule"
+                + " && typeof window.__storeModule.storeHandle === 'function')"
+                + " ? window.__storeModule.storeHandle() : null,"
+                + "importError: window.__storeImportError"
+                + "})";
+
     @Test
     public void the_injected_bridge_reaches_the_sqlite_plugin_without_any_bundled_js() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -60,34 +83,68 @@ public class BridgeSmokeTest {
     @Test
     public void the_app_opens_its_encrypted_store_at_boot() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            // The specifier is made absolute BEFORE the import, against the
-            // document. A script handed to evaluateJavascript has no base URL of
-            // its own — Chromium reports it as about:blank — so a path-absolute
-            // specifier cannot be resolved from here, while the identical
-            // specifier resolves normally inside app.js, which is a page module.
-            // That is a property of this probe, not of the shipped web root.
-            // Resolving against document.baseURI yields the very URL app.js
-            // resolved to, so this import returns the module instance the app
-            // booted with rather than a second copy of it.
+            // THE SPECIFIER IS WHAT DECIDES THIS, NOT THE BASE URL (EMV-DL-005).
+            //
+            // A script handed to evaluateJavascript has no base URL of its own —
+            // Chromium reports it as about:blank — so a path-absolute specifier
+            // cannot be resolved from here, while the identical specifier
+            // resolves normally inside app.js, which is a page module. Resolving
+            // against document.baseURI fixes that much, and this probe still
+            // does it. What it does NOT do, and what the earlier version of this
+            // comment wrongly claimed it did, is guarantee the module instance
+            // the app booted with: an absolute URL naming the FROZEN mount
+            // resolves perfectly well against the same base, because a bump is
+            // copy-forward and leaves the previous generation shipped. It then
+            // returns a second, never-initialised copy of boot.js whose
+            // module-scoped handle is null forever — which is exactly what this
+            // test did after EMV-P1 moved the shell forward while this line
+            // still named the previous generation, and exactly why it polled out
+            // in silence (run 31750267059) while the app under test had opened
+            // its store in 884 ms.
+            //
+            // So the URL is taken from the document instead of written here. The
+            // modulepreload hint is the anchor because A1-P6-INV-001 asserts the
+            // hint set equals the shell's import graph EXACTLY, in both
+            // directions — so the hint cannot go stale while boot.js is in the
+            // graph, and it is already the very URL app.js resolved to. A
+            // missing hint is reported as an error rather than thrown into a
+            // dropped promise.
             evaluate(
                     scenario,
-                    "window.__storeModule = null; window.__storeImportError = null;"
-                        + "import(new URL('/m/v1/store/boot.js', document.baseURI).href)"
+                    "(function () {"
+                        + "window.__storeModule = null; window.__storeImportError = null;"
+                        + "window.__storeProbeUrl = null;"
+                        + "var hint = document.querySelector("
+                        + "'link[rel=\"modulepreload\"][href$=\"/store/boot.js\"]');"
+                        + "if (!hint) {"
+                        + "window.__storeImportError = 'err: the shell hints no store/boot.js"
+                        + " modulepreload — the mount cannot be derived from the document';"
+                        + "return 'dispatched';"
+                        + "}"
+                        + "window.__storeProbeUrl = hint.href;"
+                        + "import(hint.href)"
                         + ".then(function (m) { window.__storeModule = m; })"
                         + ".catch(function (e) { window.__storeImportError = 'err:' + e; });"
-                        + "'dispatched'");
+                        + "return 'dispatched';"
+                        + "})()");
 
             // The app opens the store from DOMContentLoaded and does not await
             // it, so the handle appears some time after the module does. Poll
             // for the handle itself; reading it once races the open and would
             // report an empty handle as a store that never opened. An import
             // failure is reported immediately instead of waiting out the clock.
+            //
+            // A timeout now reports WHY rather than restating the expression it
+            // waited on: a module that loaded from a URL the shell does not hint
+            // is a wrong-generation import, and that is the one state the old
+            // failure text could not tell apart from a store that never opened.
             String probe =
                     pollFor(
                             scenario,
                             "window.__storeImportError ? window.__storeImportError"
                                 + " : (window.__storeModule && window.__storeModule.storeHandle()"
-                                + " ? JSON.stringify(window.__storeModule.storeHandle()) : null)");
+                                + " ? JSON.stringify(window.__storeModule.storeHandle()) : null)",
+                            STORE_PROBE_DIAGNOSTIC);
 
             assertTrue("the store never opened at boot: " + probe, probe.contains("\"journalMode\""));
             assertTrue("the store did not come up in WAL: " + probe, probe.toLowerCase().contains("wal"));
@@ -102,6 +159,21 @@ public class BridgeSmokeTest {
 
     /** Polls a JS expression until it evaluates to something other than null. */
     private String pollFor(ActivityScenario<MainActivity> scenario, String expression) {
+        return pollFor(scenario, expression, null);
+    }
+
+    /**
+     * Polls a JS expression until it evaluates to something other than null,
+     * reporting {@code diagnostic} — evaluated once, at the deadline — if it
+     * never does.
+     *
+     * <p>The diagnostic runs ONLY on the failing path, deliberately: evaluating
+     * it every 250 ms would put its own state-reading into the window it is
+     * meant to describe, and a poll that reds is already the moment where an
+     * extra WebView round trip costs nothing.
+     */
+    private String pollFor(
+            ActivityScenario<MainActivity> scenario, String expression, String diagnostic) {
         long deadline = System.currentTimeMillis() + TIMEOUT_MS;
         while (System.currentTimeMillis() < deadline) {
             String value = evaluate(scenario, expression);
@@ -115,7 +187,15 @@ public class BridgeSmokeTest {
                 fail("interrupted while waiting for " + expression);
             }
         }
-        fail("timed out waiting for " + expression);
+        if (diagnostic == null) {
+            fail("timed out waiting for " + expression);
+        } else {
+            fail(
+                    "timed out waiting for "
+                            + expression
+                            + "\n  state at the deadline: "
+                            + evaluate(scenario, diagnostic));
+        }
         return null;
     }
 

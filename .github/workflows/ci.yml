@@ -265,9 +265,16 @@ jobs:
       - name: Stage the web root from app/Dockerfile's COPY list
         run: node native/tools/stage-webdir.js
 
+      # The reset is the first hop of the same determinism the stager already
+      # gives native/www (EMV-P5, closing LSC-DL-005 side-find (2)): `cap sync`
+      # writes OVER assets/public/ rather than clearing it. It changes nothing
+      # in CI, where that directory is gitignored and so absent from a fresh
+      # checkout — it is here so the CI sequence and `npm run sync` stay the
+      # same sequence, which is the only reason a developer's local build and
+      # this job can be reasoned about together.
       - name: Sync the staged web root into the Android project
         working-directory: native
-        run: npx cap sync android
+        run: node tools/reset-sync-target.js && npx cap sync android
 
       - name: Assemble the debug APK
         working-directory: native/android
@@ -474,9 +481,16 @@ jobs:
       - name: Stage the web root from app/Dockerfile's COPY list
         run: node native/tools/stage-webdir.js
 
+      # The reset is the first hop of the same determinism the stager already
+      # gives native/www (EMV-P5, closing LSC-DL-005 side-find (2)): `cap sync`
+      # writes OVER assets/public/ rather than clearing it. It changes nothing
+      # in CI, where that directory is gitignored and so absent from a fresh
+      # checkout — it is here so the CI sequence and `npm run sync` stay the
+      # same sequence, which is the only reason a developer's local build and
+      # this job can be reasoned about together.
       - name: Sync the staged web root into the Android project
         working-directory: native
-        run: npx cap sync android
+        run: node tools/reset-sync-target.js && npx cap sync android
 
       - name: Instrumented store tests (emulator)
         uses: reactivecircus/android-emulator-runner@v2
