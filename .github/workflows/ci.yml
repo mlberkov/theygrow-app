@@ -314,6 +314,13 @@ jobs:
       #
       # Costs one apksigner invocation on an APK this job has already built.
       # No secret is involved.
+      #
+      # RSN-P3: this step is where run 31894850072 returned 4 with a log that
+      # could not say why. On 4, 7 or 8 the comparator now prints — right here,
+      # above the ::error:: line — how it resolved apksigner and which candidates
+      # lost, what argv ran, how many bytes came back on each stream, a bounded
+      # DN-redacted excerpt of both, and a READING line naming which explanation
+      # those bytes support. Diagnose from that block, not from a guess.
       - name: The signature comparator rejects a foreign certificate
         run: |
           set -euo pipefail
@@ -326,7 +333,8 @@ jobs:
           if [ "${status}" -ne 3 ]; then
             echo "::error::the comparator returned ${status} against a debug-signed APK;"\
                  "expected 3 (THEYGROW_RELEASE_CERT_MISMATCH). A detector that cannot go"\
-                 "red for the right reason is not a detector — fix it, do not relax this."
+                 "red for the right reason is not a detector — fix it, do not relax this."\
+                 "The diagnostic block printed above this line says what it actually saw."
             exit 1
           fi
 
@@ -348,7 +356,26 @@ jobs:
       # It is also the only detector for the guard. Delete the guard from
       # build.gradle and this step goes red — not quietly green, which is what a
       # source scan for the same property would do.
+      #
+      # RSN-P3 — `if: ${{ !cancelled() }}` IS THE MECHANISM THAT KEEPS ONE RED
+      # FROM HIDING ANOTHER. Steps default to `if: success()`, so when the
+      # comparator step above went red on run 31894850072 this step never ran and
+      # the milestone still does not know whether these two legs pass. With this
+      # condition it runs anyway, and — the point — BOTH steps stay ordinary hard
+      # failures: no `continue-on-error`, no summarising gate step. There is
+      # therefore no line here whose deletion turns two reds into a green job.
+      # Deleting this one line only costs the second verdict on runs where the
+      # first already failed; the job is still red, from the first step.
+      # (Same semantics as the `Upload scorecard` step's `if: always()` in the
+      # `eval` job above, which exists because the step before it exits 1.)
+      #
+      # The comparator step mutates nothing this step needs — it runs python
+      # against an already-built APK — so nothing is destroyed by its failure.
+      # The consequence to know: after an EARLIER failure (a broken `cap sync`,
+      # say) this step also runs and will likely red for that same cause. Its red
+      # is then secondary; read the first one.
       - name: Release packaging fails closed without a usable signing environment
+        if: ${{ !cancelled() }}
         working-directory: native/android
         env:
           FAILCLOSED_LOGS: ${{ runner.temp }}/release-failclosed

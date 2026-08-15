@@ -14,9 +14,18 @@ wherever an SDK exists.
 
 The public-key digest is deliberately DIFFERENT from the certificate digest, as
 it is on a real APK — that difference is the whole point of the decoy test.
+
+RSN-P3 adds `fake_apksigner` on the same terms and with the same limit. A stub
+this repository wrote proves the comparator's PLUMBING — which binary it picks,
+which stream it parses, what it says when it cannot parse — and proves nothing at
+all about what a real apksigner prints. That second claim still belongs to the
+`android` job and to no test here.
 """
 
 from __future__ import annotations
+
+import sys
+from pathlib import Path
 
 _DN = "CN=they grow, OU=release, O=theygrow, L=x, ST=x, C=ZZ"
 
@@ -80,3 +89,47 @@ def sdk_range_output(cert_digest: str) -> str:
         "Signer (minSdkVersion=24, maxSdkVersion=2147483647) #1 public key SHA-256 "
         f"digest: {_derived(cert_digest, 64)}\n"
     )
+
+
+def fake_apksigner(
+    sdk_root: Path,
+    *,
+    stdout: str = "",
+    stderr: str = "",
+    returncode: int = 0,
+    version: str = "36.0.0",
+) -> Path:
+    """Plant an executable apksigner stub at `<sdk_root>/build-tools/<version>/`.
+
+    Returns `sdk_root`, so a caller can hand it straight to `ANDROID_HOME`. Call
+    it more than once with different `version` values to build the several-
+    versions-side-by-side layout GitHub's runner images carry, which is what the
+    resolution order has to be right about.
+
+    The payloads live in sibling files the stub copies out, rather than inside a
+    heredoc: the byte streams have to be EXACT — "stdout was empty" is a distinct
+    diagnosis from "stdout was one newline", and a heredoc cannot express the
+    first. The stub is Python behind an absolute-path shebang and calls no
+    external command, because the suite scrubs PATH to prove the ABSENT verdict
+    and a stub that needed `cat` would die of that scrubbing instead of
+    answering.
+    """
+    tool_dir = sdk_root / "build-tools" / version
+    tool_dir.mkdir(parents=True, exist_ok=True)
+
+    out_file = tool_dir / "stdout.txt"
+    err_file = tool_dir / "stderr.txt"
+    out_file.write_text(stdout, encoding="utf-8")
+    err_file.write_text(stderr, encoding="utf-8")
+
+    tool = tool_dir / "apksigner"
+    tool.write_text(
+        f"#!{sys.executable}\n"
+        "import pathlib, sys\n"
+        f"sys.stdout.write(pathlib.Path({str(out_file)!r}).read_text(encoding='utf-8'))\n"
+        f"sys.stderr.write(pathlib.Path({str(err_file)!r}).read_text(encoding='utf-8'))\n"
+        f"raise SystemExit({returncode})\n",
+        encoding="utf-8",
+    )
+    tool.chmod(0o755)
+    return sdk_root

@@ -219,6 +219,66 @@ def test_rejects_output_it_cannot_parse(certs_output: str, tmp_path: Path) -> No
 
 
 # --------------------------------------------------------------------------
+# RSN-P3 — an unparseable verdict shows what it could not parse.
+#
+# The `--apk` half of this, with a stub apksigner, is
+# `test_apksigner_invocation.py`. This half covers the seam CI's release
+# arm-check uses, where the input is a file rather than a process.
+# --------------------------------------------------------------------------
+
+
+def test_unparseable_file_mode_shows_the_file_and_what_was_in_it(tmp_path: Path) -> None:
+    output = apksigner_output(EXPECTED, include_certificate_digest=False)
+    result = run_comparator(output, COMMITTED_BASELINE, tmp_path)
+
+    assert result.returncode == EXIT_UNPARSEABLE
+    assert str(tmp_path / "certs.txt") in result.stderr
+    # The two hypotheses are named, not left to be inferred: a certificate block
+    # IS here, and no line matched.
+    assert "READING: the certificate block IS on the file" in result.stderr
+    assert "PATTERN defect" in result.stderr
+    assert "public key SHA-256 digest" in result.stderr
+
+
+def test_unparseable_file_mode_names_an_empty_file_as_such(tmp_path: Path) -> None:
+    result = run_comparator("", COMMITTED_BASELINE, tmp_path)
+    assert result.returncode == EXIT_UNPARSEABLE
+    assert "(EMPTY — nothing at all arrived here)" in result.stderr
+    assert "INVOCATION defect" in result.stderr
+
+
+def test_unparseable_file_mode_bounds_the_excerpt(tmp_path: Path) -> None:
+    flood = "".join(f"Signer #{index} noise {'x' * 400}\n" for index in range(1, 501))
+    result = run_comparator(flood, COMMITTED_BASELINE, tmp_path)
+
+    assert result.returncode == EXIT_UNPARSEABLE
+    assert len(result.stderr) < 10_000
+    assert "further lines omitted by the excerpt bound" in result.stderr
+    assert "500 lines" in result.stderr
+
+
+def test_unparseable_file_mode_redacts_a_distinguished_name(tmp_path: Path) -> None:
+    named = (
+        "Verifies\n"
+        "Signer #1 certificate DN: CN=Ada Lovelace, OU=owner, O=theygrow, C=ZZ\n"
+        f"Signer #1 public key SHA-256 digest: {EXPECTED}\n"
+    )
+    result = run_comparator(named, COMMITTED_BASELINE, tmp_path)
+
+    assert result.returncode == EXIT_UNPARSEABLE
+    assert "Ada Lovelace" not in result.stderr
+    assert "Signer #1 certificate DN: <redacted:" in result.stderr
+
+
+def test_a_mismatch_carries_no_excerpt(tmp_path: Path) -> None:
+    """Only the blind verdicts get a diagnostic block; a mismatch is not blind."""
+    result = run_comparator(apksigner_output(ONE_NIBBLE_OFF), COMMITTED_BASELINE, tmp_path)
+    assert result.returncode == EXIT_MISMATCH
+    assert "--- what was read ---" not in result.stderr
+    assert "READING:" not in result.stderr
+
+
+# --------------------------------------------------------------------------
 # The baseline must be present and unambiguous.
 # --------------------------------------------------------------------------
 
