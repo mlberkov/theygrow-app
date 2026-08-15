@@ -7,13 +7,13 @@ import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.net.Uri;
-import android.util.Base64;
 import android.webkit.WebView;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -36,10 +36,16 @@ import org.junit.runner.RunWith;
  * covered by the owner-run smoke in {@code docs/RUNBOOK.md}.
  *
  * <p>WHAT IT DOES TEST is the half that can silently corrupt a family's only
- * off-device copy: base64 decode, the stream to the chosen document, and
- * truncation. Plus one registration probe — a first-party plugin that failed to
- * register would leave the export button doing nothing on a real phone while
+ * off-device copy: the stream from the staged buffer to the chosen document,
+ * and truncation. Plus one registration probe — a first-party plugin that failed
+ * to register would leave the export button doing nothing on a real phone while
  * every desktop test stayed green.
+ *
+ * <p>Since XPT-P1 the base64 decode no longer happens on this path: chunks are
+ * decoded as they arrive in {@code appendChunk}, and what reaches the document
+ * is the staged buffer. That whole path — chunks in, archive out — is executed
+ * end to end by {@link ExportTransferTest}; what stays here is the last hop,
+ * driven directly so it can be asserted without the system file picker.
  */
 @RunWith(AndroidJUnit4.class)
 public class ExportSinkTest {
@@ -59,8 +65,7 @@ public class ExportSinkTest {
             payload[i] = (byte) i;
         }
 
-        ExportSinkPlugin.writeDocument(
-                context, Uri.fromFile(target), Base64.encodeToString(payload, Base64.DEFAULT));
+        ExportSinkPlugin.writeDocument(context, Uri.fromFile(target), staged(payload));
 
         assertArrayEquals("the sink did not write the bytes it was given", payload, read(target));
     }
@@ -75,8 +80,8 @@ public class ExportSinkTest {
         byte[] shorter = "короткий архив".getBytes(StandardCharsets.UTF_8);
 
         Uri uri = Uri.fromFile(target);
-        ExportSinkPlugin.writeDocument(context, uri, Base64.encodeToString(longer, Base64.DEFAULT));
-        ExportSinkPlugin.writeDocument(context, uri, Base64.encodeToString(shorter, Base64.DEFAULT));
+        ExportSinkPlugin.writeDocument(context, uri, staged(longer));
+        ExportSinkPlugin.writeDocument(context, uri, staged(shorter));
 
         // Without truncation the file would still be 1024 bytes and the zip's
         // central directory would disagree with the bytes after it — a corrupt
@@ -109,6 +114,17 @@ public class ExportSinkTest {
                     "the export sink plugin did not answer as a registered plugin: " + probe,
                     probe != null && probe.contains("needs a filename"));
         }
+    }
+
+    /**
+     * The staged buffer the plugin holds when the picker returns, built here
+     * from bytes instead of from chunks. {@link ExportTransferTest} is what
+     * fills one the way the app does.
+     */
+    private static ByteArrayOutputStream staged(byte[] payload) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(payload.length);
+        out.write(payload);
+        return out;
     }
 
     private static byte[] read(File file) throws IOException {

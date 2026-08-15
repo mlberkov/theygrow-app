@@ -63,12 +63,12 @@ final class MountAddress {
         return cached;
     }
 
-    /** The mount's URL prefix, e.g. {@code "/m/v2/"}. */
+    /** The mount's URL prefix, e.g. {@code "/m/v3/"}. */
     static String prefix() {
         return "/m/" + version() + "/";
     }
 
-    /** The mount's prefix as an ASSET path, e.g. {@code "public/m/v2/"}. */
+    /** The mount's prefix as an ASSET path, e.g. {@code "public/m/v3/"}. */
     static String assetPrefix() {
         return "public/m/" + version() + "/";
     }

@@ -28,10 +28,18 @@
 //
 // WHAT IS STAGED, AND HOW FAITHFUL IT IS. tests/support/prev-generation.js
 // derives the previous shell and worker from the bytes on disk; read its header
-// for the derivation and its verified byte-identity to the shell published at
-// 711b5bc. The mount assets themselves are NOT derived — /m/v1/** on disk IS the
-// frozen prior generation, missing the .modal.show rule, which is why the staged
-// client reproduces the original defect rather than imitating it.
+// for the derivation and for which published generation the result is identical
+// to. The mount assets themselves are NOT derived — the previous version
+// directory on disk IS the frozen prior generation, whatever it does and does
+// not contain.
+//
+// WHICH GENERATION THAT IS MOVES WITH EVERY BUMP, AND THE SPEC FOLLOWS IT. At
+// EMV-P3 the previous generation was /m/v1/, which had no .modal.show rule, so
+// the staged client reproduced the original defect and this spec asserted that
+// it did. Since the XPT-P1 bump the previous generation is one that already
+// carries the rule, so that assertion does not apply and the run says so in an
+// annotation instead — see PREV_DECLARES_SHOW_RULE below. The upgrade MECHANISM,
+// which is what this spec is for, is unaffected either way.
 //
 // THE BOUND, STATED WHERE IT CANNOT BE MISSED. This is the generation the repo
 // published, not the bytes any PARTICULAR live client holds: a live client holds

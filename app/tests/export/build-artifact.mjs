@@ -5,8 +5,8 @@
 //
 // Its whole job is to be thin. It reads a read-out produced by
 // app/tests/export/harness.py against a real SQLite database carrying the real
-// frozen DDL, hands it to app/m/v1/export/build.js untouched, and writes the
-// bytes out. Nothing here renders, orders, encodes or defaults anything: a
+// frozen DDL, hands it to the SHELL'S OWN mount's export/build.js untouched
+// (derived below, never written down), and writes the bytes out. Nothing here renders, orders, encodes or defaults anything: a
 // driver that did would be a second implementation, and the suite would be
 // proving the driver rather than the artifact.
 //
@@ -31,7 +31,37 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const EXPORT_DIR = path.join(HERE, '..', '..', 'm', 'v1', 'export');
+const APP_ROOT = path.join(HERE, '..', '..');
+
+/**
+ * The module mount the shipped SHELL references, e.g. "v3".
+ *
+ * Derived, never written down (EMV-DL-005; this file was repaired at XPT-P1). A
+ * mount bump is copy-forward, so the frozen generation stays on disk and stays
+ * shipped: the literal that used to sit here kept building the artifact with a
+ * builder no device runs, and went on passing because the generations differed
+ * only in values the suite does not read. harness.py — which invokes this
+ * driver — has derived the mount since EMV-P1, so the two disagreed about which
+ * bytes were under test.
+ *
+ * Fails CLOSED, like its twins in app/tests/support/ship-list.js and
+ * app/tests/schema/harness.py: anything other than exactly one mount version
+ * among the shell's references throws rather than picking one.
+ */
+function currentMount() {
+    const shell = readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8');
+    const versions = new Set(Array.from(shell.matchAll(/\/m\/(v\d+)\//g)).map((m) => m[1]));
+    if (versions.size !== 1) {
+        throw new Error(
+            `app/index.html references ${versions.size} mount versions (${[...versions]
+                .sort()
+                .join(', ')}) — a bump is half-applied`
+        );
+    }
+    return [...versions][0];
+}
+
+const EXPORT_DIR = path.join(APP_ROOT, 'm', currentMount(), 'export');
 const DECLARATION = path.join(EXPORT_DIR, 'declaration.json');
 
 const [, , payloadPath, outPath] = process.argv;

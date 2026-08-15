@@ -244,6 +244,12 @@ dependencies {
     // classpath but not its compile classpath. The version is pinned to the one
     // the plugin itself resolves — if the two ever diverge, the engine under the
     // instrumented assertions stops being the engine the app actually uses.
+    // XPT-P1 — the export transfer test stubs ACTION_CREATE_DOCUMENT instead of
+    // driving the system file picker's UI, which is the assertion this project
+    // has declined to make since L1-P3. Pinned to the espresso-core version
+    // already resolved above: the two artifacts share a release train, and a
+    // mismatch between them fails at runtime rather than at resolution.
+    androidTestImplementation "androidx.test.espresso:espresso-intents:$androidxEspressoCoreVersion"
     androidTestImplementation "androidx.test:core:1.6.1"
     androidTestImplementation "androidx.test:runner:1.6.2"
     androidTestImplementation "net.zetetic:sqlcipher-android:4.17.0@aar"

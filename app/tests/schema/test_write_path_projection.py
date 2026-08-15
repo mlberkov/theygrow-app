@@ -23,9 +23,21 @@ from pathlib import Path
 
 import pytest
 
-from .harness import append_assertion, append_confirmation, seed_child, seed_participant
+from .harness import (
+    append_assertion,
+    append_confirmation,
+    current_mount,
+    seed_child,
+    seed_participant,
+)
 
-JOURNAL_JS = Path(__file__).resolve().parents[2] / "m" / "v1" / "store" / "journal.js"
+# The mount the SHELL references, never a written-down version (EMV-DL-005,
+# repaired at XPT-P1). A copy-forward bump leaves the frozen generation on disk
+# and shipped, so this read the previous generation's journal.js for two whole
+# bumps while passing — the query it verified was not the query the app ran, and
+# the two agreed only by luck. `harness.py` beside this file has derived the
+# mount since EMV-P1; this line had not been brought along.
+JOURNAL_JS = Path(__file__).resolve().parents[2] / "m" / current_mount() / "store" / "journal.js"
 
 # The import date a legacy mark is stamped with, and the date it would carry if
 # the importer were to invent an observation date instead. They are different on
