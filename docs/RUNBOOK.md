@@ -312,6 +312,137 @@ Canonical names to create: Cloud Run service **`theygrow-api-staging`**, databas
 3. **Retiring an old mount version** is a **separate owner cleanup**, never part of the bump packet — the same posture as the orphaned icon placeholders (vault ADR-024 OQ#1). A version may be dropped once no cached HTML can still reference it; the shell's own `max-age=3600, must-revalidate` bounds that window in practice, but the call stays the owner's.
 4. **Promotion.** The no-traffic revision smoke (step 3 of **Promotion + rollback (L1 deploy-safety gate)** above) includes the mount's immutable `Cache-Control` and `Content-Type` checks. A bump is also exactly the case step **5** of that gate exists for: the tagged-revision smoke runs in a browser with nothing cached, so it cannot see whether the new generation reaches a client that is already on the old one. Since EMV-P3 the parity suite executes that upgrade against a **staged** previous generation (`EMV-P3-INV-001`); the real device stays step 5's, because no test can know which generation a live client holds.
 
+## Release build + APK distribution (RSN, owner-run)
+
+> **Owner action, and the only channel there is.** The signed release APK is built by the `Release` workflow (`.github/workflows/release.yml`) and **published by hand**. CI creates no release, uploads no asset, invokes no `gh`, and keeps `permissions: contents: read` — automated publication would need `contents: write` and is a decision that has not been taken (ADR-047). Distribution is direct APK handout (ADR-043 §3). **Merge is not delivery** (ADR-020), and on this channel nothing is automatic at all: a family device gets a new build only when a human hands it one.
+
+**What is proven, and what the first run executes for the first time.** This section describes a procedure that has never been run end to end, and it is written so a reader can tell the two apart. **No run of the `Release` workflow has ever happened, on any trigger.**
+
+| Proven, on every push | First executed by the owner, on the first release run |
+| --- | --- |
+| The comparator can go **red**, twice and differently: `pytest app/tests/release` in the `quality` job (its logic, against synthesised `apksigner` output), and the `android` job step *The signature comparator rejects a foreign certificate*, which runs the **real** `apksigner` against the **real** debug APK and requires exit **3** — a debug certificate is by definition not the release one. | `ANDROID_KEYSTORE_BASE64` decoding to a keystore. |
+| Release packaging **fails closed**: the `android` job step *Release packaging fails closed without a usable signing environment* runs `:app:assembleRelease` twice — no signing environment, then a keystore it cannot open — and asserts the named token and that no release APK exists (`RSN-P1-INV-001`). | That keystore **opening** under `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_ALIAS` naming an entry inside it. |
+| The committed baseline parses, holds one fingerprint, and still says it is public (`app/tests/release/test_verify_release_signature.py`). | The comparator's **positive** verdict — the first time the committed baseline and the key in the secret ever meet. |
+| `release.yml` parses as YAML (`check-yaml`, via `pre-commit`). Its **behaviour** is not covered by that and by nothing else. | The in-run arm-check, the `output-metadata.json` read-back and the derived filename, `sha256sum -c`, the artifact upload, and the keystore-removal step. |
+
+Individual steps below carry a **(first execution)** marker where they fall in the right-hand column.
+
+### Before the first run
+
+1. **The key exists; this repository does not hold it.** Its certificate fingerprint is committed, in `keytool` / Play Console form, at `native/android/release-signing/cert-sha256.txt` — that file is the comparand every release run is checked against. It is a fingerprint **of** a certificate, not key material, and it is public on purpose. **Never move it into an Actions secret:** a detector whose expected value lives in the same store as the key it checks proves nothing.
+2. **Three repository Actions secrets must be set** — `ANDROID_KEYSTORE_BASE64` (the PKCS12 keystore, base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`. **There is no fourth.** PKCS12 has no separate key-entry password — `keytool` refuses to set one — so `native/android/app/build.gradle` feeds `keyPassword` the same variable as `storePassword` deliberately (`RSN-DL-001`). Whether the three are currently set is not knowable from this repository; the first run is what says so, by name.
+3. **Key custody (`solo-shortcuts-registry` C-2 — an obligation, not a wish).** The keystore lives in **two separate places**, and the store password is held **apart from the file**, so that losing one does not lose both. Losing the key is not recoverable: every future build would carry a different identity, and every device would need an uninstall-reinstall. Verify the backups periodically — see **Keystore backup and the restorability check** below.
+   - **Backup copy A:** *location to be recorded by the owner.*
+   - **Backup copy B:** *location to be recorded by the owner — a different place, not a second folder in the first one.*
+   - **Store password:** *where it is held, to be recorded by the owner — apart from both copies.*
+   - **Key alias:** *to be recorded by the owner* (it is an Actions secret; the guard deliberately never prints it, nor the aliases a keystore does hold).
+4. **Handle keystore material outside this repository tree.** When you re-encode a backup, do it in a scratch directory somewhere else. `.gitignore`, `native/.gitignore` and `native/android/.gitignore` all carry keystore patterns and gitleaks runs on every push, but the cheapest way not to commit a key is not to put one in the working tree.
+
+### Running the release build
+
+1. **Trigger it** — two ways, and the difference decides the first run's order:
+   - **Tag push.** Push a tag matching `v*` at the commit you want released. **The tag name does not set the version** (see step 3); it selects the commit and it is what makes the release identifiable afterwards.
+   - **`workflow_dispatch`.** GitHub → **Actions** → **Release** → **Run workflow**. Documented GitHub behaviour, and unexecuted here: **the manual button only appears once the workflow file is on the default branch.** Until this milestone merges, a tag is the only trigger available; after it merges, both are.
+   - The two triggers are the whole list on purpose. Every run of this workflow decodes the keystore, so the number of runs that touch that secret is kept small. **There is deliberately no `push` on branches — do not add one** (`RSN-DL-002`).
+   - Runs are serialised (`concurrency: release`) and never cancelled in flight: a cancelled run can be killed before its cleanup step completes, leaving a decoded keystore on a runner it no longer controls.
+2. **Watch it.** No Telegram message arrives — `notify.yml` is scoped to the `CI` workflow only, and that was left as it is deliberately (`RSN-DL-003`). Read the run page. **(first execution)** for every step in it.
+3. **What a green run produces** — **(first execution)**, and the naming path in particular: no run has ever read `output-metadata.json` or derived a filename from it. One artifact, `theygrow-release-apk` (retention **30 days**), holding exactly two files:
+   - `theygrow-v{versionName}-{versionCode}.apk` — e.g. `theygrow-v0.1.147-147.apk`. `versionCode` is `git rev-list --count HEAD` at the released commit (reproducible from the commit, monotone along ancestry — a CI run number is neither), and `versionName` is `0.1.{versionCode}`, the marketing half being the one number a human ever chooses. Both are **read back from the build's own `output-metadata.json`**, not re-derived: the filename is a claim about the APK, and re-deriving would agree with itself even if the APK disagreed.
+   - `theygrow-v{versionName}-{versionCode}.apk.sha256` — `sha256sum`'s own format, so `sha256sum -c` works with the two files side by side.
+4. **Nothing else survives the run.** The decoded keystore lives only under `RUNNER_TEMP`, never in the workspace or the build tree, and the final step removes it and fails the job if it is still there. It is `rm`, not `shred`, and the reason is written into the workflow: the runner VM and its disk are destroyed with the run, and `shred` on an overlay filesystem does not deliver what its name promises.
+
+### Publishing it, by hand
+
+**(first execution) — all of it.** Nothing here has been done before: no artifact of this workflow has ever been downloaded, and nothing has been published on this channel.
+
+1. **Download the artifact** from the run page. It arrives as a `.zip` (the Actions UI always zips artifacts).
+2. **Unzip it and publish the two files inside — verbatim.** Not the zip, not renamed, not re-compressed. The checksum was computed on the APK this run produced; re-wrapping it is what makes a good checksum look wrong to the person checking it.
+3. **Verify the pair locally first:** `sha256sum -c theygrow-v{…}.apk.sha256` in the directory holding both. That is the transfer check, and it costs one command.
+4. **Wherever the file is handed over — a GitHub release page, a direct handout — these three travel with it, together:** the **versioned filename** (never a static `latest`: a page must not carry two different binaries under one name), the **SHA-256 beside the download**, and an explicit **"allow installs from unknown sources"** instruction. This is accepted distribution practice for a direct-APK channel under ADR-047 §8 — not a vendor directive, and not something Android enforces on our behalf.
+5. **Handout text (Russian — it is read by the people installing, not by whoever runs this procedure).** Fill in the filename and the checksum:
+
+```
+theygrow — приложение для Android
+Файл: theygrow-v0.1.NNN-NNN.apk
+SHA-256: <строка из файла .sha256>
+
+Установка:
+1. Скачайте .apk на телефон.
+2. Android предупредит про установку из неизвестных источников. Это ожидаемо:
+   приложение не из Google Play, оно передаётся напрямую. Разрешите установку
+   для того приложения (браузер или файловый менеджер), из которого открываете файл.
+3. ВАЖНО, если на телефоне уже стоит прежняя тестовая сборка: обновиться поверх
+   неё нельзя — у новой версии другая подпись. Прежнюю нужно удалить, и вместе с
+   ней удалятся все данные, которые вы вносили в приложении на телефоне. Если там
+   есть что-то нужное — сначала «Сохранить архив» и скопируйте архив с телефона.
+4. История в браузере (веб-версия) при этом никуда не денется. Ничего в браузере
+   очищать не нужно — и не очищайте.
+```
+
+### The first install destroys the app sandbox — read this before installing
+
+**The release APK is signed by a different key than the debug build that is installed today, so Android will not update over it** (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). The install is **uninstall-then-install**, and the uninstall takes the **app sandbox** with it: the SQLCipher-encrypted store, the key held in `EncryptedSharedPreferences`, and everything written on that phone since L1-P4. Android Auto Backup is off by design (`LSC-P1-INV-002`), so there is no cloud copy anywhere. **(first execution)** — no release build has been installed on any device, so the failure mode described here is the documented Android behaviour for a signature change, not something observed on this app.
+
+- **Precondition.** If the sandbox holds anything worth keeping, **export first** — *The export archive — L1-P3* below — and copy the archive **off the device** before uninstalling. An archive still on the phone is deleted with the app.
+- **The app-side export does NOT protect the family's real history, and must not be treated as if it did.** That history lives in the **browser's `localStorage` under the production origin**. It is untouched by any uninstall, it is the only real copy, and **it must not be cleared** — not before this install, not after a successful one — until the browser→app transfer path exists. The migration bridge reads the WebView's own storage, so nothing on the phone can stand in for the browser copy (ADR-043 §3 and its 2026-08-15 annotation; the one-way import in *The write path and the legacy import — L1-P4* is not reconciliation).
+- **Why now.** The first release build costs a reinstall on every family device, and this is the cheapest moment it will ever cost that: the window closes with the first diary packet, after which a reinstall starts destroying records that exist nowhere else (ADR-047 consequences).
+
+### When the run goes red
+
+Every failure below prints a bare `THEYGROW_RELEASE_*` token, so a raw CI log can be grepped for it. **Two of them have different cures, and confusing the two is expensive.**
+
+**A. The secret is wrong — `THEYGROW_RELEASE_KEYSTORE_DECODE_FAILED`, `THEYGROW_RELEASE_KEYSTORE_UNREADABLE`, `THEYGROW_RELEASE_KEY_ALIAS_ABSENT`.** The run never got as far as a signature. Nothing about the secret's content is known to the failing step or printed by it.
+
+- **Re-mint the SECRET. Never mint a new KEY.** Re-encode the *existing* backup (`base64 -w0 <backup.p12>`, in a scratch directory outside this tree) and set `ANDROID_KEYSTORE_BASE64` again; or re-read the store password from where it is held apart and set `ANDROID_KEYSTORE_PASSWORD`; or read the alias out of the backup (`keytool -list -keystore <backup.p12> -storetype PKCS12`) and set `ANDROID_KEY_ALIAS`.
+- **A new key is a new application identity** — a different certificate, a stale committed baseline, and a second uninstall-reinstall for every family device. It is the last resort after both backups have failed the restorability check, never the first thing to try because a run went red.
+- Which one to fix is told by the token: `DECODE_FAILED` is the base64 (truncated paste, wrapped lines, empty secret); `KEYSTORE_UNREADABLE` is the password or a decoded file that is not a PKCS12; `KEY_ALIAS_ABSENT` means the keystore opened and holds no entry under that alias.
+
+**B. `THEYGROW_RELEASE_CERT_MISMATCH` — the APK is signed, but not by the expected key.** The run prints **both** fingerprints, labelled, so no second run is needed to tell the causes apart. There are exactly two, and they are told apart by which side you trust:
+
+1. **The committed baseline is not this app's certificate.** Correcting it is a **two-file edit** — `native/android/release-signing/cert-sha256.txt` **and** the `EXPECTED` constant pinned in `app/tests/release/test_verify_release_signature.py`. Change only the first and the `quality` job goes red with no explanation of why. It is a code change with its own review; it is not an edit made mid-release to get a build out.
+2. **The keystore in `ANDROID_KEYSTORE_BASE64` is not the key that fingerprint came from.** Replace the secret with the right keystore — the one whose fingerprint the restorability check below confirms.
+
+**The cure is never to relax the check.** Do not widen the comparator, do not delete the verify step, and do not publish the APK that produced the mismatch. A detector that cannot tell two keys apart is worth less than no detector, because it is believed.
+
+**C. Everything else, briefly.**
+
+| Signal | What it means |
+| --- | --- |
+| The arm-check step fails ("the comparator returned N … expected 3") | The **detector itself** is broken: it did not go red against a fingerprint deliberately derived to differ from the baseline. The verdict in the next step could not be trusted, so the run stops before producing an artifact. Fix the comparator (a code packet); do not touch the baseline. |
+| `THEYGROW_RELEASE_SIGNING_MISSING` | One of the three variables is unset or empty — the message names which. A mistyped secret **name** looks exactly like this. |
+| `THEYGROW_RELEASE_VERSIONCODE_UNRESOLVED` | The checkout was shallow, or it is not a git work tree. The workflow pins `fetch-depth: 0` precisely to avoid this, so seeing it means that was changed. **Never hand-set a `versionCode` to get past it:** a release APK carrying a wrong one cannot be updated over, and the update chain carries family data. |
+| Comparator exit `4` (`…CERT_UNPARSEABLE`) | No `Signer #N certificate SHA-256 digest:` line — the APK may be unsigned, or `apksigner`'s output format changed. The signature was **not** verified. |
+| Comparator exit `5` (`…CERT_BASELINE_INVALID`) | The baseline file is missing, unreadable, empty, or carries more than one fingerprint line. |
+| Comparator exit `6` (`…CERT_MULTIPLE_SIGNERS`) | More than one signing identity in the APK — key rotation or a re-sign nobody decided on. |
+| Comparator exit `7` (`…APKSIGNER_ABSENT`) | No `apksigner` under `$ANDROID_HOME/build-tools/*/` or on `PATH`. Install build-tools; never substitute a check that does not verify the signature. |
+| Comparator exit `8` (`…APK_UNVERIFIED`) | `apksigner` refuses to verify the APK at all. Not shippable. |
+
+### Keystore backup and the restorability check (periodic, owner-run, read-only)
+
+A backup nobody has opened is a belief. This check is the only thing that ever tells you the keystore backup is still usable, and it is the standing half of the C-2 obligation — it is not deferred to any trigger. It publishes nothing, uploads nothing and changes nothing.
+
+**Cadence.** Before each release run, and on a standing period between releases. Run it against **both** backup copies, not the convenient one. **(first execution)** — neither leg has been run by anyone; whether the backups open at all is not known from this repository, and that is precisely what makes this check worth its place rather than an obligation on paper.
+
+**Leg (a) — the backup leg. This is the leg that discharges the obligation.** For each copy, open it with the password from its separate home and read the certificate out:
+
+```
+keytool -list -v -keystore <backup-copy.p12> -storetype PKCS12 -alias <alias>
+```
+
+Compare the printed **SHA-256** to `native/android/release-signing/cert-sha256.txt` — the baseline is stored uppercase and colon-separated exactly so this comparison can be made by eye. Three things must hold: the file opens with the password you actually hold, the alias is present, and the fingerprint matches. Run it outside this repository tree.
+
+**Leg (b) — the artifact leg (ADR-047 §7 as written).** Against a previously signed APK:
+
+```
+apksigner verify --print-certs <apk>
+# or, machine-checked, reusing the comparator that gates every release run:
+python3 scripts/verify_release_signature.py --apk <apk> --baseline native/android/release-signing/cert-sha256.txt
+```
+
+The second form returns a verdict as an exit code instead of asking a human to compare hex under stress. Either form needs `apksigner` from the Android SDK build-tools (the comparator exits `7` when it cannot find one); the development machine has no Android SDK, so this leg belongs on a machine that does.
+
+**The two legs prove different things, and the difference is the point.** Leg (b) proves a **published binary** is still signed by our key. It **cannot fail because a backup is unreadable** — it never opens a backup — so it does not, on its own, establish restorability. Leg (a) is what does. Run both; do not let (b) stand in for (a).
+
 ## Restore / disaster recovery
 
 The production episodic store is **managed Cloud SQL PostgreSQL + pgvector** (ADR-008). This section is the recovery path for it: point-in-time restore → stand up → validate → switch the connection → return traffic → review. It is written to be executable end-to-end from this document alone, under stress, without reading anything else.
@@ -370,6 +501,8 @@ Those three facts — backup id, from-revision, start timestamp — are what a t
 
 Neither drill is automated, and nothing in CI runs any part of this section.
 
+Neither drill covers the **release signing keystore** either — a different asset, a different loss mode, and irrecoverable rather than restorable. Its own periodic check is **Release build + APK distribution → Keystore backup and the restorability check** above.
+
 ### Future state — AlloyDB (not today)
 
 Nothing in this repo targets AlloyDB; the production store is Cloud SQL (ADR-008 names AlloyDB as a by-load successor). If that migration happens the sequence above holds, but steps 2 and 3 change shape: AlloyDB point-in-time recovery restores to a **new cluster**, not a new instance, and a restored cluster has no serving endpoint until a **primary instance is created manually** inside it. The connection switch therefore becomes two-step (create the primary, then switch the connection string), and the RTO budget must absorb cluster-plus-instance provisioning rather than a single clone. Revisit this section deliberately when the store moves; do not improvise it during an incident.
@@ -419,7 +552,7 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
 
 1. **Push the branch.** The `android` CI job stages, syncs and runs `./gradlew assembleDebug`.
 2. **Download the artifact** `theygrow-debug-apk` from that job's run page (retention 7 days).
-3. **Install it** on an Android device — `adb install -r app-debug.apk`, or transfer the file and allow installation from unknown sources. It is **debug-signed**: no release keystore exists, and none is created by this packet. That is deliberate — distribution is direct-APK under dark-build discipline (PDR-019) and key custody is a later explicit decision.
+3. **Install it** on an Android device — `adb install -r app-debug.apk`, or transfer the file and allow installation from unknown sources. It is **debug-signed**, and that is still the right thing for this path: an APK off a branch build, for the owner, with no key involved. *(Corrected in RSN-CLOSE: this step read "no release keystore exists, and none is created by this packet", and key custody as "a later explicit decision". A release keystore now exists, it lives in the repository's Actions secrets, release packaging is fail-closed without it (`RSN-P1-INV-001`), and the signed build has its own procedure — see **Release build + APK distribution** above.)* Distribution remains direct-APK under dark-build discipline (PDR-019). **The two builds are signed by different keys, so neither installs over the other** — see the first-install warning in that section before putting a release build on a phone that already has this one.
 4. **Run the on-device smoke.** Nothing in CI or in the parity suite can observe any of this:
    - the app launches and the skills table renders (174 rows);
    - creating or selecting a profile works, and a ticked skill **survives a cold restart** (force-stop, relaunch);

@@ -19,7 +19,18 @@ www/
 *.apk
 *.aab
 
-# Signing material. Nothing in this packet produces a release key (debug
-# signing only), and nothing ever commits one.
+# Signing material. A release key EXISTS since the release-signing milestone
+# (RSN-P1/P2): it lives in the repository's Actions secrets, the release
+# workflow decodes it into RUNNER_TEMP only, and it is never in the tree under
+# any branch. These lines are the last net, not the plan — the plan is that
+# keystore material is handled outside this repository entirely
+# (docs/RUNBOOK.md, "Release build + APK distribution").
+#
+# PKCS12 is the format actually in use — build.gradle sets storeType 'PKCS12'
+# — so .p12/.pfx are covered here too. native/android/.gitignore learned that
+# at RSN-P2; this level did not, and one of three ignore files knowing the real
+# format is the asymmetry this block closes (RSN-CLOSE).
 *.jks
 *.keystore
+*.p12
+*.pfx
