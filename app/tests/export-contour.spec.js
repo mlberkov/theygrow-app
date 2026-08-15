@@ -50,6 +50,13 @@ const SURFACE = fs.readFileSync(
 const DECLARATION = JSON.parse(
     fs.readFileSync(path.join(EXPORT_DIR, 'declaration.json'), 'utf8')
 );
+// The other side of the sink seam (XPT-P1). Read rather than imagined: the bound
+// the app declares has to be the bound the plugin enforces.
+const PLUGIN_SOURCE_PATH = path.resolve(
+    APP_ROOT,
+    '..',
+    'native/android/app/src/main/java/app/theygrow/ExportSinkPlugin.java'
+);
 
 test.describe('the conformance gate can actually pass', () => {
     // WHY THIS EXISTS. The first version of the veraPDF step grepped the report
@@ -221,15 +228,20 @@ test.describe('the artifact is written locally and nowhere else', () => {
     });
 });
 
-test.describe('the sink is one method wide', () => {
+test.describe('the sink is a closed set of write-only methods', () => {
     test('every sink method called is on the declared allowlist', () => {
         const block = /ALLOWED_SINK_METHODS = Object\.freeze\(\[([\s\S]*?)\]\)/.exec(CONFIG_SOURCE);
         expect(block, 'config.js declares no ALLOWED_SINK_METHODS').not.toBeNull();
         const allowed = new Set(Array.from(block[1].matchAll(/'([^']+)'/g)).map((m) => m[1]));
 
-        // One method, and the count is asserted: an allowlist that grows quietly
-        // is an allowlist that has stopped being a boundary.
-        expect(allowed).toEqual(new Set(['createDocument']));
+        // THE SET IS ASSERTED, NOT ITS SIZE, and that is the same boundary this
+        // check has always drawn: an allowlist that grows quietly has stopped
+        // being one. It grew from one method to three at XPT-P1, when the
+        // archive stopped riding the call that opens the file picker — two of
+        // these stage bytes inside the app's own process and the third is the
+        // one that writes, to the single document the parent picked. None of
+        // them can read, list or delete, which is what the boundary is about.
+        expect(allowed).toEqual(new Set(['beginTransfer', 'appendChunk', 'createDocument']));
 
         const called = new Set();
         for (const { source } of EXPORT_SOURCES) {
@@ -282,6 +294,31 @@ test.describe('the config surface carries its provenance', () => {
         expect(shell, 'index.html no longer declares APP_VERSION').not.toBeNull();
         expect(config, 'the export config declares no appVersion').not.toBeNull();
         expect(config[1]).toBe(shell[1]);
+    });
+
+    test('the launch-options ceiling is the same number on both sides of the bridge', () => {
+        // The knob lives in the app's config surface and the bound has to be
+        // held by the plugin, and the two languages share no config surface. So
+        // the number is written twice by hand and asserted equal here — the same
+        // arrangement STORE_CONFIG.sqliteVersionFloor has with
+        // app/tests/schema/harness.py, and for the same reason: a bound that
+        // drifts on one side stops being a bound at all.
+        const declared = /sinkLaunchOptionsMaxBytes: (\d+)/.exec(CONFIG_SOURCE);
+        expect(declared, 'the export config declares no sinkLaunchOptionsMaxBytes').not.toBeNull();
+
+        const plugin = fs.readFileSync(PLUGIN_SOURCE_PATH, 'utf8');
+        const enforced = /LAUNCH_OPTIONS_MAX_BYTES = (\d+)/.exec(plugin);
+        expect(enforced, 'the sink plugin declares no LAUNCH_OPTIONS_MAX_BYTES').not.toBeNull();
+
+        expect(enforced[1]).toBe(declared[1]);
+
+        // The other half of the same guard: the plugin refuses any option key it
+        // does not declare, so that list IS the shape of the launching call.
+        const keys = /LAUNCH_OPTION_KEYS =\s*Arrays\.asList\(([^)]*)\)/.exec(plugin);
+        expect(keys, 'the sink plugin declares no LAUNCH_OPTION_KEYS').not.toBeNull();
+        expect(new Set(Array.from(keys[1].matchAll(/"([^"]+)"/g)).map((m) => m[1]))).toEqual(
+            new Set(['transferId', 'filename', 'mimeType', 'totalBytes'])
+        );
     });
 
     test('the declaration and the config surface agree on the format', () => {

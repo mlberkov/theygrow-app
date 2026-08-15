@@ -114,7 +114,13 @@ module.exports = defineConfig({
       // shipped mount's CSS and modules and drives no browser. Its runtime
       // twin — the click that proves the export modal is actually visible —
       // lives in behavior.spec.js, deliberately not here.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|write-path|import-legacy|signal-payload|show-rule-coverage)\.spec\.js/,
+      // XPT-P1 adds one more off-device unit run: the export sink's transfer,
+      // driven against a fake Capacitor. It is here rather than beside the
+      // instrumented tests because "the chunks reassemble to the bytes that left"
+      // is cheap enough to check on every push, and because the claims that need
+      // a device — saved instance state, the binder limit — are deliberately NOT
+      // made there.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

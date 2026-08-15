@@ -15,14 +15,19 @@
 // current ones rather than copied into the repo:
 //
 //   shell  — app/index.html with every `m/v{cur}/` occurrence rewritten to the
-//            previous mount. Verified at authoring time (EMV-P3): the result is
-//            BYTE-IDENTICAL to app/index.html as published at 711b5bc, the last
-//            commit on main before EMV-P1, because the only change EMV-P1 made
-//            to the shell was that repoint. That identity holds only while that
-//            stays true — a later packet editing index.html for any other reason
-//            turns this into "the current shell repointed at the previous
-//            mount", which is still the right fixture for the mechanism but is
-//            no longer the historical bytes. The spec states this bound too.
+//            previous mount. The identity this buys is stated as of the last
+//            bump rather than once and for all: EVERY packet that has edited
+//            index.html since EMV-P1 has edited it by mount repoint and by
+//            nothing else — EMV-P1 itself, then XPT-P1 — so rewriting the
+//            current shell back one generation reproduces the shell that
+//            generation actually published. (At EMV-P3 that was verified
+//            byte-for-byte against 711b5bc, the last commit on main before
+//            EMV-P1; the anchor moves forward with each bump, and the claim
+//            holds only while "repoint only" stays true.) A later packet
+//            editing index.html for any other reason turns this into "the
+//            current shell repointed at the previous mount", which is still the
+//            right fixture for the mechanism but is no longer the historical
+//            bytes. The spec states this bound too.
 //   worker — app/sw.js under the same rewrite, with CACHE_VERSION decremented.
 //            Behaviourally the worker that generation shipped; byte-different
 //            from it by the one comment block EMV-P1 added. Byte-difference is
@@ -68,8 +73,9 @@ function rewriteMount(source, from, to, where) {
 // the numeric suffix rather than looked up: what the fixture needs is a cache
 // name that is OLDER and byte-different, so that activate() has something to
 // purge and the update path has something to supersede. That it also equals the
-// value actually published (v11, verified at authoring time against 711b5bc) is
-// a bonus, not a dependency.
+// value the previous generation actually published is a bonus, not a dependency,
+// and it has held at every bump so far because each one moved CACHE_VERSION by
+// exactly one (v11 at EMV-P3, verified then against 711b5bc; v12 since XPT-P1).
 //
 // Loud failure, like mutatedServiceWorker(): if sw.js is restructured, this must
 // not silently degrade into staging a worker with the CURRENT cache name — that
