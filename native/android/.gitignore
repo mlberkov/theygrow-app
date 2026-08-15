@@ -56,6 +56,11 @@ captures/
 # Uncomment the following lines if you do not want to check your keystore files in.
 *.jks
 *.keystore
+# PKCS12 is the format actually in use — build.gradle sets storeType 'PKCS12'
+# and the CI fail-closed leg mints a throwaway .p12 — so the two lines above,
+# which name the formats ADR-047 did not take, do not cover it. RSN-P2.
+*.p12
+*.pfx
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

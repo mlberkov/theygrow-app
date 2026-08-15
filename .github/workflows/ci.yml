@@ -121,6 +121,13 @@ jobs:
       - name: pytest (export artifact format)
         run: pytest app/tests/export
 
+      # RSN-P2 — the release signature detector. The release workflow's POSITIVE
+      # verdict can only ever run with the real keystore secret on an
+      # owner-triggered run, so the comparator's ability to go RED is executed
+      # here instead: standard library only, no Android SDK, no secret.
+      - name: pytest (release signature comparator)
+        run: pytest app/tests/release
+
       - name: pre-commit (all files)
         run: pre-commit run --all-files --show-diff-on-failure
 
@@ -291,6 +298,37 @@ jobs:
           path: native/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
           if-no-files-found: error
+
+      # RSN-P2 — the release signature detector, against a REAL apksigner and a
+      # REAL APK. `pytest app/tests/release` in the `quality` job proves the
+      # comparator's LOGIC, but on output this repository wrote; only this step
+      # proves it resolves the apksigner binary and parses what apksigner
+      # actually prints. Those are different claims and both are needed.
+      #
+      # The debug APK is signed by the debug key, whose certificate is by
+      # definition not the release certificate — so the CORRECT verdict here is a
+      # mismatch, and exit 3 specifically. Any other code means the detector is
+      # broken in a way that would go unnoticed until a release run: a green
+      # would mean it cannot tell keys apart, and a 4 or a 7 would mean the real
+      # release run is about to fail for a reason unrelated to the signature.
+      #
+      # Costs one apksigner invocation on an APK this job has already built.
+      # No secret is involved.
+      - name: The signature comparator rejects a foreign certificate
+        run: |
+          set -euo pipefail
+          set +e
+          python3 scripts/verify_release_signature.py \
+            --apk native/android/app/build/outputs/apk/debug/app-debug.apk \
+            --baseline native/android/release-signing/cert-sha256.txt
+          status=$?
+          set -e
+          if [ "${status}" -ne 3 ]; then
+            echo "::error::the comparator returned ${status} against a debug-signed APK;"\
+                 "expected 3 (THEYGROW_RELEASE_CERT_MISMATCH). A detector that cannot go"\
+                 "red for the right reason is not a detector — fix it, do not relax this."
+            exit 1
+          fi
 
       # release-signing — the fail-closed leg of native/android/app/build.gradle,
       # EXECUTED rather than read (AGENTS.md §11). The signing config is not a

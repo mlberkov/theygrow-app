@@ -1,0 +1,15 @@
+# The release signing certificate for app.theygrow — ADR-047 detector (a).
+#
+# PUBLIC. This is a fingerprint OF a certificate, not key material, and it is
+# committed on purpose: it is the comparand `scripts/verify_release_signature.py`
+# checks every release APK against. Never move it into an Actions secret — a
+# detector whose expected value lives in the same secret store as the key it is
+# checking proves nothing.
+#
+# Written in the uppercase colon-separated form `keytool` and the Play Console
+# print, so it can be compared to the source of truth by eye. `apksigner` prints
+# lowercase and colon-free; the comparator normalises both sides.
+#
+# Format: `#` comments and blank lines are ignored; exactly one fingerprint line
+# must remain, and it must be 32 hex octets.
+E0:87:2F:0A:B8:8E:3E:BC:30:DD:3D:5C:F2:37:8D:89:B9:53:55:BA:8E:EA:2B:1E:9F:BD:8F:8C:F4:B2:B9:42
