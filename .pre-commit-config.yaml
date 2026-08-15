@@ -58,7 +58,19 @@ repos:
         # list is again unchanged, and it carries an __init__.py for the same
         # collision reason. It imports `schema.harness`, which resolves because
         # both are packages under the same app/tests root.
-        args: [--config-file=pyproject.toml, api, app/tests/schema, app/tests/export]
+        #
+        # RSN-P2 adds the release signature detector and its suite on the same
+        # terms — standard library only (argparse, re, shutil, subprocess) plus
+        # pytest, so the dependency list is unchanged again. app/tests/release
+        # carries an __init__.py for the same collision reason.
+        args: [
+          --config-file=pyproject.toml,
+          api,
+          app/tests/schema,
+          app/tests/export,
+          app/tests/release,
+          scripts/verify_release_signature.py,
+        ]
         pass_filenames: false
         additional_dependencies:
           - fastapi

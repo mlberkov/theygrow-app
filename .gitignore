@@ -16,6 +16,22 @@ test-results/
 playwright-report/
 blob-report/
 
+# Workflow artifacts downloaded from CI runs (debug APKs, reports, scorecards).
+# Build outputs of a run, never sources; from the release-signing milestone the
+# same directory also receives signed release binaries.
+ci-artifacts/
+
+# Signing material, repository-wide (RSN-CLOSE). The release key lives in
+# Actions secrets and is never in the tree — but the ignore coverage was uneven
+# (native/android/ knew about PKCS12, native/ knew only .jks/.keystore, and this
+# file knew nothing), and the failure mode of that gap is a private key in git
+# history, which no later commit removes. Handling keystore material outside
+# this tree is still the rule; this is the net under it.
+*.jks
+*.keystore
+*.p12
+*.pfx
+
 # Standard ignores (P4 pass)
 .venv/
 __pycache__/
