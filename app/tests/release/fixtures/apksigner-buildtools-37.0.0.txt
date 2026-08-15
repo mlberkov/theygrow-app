@@ -1,0 +1,59 @@
+# RSN-P4 — recorded `apksigner verify --verbose --print-certs` output.
+#
+# PROVENANCE
+#   run:          GitHub Actions run 31896998977 (workflow `CI`, commit 59748ee)
+#   job / step:   `android` / *The signature comparator rejects a foreign certificate*
+#   runner:       ubuntu-24.04
+#   tool:         /usr/local/lib/android/sdk/build-tools/37.0.0/apksigner
+#                 (chosen from six candidates, 34.0.0 through 37.0.0)
+#   subject:      native/android/app/build/outputs/apk/debug/app-debug.apk
+#   apksigner exit code: 0; stdout 1026 bytes, 18 lines; stderr 0 bytes (EMPTY)
+#   recorded:     2026-08-15, from the run log's diagnostic excerpt
+#
+# WHY THIS FILE EXISTS. `app/tests/release/harness.py` builds its comparands
+# programmatically, and everything it builds is output this repository wrote.
+# The defect this fixture pins was invisible to all of it precisely because the
+# repository had never seen what the tool prints: the signer line is
+# SCHEME-QUALIFIED (`V2 Signer:`) and carries no `#N` at all on this build-tools
+# version. These are the only apksigner bytes in the repository that apksigner
+# produced, and that is the whole point of keeping them.
+#
+# TWO THINGS THIS FILE IS NOT, both load-bearing:
+#
+# 1. THE DN LINE IS RECONSTRUCTED, NOT OBSERVED. The comparator redacts the
+#    distinguished name's value before it reaches a log, so the run recorded only
+#    `<redacted: 33 chars>`. The DN below is the canonical Android debug DN, which
+#    is exactly 33 characters and brings this file to exactly the 1026 bytes and
+#    18 lines the run reported. That is corroboration and not observation: no run
+#    log anywhere states this value, and nothing may be asserted about the DN's
+#    content on the strength of this file.
+#
+# 2. THIS IS A RECORD OF SHAPE, NEVER A PINNED VALUE. The digests below belong to
+#    the DEBUG signing key, which is minted per run — the same job tomorrow prints
+#    different hex. Nothing may ever compare a release APK, or the committed
+#    baseline at native/android/release-signing/cert-sha256.txt, against anything
+#    in this file. What is pinned here is the LINE SHAPE the parser must read, and
+#    the five near-miss lines it must refuse.
+#
+# FORMAT. Lines beginning with `#` are this header and are stripped by
+# `release.harness.recorded_output()`; everything after them is verbatim tool
+# output, byte for byte, and its length is asserted by the suite. apksigner emits
+# no line beginning with `#`, so the rule cannot eat recorded output.
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V2 Signer: certificate DN: CN=Android Debug, O=Android, C=US
+V2 Signer: certificate SHA-256 digest: b31b2c7312fcd55a8f3b21046332a38fabb5b76345367fb958294ac1c15faccf
+V2 Signer: certificate SHA-1 digest: c76b496a62cc6080d3ba33ab3de870f40a519632
+V2 Signer: certificate MD5 digest: 6d3422eca24ac0602b74f313abd24ef4
+V2 Signer: key algorithm: RSA
+V2 Signer: key size (bits): 2048
+V2 Signer: public key SHA-256 digest: 56879f9be4c700c6958403ee42d3c8634df191116eb2f741460398c5eddf50ed
+V2 Signer: public key SHA-1 digest: bfba9e4b60477280da2843b4cfa9269687e2b1b2
+V2 Signer: public key MD5 digest: 603592de54da9d88a7236b03efda8573

@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from release.harness import apksigner_output, sdk_range_output
+from release.harness import apksigner_output, scheme_qualified_output, sdk_range_output
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "verify_release_signature.py"
@@ -176,6 +176,68 @@ def test_accepts_the_sdk_range_signer_line(tmp_path: Path) -> None:
     """`Signer (minSdkVersion=…) #1 …` from newer build-tools still parses."""
     result = run_comparator(sdk_range_output(EXPECTED), COMMITTED_BASELINE, tmp_path)
     assert result.returncode == EXIT_OK
+
+
+# --------------------------------------------------------------------------
+# RSN-P4 — the shapes, all of them, none dropped.
+#
+# The observed shape is pinned against recorded bytes in
+# test_recorded_apksigner_output.py. What these add is that widening to it did
+# not COST the older ones: the release workflow and the `android` job need not
+# run the same runner image, so more than one shape can still reach this parser.
+# The two tests above are the classic `Signer #N` and rotation-aware forms and
+# are part of this group.
+# --------------------------------------------------------------------------
+
+
+def test_accepts_the_scheme_qualified_signer_line(tmp_path: Path) -> None:
+    """`V2 Signer: certificate SHA-256 digest:` — no `#N` anywhere on the line."""
+    output = scheme_qualified_output(EXPECTED)
+    assert "Signer #" not in output
+    result = run_comparator(output, COMMITTED_BASELINE, tmp_path)
+    assert result.returncode == EXIT_OK
+
+
+def test_accepts_a_scheme_qualified_sdk_range_line(tmp_path: Path) -> None:
+    """Both prefixes at once — accepted by construction, not by observation.
+
+    Nothing in this repository's evidence shows apksigner printing the scheme
+    qualifier and the rotation parenthetical together. It is accepted because a
+    parser handling each half alone and failing on the pair is a surprise best
+    not met for the first time on a release run.
+    """
+    result = run_comparator(
+        scheme_qualified_output(EXPECTED, schemes=("V3",), sdk_range=True),
+        COMMITTED_BASELINE,
+        tmp_path,
+    )
+    assert result.returncode == EXIT_OK
+
+
+def test_one_certificate_under_several_schemes_collapses_to_one_digest(tmp_path: Path) -> None:
+    """An APK signed under v2 AND v3 prints one block per scheme, same certificate.
+
+    That is the COLLAPSE case, not the multiple-signers case: `evaluate` builds a
+    SET of digests, so the same certificate reported three times is one identity
+    and the verdict is the ordinary one. Getting this wrong would turn every
+    multi-scheme release APK into exit 6 — a fail-closed red on a correctly
+    signed artifact, discovered on an owner's release run.
+    """
+    output = scheme_qualified_output(EXPECTED, schemes=("V2", "V3", "V3.1"))
+    assert output.count("certificate SHA-256 digest") == 3
+    result = run_comparator(output, COMMITTED_BASELINE, tmp_path)
+    assert result.returncode == EXIT_OK
+
+
+def test_different_certificates_across_schemes_are_still_multiple_signers(tmp_path: Path) -> None:
+    """The other side of the same coin: collapsing must not hide a second identity."""
+    result = run_comparator(
+        scheme_qualified_output(EXPECTED, ONE_NIBBLE_OFF, schemes=("V2", "V3")),
+        COMMITTED_BASELINE,
+        tmp_path,
+    )
+    assert result.returncode == EXIT_MULTIPLE_SIGNERS
+    assert "THEYGROW_RELEASE_CERT_MULTIPLE_SIGNERS" in result.stderr
 
 
 # --------------------------------------------------------------------------

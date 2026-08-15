@@ -45,10 +45,22 @@ can carry a person's name — the certificate DN — has its VALUE redacted whil
 the line itself stays visible, since "a certificate block was present" is the
 diagnostically load-bearing half.
 
-The diagnostics never move a verdict. What is parsed (stdout), what is matched
-(the certificate line, never the public-key one) and the exit codes the two
-workflows branch on are untouched by this packet — deliberately, because this
-push is the measurement that tells a later packet which of them to repair.
+The diagnostics never move a verdict. RSN-P3 left what is parsed (stdout), what
+is matched and the exit codes deliberately unmoved, because that push WAS the
+measurement that would tell a later packet which of them to repair.
+
+THE REPAIR (RSN-P4). The measurement came back on CI run 31896998977: the
+certificate block was on stdout, stderr was empty, and the READING line named a
+PATTERN defect. build-tools 37.0.0 prints `V2 Signer: certificate SHA-256
+digest: <64 hex>` — scheme-qualified, and with no `#N` on the line at all — which
+the pattern of the day missed three ways at once. The pattern is widened here to
+the four shapes named in the ledger below, the older ones KEPT because the two
+workflows need not run the same image, and the real bytes are recorded at
+`app/tests/release/fixtures/`. What is NOT widened: `certificate` and `SHA-256`
+stay mandatory and adjacent, because the same block carries five near-misses and
+one of them is a 64-hex public-key digest that would read as a green on the
+wrong key. The stream, the exit codes and the tokens the two workflows branch on
+are still untouched.
 """
 
 from __future__ import annotations
@@ -81,25 +93,61 @@ TOKEN_MULTIPLE_SIGNERS = "THEYGROW_RELEASE_CERT_MULTIPLE_SIGNERS"
 TOKEN_APKSIGNER_ABSENT = "THEYGROW_RELEASE_APKSIGNER_ABSENT"
 TOKEN_APK_UNVERIFIED = "THEYGROW_RELEASE_APK_UNVERIFIED"
 
-# THE `certificate` IN THIS PATTERN IS LOAD-BEARING. apksigner prints BOTH
+# THE SHAPE LEDGER. This pattern is the whole reading half of the detector, so
+# what it accepts and what it refuses are both written down here.
 #
+# ACCEPTED — all four are the same line with different prefixes, and the prefix
+# is the part that varies by build-tools version and by how the APK was signed:
+#
+#   V2 Signer: certificate SHA-256 digest: <64 hex>                  <- OBSERVED
 #   Signer #1 certificate SHA-256 digest: <64 hex>
-#   Signer #1 public key SHA-256 digest:  <64 hex>
+#   Signer (minSdkVersion=24, maxSdkVersion=2147483647) #1 certificate SHA-256 digest: <64 hex>
+#   V3 Signer (minSdkVersion=…, maxSdkVersion=…) #1 certificate SHA-256 digest: <64 hex>
 #
-# for the same signer, and they are DIFFERENT values. A pattern that matched
-# "SHA-256 digest" alone would compare the public-key digest against a
-# certificate fingerprint and be wrong in both directions — red on a correctly
-# signed APK, and, if a baseline were ever recorded from the same wrong line,
-# green on an incorrectly signed one. `app/tests/release` pins this with output
-# that carries the public-key lines and no certificate line.
+# The first is what build-tools 37.0.0 actually printed on CI run 31896998977 —
+# SCHEME-QUALIFIED, and with no `#N` anywhere on the line. The pattern that stood
+# until RSN-P4 required `Signer` at the start AND a `#N`, so it missed that line
+# three ways at once and the detector returned 4 on every run since RSN-P2. The
+# older shapes are KEPT rather than replaced: the release workflow and the
+# `android` job need not run the same runner image, so the shape that reaches
+# this parser is not a single known quantity. `app/tests/release` pins all four,
+# and the observed one against recorded bytes (`fixtures/`).
 #
-# The `Signer\b.*?#\d+` prefix tolerates the
-# `Signer (minSdkVersion=24, maxSdkVersion=2147483647) #1 ...` form that newer
-# build-tools emit when the signature differs across an SDK range.
+# REFUSED, and this is the half that matters. The same signer block carries FIVE
+# near-misses, and one output holds all of them:
+#
+#   V2 Signer: certificate SHA-1 digest: <40 hex>        wrong algorithm
+#   V2 Signer: certificate MD5 digest: <32 hex>          wrong algorithm
+#   V2 Signer: public key SHA-256 digest: <64 hex>       WRONG THING, RIGHT SHAPE
+#   V2 Signer: public key SHA-1 digest: <40 hex>         wrong thing and algorithm
+#   V2 Signer: public key MD5 digest: <32 hex>           wrong thing and algorithm
+#
+# The third is the catastrophic one: 64 hex characters, indistinguishable by
+# shape from the answer, belonging to a different thing. A pattern matching
+# "SHA-256 digest" alone would compare it against a certificate fingerprint and
+# be wrong in both directions — red on a correctly signed APK, and, if a baseline
+# were ever recorded from the same wrong line, GREEN ON AN INCORRECTLY SIGNED
+# ONE. That is why `certificate` and `SHA-256` are both mandatory and adjacent,
+# and why each of the five is pinned by its own test.
+#
+# `[^:\n]` and not `[^:]`: `.`-like classes match newlines, and under
+# re.MULTILINE the anchors are per-line while the class is not — so `[^:]` would
+# happily join a `Signer` line to a `certificate SHA-256 digest:` line further
+# down whenever no colon fell in between, reading a digest that is not on the
+# signer line at all. Today's output always intervenes a colon, so that was
+# latent rather than live; latent is exactly what surfaces on the next tool
+# version. The horizontal-only `[ \t]` runs are the same rule applied to the
+# separators. Leading whitespace is deliberately NOT tolerated: this parser is
+# widened to the shapes that were MEASURED, and no further.
 _CERT_DIGEST = re.compile(
-    r"^Signer\b.*?#\d+\s+certificate\s+SHA-256\s+digest:\s*([0-9a-fA-F]{64})\s*$",
+    r"^(?:V\d+(?:\.\d+)?[ \t]+)?Signer\b[^:\n]*?:?[ \t]*"
+    r"certificate[ \t]+SHA-256[ \t]+digest:[ \t]*([0-9a-fA-F]{64})[ \t]*$",
     re.MULTILINE,
 )
+
+# The accepted shapes, in the words the failure messages use. One string, so the
+# ledger above, the unparseable verdict and the READING line cannot drift apart.
+ACCEPTED_SHAPE = "`[V<n> ]Signer[ (minSdkVersion=…)][ #N] certificate SHA-256 digest: <64 hex>`"
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -165,9 +213,10 @@ def evaluate(certs_output: str, baseline: str) -> Verdict:
         return Verdict(
             EXIT_UNPARSEABLE,
             TOKEN_UNPARSEABLE,
-            "no `Signer #N certificate SHA-256 digest:` line was found in the apksigner "
-            "output. The APK may be unsigned, or the output format may have changed — "
-            "either way the signature has NOT been verified and this must not pass.",
+            f"no line matching {ACCEPTED_SHAPE} was found in the apksigner output. The "
+            "APK may be unsigned, this may not be apksigner output at all, or the output "
+            "format may have changed again — either way the signature has NOT been "
+            "verified and this must not pass. The diagnostic block below says which.",
         )
 
     if len(found) > 1:
@@ -295,7 +344,8 @@ def absent_verdict() -> Verdict:
     return Verdict(
         EXIT_APKSIGNER_ABSENT,
         TOKEN_APKSIGNER_ABSENT,
-        "no apksigner found under $ANDROID_HOME/build-tools/*/ or on PATH. It ships "
+        "no apksigner found under $ANDROID_HOME/build-tools/*/ or "
+        "$ANDROID_SDK_ROOT/build-tools/*/, or on PATH. It ships "
         "with the Android SDK build-tools; if the runner image has stopped providing "
         "it, install one explicitly (`sdkmanager 'build-tools;36.0.0'`) rather than "
         "substituting a check that does not verify the signature.",
@@ -418,8 +468,11 @@ def reading(parsed_label: str, parsed: str, other_label: str | None, other: str)
         return (
             f"  READING: the certificate block IS on {parsed_label} — {signer} line(s) mentioning "
             f"`Signer`, {certificate} mentioning `certificate` — but not one of them matched "
-            "`Signer … #N certificate SHA-256 digest: <64 hex>`. This is a PATTERN defect: read "
-            "the `Signer` lines in the excerpt below verbatim and compare them to that shape."
+            f"{ACCEPTED_SHAPE}. This is a PATTERN defect: read the `Signer` lines in the excerpt "
+            "below verbatim and compare them to that shape. RSN-P4 widened this pattern once "
+            "already, from a measurement exactly like this one; widen it to what THIS log shows "
+            "and record those bytes as a fixture. Never widen it past `certificate SHA-256` — "
+            "the public-key digest on the neighbouring line is the same shape and the wrong key."
         )
 
     return (
@@ -530,6 +583,16 @@ def main(argv: list[str]) -> int:
         choice = find_apksigner()
         if choice.chosen is None:
             return report(absent_verdict(), describe_choice(choice))
+
+        # WHICH TOOL BLESSED THIS, ON EVERY VERDICT AND NOT ONLY THE RED ONES.
+        # The build-tools version is not pinned (see find_apksigner), and the
+        # shape this parser reads has already changed once under a version bump
+        # nobody watched. The full resolution block still appears only on 4/7/8;
+        # this is one line, it carries no THEYGROW_RELEASE_* token, nothing parses
+        # it, and it means a GREEN run also records what produced the output it
+        # passed — so the next shape change is visible in a diff of two passing
+        # logs rather than discovered by the red that follows it.
+        print(f"apksigner: {choice.chosen} (found via {choice.source})")
 
         run = invoke_apksigner(choice.chosen, args.apk)
         if run.returncode != 0:

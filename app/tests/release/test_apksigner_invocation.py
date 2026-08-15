@@ -8,15 +8,15 @@ or nothing on the parsed stream at all. The diagnostic block added by this packe
 is what tells them apart, and a diagnostic asserted only by reading it is the
 failure that produced this packet. So it is executed here.
 
-WHAT THIS PROVES AND WHAT IT DOES NOT. The apksigner here is a shell stub this
+WHAT THIS PROVES AND WHAT IT DOES NOT. The apksigner here is a Python stub this
 repository wrote. That makes every claim below a claim about the comparator's
 PLUMBING — which binary it resolves out of several, which stream it parses, what
 it prints when it cannot parse, and that none of it moves a verdict. It proves
 NOTHING about what a real apksigner prints, which is exactly the gap that opened
 this packet, and which only the `android` job can close.
 
-The suite is POSIX-only: the stub is a `#!/bin/sh` script. Both CI runners and
-the development machine are Linux.
+The suite is POSIX-only: the stub is an executable script behind a shebang, run
+by path. Both CI runners and the development machine are Linux.
 """
 
 from __future__ import annotations
@@ -128,6 +128,38 @@ def test_a_foreign_certificate_still_returns_three_and_carries_no_excerpt(tmp_pa
     assert "THEYGROW_RELEASE_CERT_MISMATCH" in result.stderr
     assert "how apksigner was resolved" not in result.stderr
     assert "--- apksigner stdout" not in result.stderr
+    # RSN-P4: the one-line resolution note IS here, and the block is not. The
+    # distinction is the point — the version floats, so every verdict records
+    # which tool produced it, while the diagnostic block stays confined to the
+    # three verdicts that are blind.
+    assert "apksigner: " in result.stdout
+    assert "build-tools/36.0.0" in result.stdout
+
+
+def test_every_verdict_records_which_apksigner_produced_it(tmp_path: Path) -> None:
+    """Including the GREEN one, which is the case that had no record at all.
+
+    The build-tools version is not pinned, and the shape this comparator reads
+    already changed once under a version bump nobody watched (RSN-P4). A passing
+    run that does not say which tool it passed against cannot be diffed against
+    the next passing run, so the change is discovered by the red that follows it.
+    """
+    result = run_against_stub(tmp_path, stdout=apksigner_output(BASELINE), version="36.0.0")
+    assert result.returncode == EXIT_OK
+    assert str(tmp_path / "sdk" / "build-tools" / "36.0.0" / "apksigner") in result.stdout
+    assert "found via build-tools/36.0.0" in result.stdout
+    # It is a log line and nothing more: no token, so nothing greps it as a verdict.
+    assert "THEYGROW_RELEASE" not in result.stdout.split("\n")[0]
+
+
+def test_the_newest_tool_is_the_one_named_on_a_green_verdict(tmp_path: Path) -> None:
+    """The note has to name the tool that actually ran, not the first one found."""
+    result = run_against_stub(
+        tmp_path, stdout=apksigner_output(BASELINE), version="36.0.0", also_install=("9.0.0",)
+    )
+    assert result.returncode == EXIT_OK
+    assert "found via build-tools/36.0.0" in result.stdout
+    assert "9.0.0" not in result.stdout
 
 
 # --------------------------------------------------------------------------
