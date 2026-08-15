@@ -62,7 +62,9 @@ PUBLIC_KEY_SHA256 = "56879f9be4c700c6958403ee42d3c8634df191116eb2f741460398c5edd
 FOREIGN = "9" * 64
 
 
-def run_comparator(certs_output: str, baseline: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
+def run_comparator(
+    certs_output: str, baseline: str, tmp_path: Path
+) -> subprocess.CompletedProcess[str]:
     """Drive the CLI seam, which is the contract the two workflows branch on."""
     certs_file = tmp_path / "certs.txt"
     certs_file.write_text(certs_output, encoding="utf-8")
@@ -156,10 +158,14 @@ def test_the_public_key_digest_is_never_the_answer(tmp_path: Path) -> None:
 HEADER = "Verifies\nNumber of signers: 1\n"
 
 NEAR_MISSES = {
-    "certificate-sha1": "V2 Signer: certificate SHA-1 digest: c76b496a62cc6080d3ba33ab3de870f40a519632",
+    "certificate-sha1": (
+        "V2 Signer: certificate SHA-1 digest: c76b496a62cc6080d3ba33ab3de870f40a519632"
+    ),
     "certificate-md5": "V2 Signer: certificate MD5 digest: 6d3422eca24ac0602b74f313abd24ef4",
     "public-key-sha256": f"V2 Signer: public key SHA-256 digest: {PUBLIC_KEY_SHA256}",
-    "public-key-sha1": "V2 Signer: public key SHA-1 digest: bfba9e4b60477280da2843b4cfa9269687e2b1b2",
+    "public-key-sha1": (
+        "V2 Signer: public key SHA-1 digest: bfba9e4b60477280da2843b4cfa9269687e2b1b2"
+    ),
     "public-key-md5": "V2 Signer: public key MD5 digest: 603592de54da9d88a7236b03efda8573",
 }
 
