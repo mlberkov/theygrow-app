@@ -1,5 +1,100 @@
 apply plugin: 'com.android.application'
 
+// ---------------------------------------------------------------------------
+// RELEASE SIGNING AND DERIVED VERSION (ADR-047).
+//
+// The release APK is signed by our own key. The key itself never exists in this
+// repository under any branch: it lives in the repository's Actions secrets, is
+// decoded to a file by the release workflow, and reaches Gradle only as the
+// three environment variables read below. Nothing here echoes a value — not to
+// a log, not into an exception message — and no value is ever interpolated into
+// a string. The variable NAMES are not secrets and are named freely.
+//
+//   ANDROID_KEYSTORE_PATH      path to the decoded PKCS12 keystore (not secret)
+//   ANDROID_KEYSTORE_PASSWORD  the store password
+//   ANDROID_KEY_ALIAS          the key alias
+//
+// Gradle never sees the base64 transport encoding: decoding is the workflow's
+// job, so the encoded key never enters this process's heap or its build tree.
+//
+// FAIL-CLOSED. A release build with no signing environment, an unopenable
+// keystore or a missing alias must FAIL — never emit an unsigned APK, and never
+// fall back to the debug key. The enforcement is the `gradle.taskGraph`
+// guard at the bottom of this file, which aborts before any task executes; each
+// of its errors starts with a bare THEYGROW_RELEASE_* token so a raw CI log can
+// be grepped for it. The guard is exercised by the `android` job in
+// .github/workflows/ci.yml, which runs :app:assembleRelease with the
+// environment absent and with an unopenable keystore and asserts both failures.
+// ---------------------------------------------------------------------------
+
+def signingEnvNames = ['ANDROID_KEYSTORE_PATH', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS']
+def signingEnv = signingEnvNames.collectEntries { [(it): System.getenv(it)] }
+def missingSigningEnv = signingEnvNames.findAll { !signingEnv[it] }
+def signingEnvComplete = missingSigningEnv.isEmpty()
+
+// A relative ANDROID_KEYSTORE_PATH resolves against native/android/, so the
+// value means the same thing whichever module Gradle is configuring. The path
+// is not a secret and is the one signing value the errors below may print.
+def keystoreFile = null
+if (signingEnvComplete) {
+    keystoreFile = new File(signingEnv['ANDROID_KEYSTORE_PATH'])
+    if (!keystoreFile.isAbsolute()) {
+        keystoreFile = new File(rootProject.projectDir, signingEnv['ANDROID_KEYSTORE_PATH'])
+    }
+}
+
+// versionCode is derived from the commit, not from the CI run: building the
+// same commit twice must yield the same versionCode. `git rev-list --count
+// HEAD` is reproducible from the commit and monotone along ancestry, which is
+// what an update chain needs. A CI run number satisfies neither.
+//
+// The count is only trustworthy in a COMPLETE clone. actions/checkout defaults
+// to depth 1, where the count is 1 for every commit — so a shallow tree
+// resolves to "unresolved" and the release path fails closed on it (a release
+// APK carrying a wrong versionCode breaks the update chain, and a broken update
+// chain costs family data — ADR-043 §3). Every other path falls back to 1,
+// which is bit-for-bit the value this file carried before release signing, so
+// the debug gate's output is unchanged.
+def gitOutput = { List<String> argv ->
+    try {
+        def execOutput = providers.exec { spec ->
+            spec.workingDir = rootProject.projectDir
+            spec.commandLine = argv
+            spec.ignoreExitValue = true
+        }
+        if (execOutput.result.get().exitValue != 0) {
+            return null
+        }
+        return execOutput.standardOutput.asText.get().trim()
+    } catch (Exception ignored) {
+        // No git binary, or not a work tree. Unresolved, not fatal — the guard
+        // below decides what that costs, and it costs the release path only.
+        return null
+    }
+}
+
+def resolveCommitCount = { ->
+    def shallow = gitOutput(['git', 'rev-parse', '--is-shallow-repository'])
+    if (shallow != 'false') {
+        return null
+    }
+    def count = gitOutput(['git', 'rev-list', '--count', 'HEAD'])
+    if (count == null || !(count ==~ /\d+/)) {
+        return null
+    }
+    def parsed = count as int
+    return parsed > 0 ? parsed : null
+}
+
+// changed_in: the release-signing packet. The marketing half of versionName is
+// the one number here a human ever chooses; bumping it (0.1 -> 0.2) is a
+// deliberate act, and the build half after it is derived and never hand-edited.
+def MARKETING_VERSION = '0.1'
+def FALLBACK_VERSION_CODE = 1
+
+def commitCount = resolveCommitCount()
+def resolvedVersionCode = commitCount ?: FALLBACK_VERSION_CODE
+
 android {
     namespace = "app.theygrow"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +102,8 @@ android {
         applicationId "app.theygrow"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode resolvedVersionCode
+        versionName "${MARKETING_VERSION}.${resolvedVersionCode}".toString()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,11 +111,115 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            // Populated ONLY from the environment, and only when all three
+            // variables are present and the keystore is where they say it is.
+            // When they are not, this config stays empty and the task-graph
+            // guard below aborts any release packaging before it can run.
+            if (signingEnvComplete && keystoreFile.isFile()) {
+                storeType 'PKCS12'
+                storeFile keystoreFile
+                storePassword signingEnv['ANDROID_KEYSTORE_PASSWORD']
+                keyAlias signingEnv['ANDROID_KEY_ALIAS']
+
+                // THE SAME VARIABLE AS storePassword, AND IT MUST STAY THAT WAY.
+                // A PKCS12 keystore has no separate key-entry password —
+                // established by an actual keytool run, which refuses to set one
+                // ("Different store and key passwords not supported for PKCS12
+                // KeyStores"). ADR-047 as written asks for two passwords; this
+                // is the accepted, recorded deviation, implementing the factual
+                // shape rather than the written one. There is no fourth secret
+                // and there will not be one, so do not "fix" this into an
+                // ANDROID_KEY_PASSWORD variable that cannot carry a value.
+                keyPassword signingEnv['ANDROID_KEYSTORE_PASSWORD']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Unconditional on purpose: "the release variant is signed by the
+            // release config" holds as a declaration whatever the environment
+            // says, and the config it names is never the debug one. If the guard
+            // below were ever bypassed, what is left is an EMPTY signing config,
+            // which AGP's own validation is expected to reject — expected, not
+            // proven here, because the guard fires first and the guard is what
+            // the CI step exercises.
+            signingConfig signingConfigs.release
         }
+    }
+}
+
+// FAIL-CLOSED GUARD. Fires before any task executes, for release PACKAGING
+// tasks of this module only — packageRelease, signReleaseBundle,
+// packageReleaseBundle, i.e. what assembleRelease and bundleRelease pull in.
+// lint*Release and every debug task are deliberately outside the pattern, so a
+// debug build with no signing environment is unaffected.
+def guardedProjectPath = project.path
+def releasePackagingPattern = ~/^(package|sign)[A-Za-z]*Release[A-Za-z]*$/
+
+gradle.taskGraph.whenReady { graph ->
+    def packagesRelease = graph.allTasks.any { task ->
+        task.path.startsWith("${guardedProjectPath}:") && (task.name ==~ releasePackagingPattern)
+    }
+    if (!packagesRelease) {
+        return
+    }
+
+    if (!signingEnvComplete) {
+        throw new GradleException(
+            "THEYGROW_RELEASE_SIGNING_MISSING: release packaging needs the signing" +
+            " environment, and these variables are unset or empty: " +
+            missingSigningEnv.join(', ') +
+            ". The release workflow decodes the keystore from Actions secrets and" +
+            " exports them; a release APK is never produced without them, and never" +
+            " falls back to the debug key."
+        )
+    }
+
+    if (!keystoreFile.isFile() || !keystoreFile.canRead()) {
+        throw new GradleException(
+            "THEYGROW_RELEASE_KEYSTORE_UNREADABLE: ANDROID_KEYSTORE_PATH does not" +
+            " name a readable file: " + keystoreFile.path
+        )
+    }
+
+    def store = java.security.KeyStore.getInstance('PKCS12')
+    try {
+        keystoreFile.withInputStream { input ->
+            store.load(input, signingEnv['ANDROID_KEYSTORE_PASSWORD'].toCharArray())
+        }
+    } catch (Exception failure) {
+        // The exception CLASS only. Its message is upstream's text about a file
+        // we opened with a secret, and this string reaches a CI log.
+        throw new GradleException(
+            "THEYGROW_RELEASE_KEYSTORE_UNREADABLE: the PKCS12 keystore at" +
+            " ANDROID_KEYSTORE_PATH could not be opened with" +
+            " ANDROID_KEYSTORE_PASSWORD (" + failure.class.name + "): " +
+            keystoreFile.path
+        )
+    }
+
+    if (!store.containsAlias(signingEnv['ANDROID_KEY_ALIAS'])) {
+        // Neither the alias asked for nor the aliases present are printed: the
+        // alias is an Actions secret, and enumerating the keystore would leak it
+        // from the other side.
+        throw new GradleException(
+            "THEYGROW_RELEASE_KEY_ALIAS_ABSENT: the keystore opened, but it holds" +
+            " no entry under ANDROID_KEY_ALIAS."
+        )
+    }
+
+    if (commitCount == null) {
+        throw new GradleException(
+            "THEYGROW_RELEASE_VERSIONCODE_UNRESOLVED: versionCode is derived from" +
+            " `git rev-list --count HEAD` and could not be resolved — the checkout" +
+            " is shallow, or this is not a git work tree. Check out with" +
+            " fetch-depth: 0. A release APK with a wrong versionCode cannot be" +
+            " updated over, and the update chain carries family data."
+        )
     }
 }
 

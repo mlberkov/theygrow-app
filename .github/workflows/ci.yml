@@ -211,16 +211,20 @@ jobs:
   # be able to hide another.
   #
   # This job exists because NOTHING about the native build can be proven on the
-  # development machine — it has no JDK, no Android SDK and no Gradle, and the
-  # Capacitor CLI needs Node >= 22 where that box has 18. Every other check in
-  # this packet runs locally; "the Android shell compiles" is the one claim that
-  # is true only if this job is green.
+  # development machine — it has no Android SDK and no Gradle (a JDK 21 has
+  # arrived on that box since this was written; the SDK and Gradle have not),
+  # and the Capacitor CLI needs Node >= 22 where that box has 18. Every other
+  # check in this packet runs locally; "the Android shell compiles" is the one
+  # claim that is true only if this job is green.
   #
-  # It builds a DEBUG APK and nothing else. No release keystore, no signing
-  # secret, no store upload: distribution is direct-APK under dark-build
-  # discipline (PDR-019), and key custody is a later, explicit decision. The
-  # artifact is how the owner gets something installable without a local
-  # toolchain.
+  # The only APK it BUILDS is the debug one. From the release-signing packet it
+  # also runs `:app:assembleRelease` twice — to prove each run FAILS closed, so
+  # neither produces anything. No release keystore and no signing secret reach
+  # this job: the only keystore it ever holds is a throwaway it mints itself,
+  # and the real one is decoded by the release workflow, from Actions secrets,
+  # elsewhere. No store upload either: distribution is direct-APK under
+  # dark-build discipline (PDR-019). The artifact is how the owner gets
+  # something installable without a local toolchain.
   #
   # Order matters and is not incidental: stage -> sync -> assemble. The staged
   # web root is derived from app/Dockerfile's COPY list, `cap sync` copies it
@@ -287,6 +291,89 @@ jobs:
           path: native/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
           if-no-files-found: error
+
+      # release-signing — the fail-closed leg of native/android/app/build.gradle,
+      # EXECUTED rather than read (AGENTS.md §11). The signing config is not a
+      # runtime claim because it exists; it is one because these two runs of the
+      # real packaging task fail, here, for the named reason.
+      #
+      # WHY THIS JOB AND NOT `android-instrumented`. The standing rule sends
+      # EXPENSIVE verifiers to the dispatch job. This one is not expensive: the
+      # guard throws at task-graph-ready, before a single compile or packaging
+      # task executes, so each run costs a Gradle configuration and no build.
+      # It needs no emulator, no secret and no network beyond what the debug
+      # assemble above already fetched.
+      #
+      # AFTER the upload on purpose: a red result here must not also cost the
+      # owner the installable debug APK this job exists to produce.
+      #
+      # It is also the only detector for the guard. Delete the guard from
+      # build.gradle and this step goes red — not quietly green, which is what a
+      # source scan for the same property would do.
+      - name: Release packaging fails closed without a usable signing environment
+        working-directory: native/android
+        env:
+          FAILCLOSED_LOGS: ${{ runner.temp }}/release-failclosed
+        run: |
+          set -euo pipefail
+          mkdir -p "${FAILCLOSED_LOGS}"
+
+          # The log is grepped, never uploaded: it is the output of a build that
+          # was handed a keystore password, even a throwaway one.
+          assert_named_failure () {
+            token="$1"; log="$2"
+            if [ ! -s "${log}" ]; then
+              echo "::error::${token}: the build produced no log at ${log}"
+              exit 1
+            fi
+            if ! grep -qF "${token}" "${log}"; then
+              echo "::error::the release build failed, but not with ${token} —"\
+                   "read the tail below and fix the guard, do not relax this check"
+              tail -n 40 "${log}"
+              exit 1
+            fi
+            echo "ok: ${token}"
+          }
+
+          assert_no_release_apk () {
+            found="$(find app/build/outputs/apk/release -name '*.apk' 2>/dev/null || true)"
+            if [ -n "${found}" ]; then
+              echo "::error::a release APK exists after a build that had to fail closed: ${found}"
+              exit 1
+            fi
+          }
+
+          # 1. No signing environment at all. This is the shape a mistaken manual
+          #    run takes, and the one that must never yield an unsigned APK.
+          if ./gradlew --no-daemon :app:assembleRelease > "${FAILCLOSED_LOGS}/no-env.log" 2>&1; then
+            echo "::error::assembleRelease SUCCEEDED with no signing environment"
+            exit 1
+          fi
+          assert_named_failure THEYGROW_RELEASE_SIGNING_MISSING "${FAILCLOSED_LOGS}/no-env.log"
+          assert_no_release_apk
+
+          # 2. A keystore that cannot be opened. Both passwords are minted here,
+          #    at runtime, and are random: no password-shaped literal enters the
+          #    repository, and this proves the leg WITHOUT any real secret. The
+          #    throwaway key is RSA 2048 / 1 day because it exists to be rejected
+          #    — it is not, and must never be confused with, the release key.
+          store_password="$(openssl rand -hex 24)"
+          wrong_password="$(openssl rand -hex 24)"
+          keytool -genkeypair -noprompt \
+            -storetype PKCS12 -keystore "${RUNNER_TEMP}/throwaway.p12" \
+            -storepass "${store_password}" -keypass "${store_password}" \
+            -alias throwaway -keyalg RSA -keysize 2048 -validity 1 \
+            -dname "CN=throwaway, OU=ci, O=ci, L=ci, ST=ci, C=ZZ" > /dev/null
+
+          if ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/throwaway.p12" \
+             ANDROID_KEYSTORE_PASSWORD="${wrong_password}" \
+             ANDROID_KEY_ALIAS=throwaway \
+             ./gradlew --no-daemon :app:assembleRelease > "${FAILCLOSED_LOGS}/bad-password.log" 2>&1; then
+            echo "::error::assembleRelease SUCCEEDED against a keystore it cannot open"
+            exit 1
+          fi
+          assert_named_failure THEYGROW_RELEASE_KEYSTORE_UNREADABLE "${FAILCLOSED_LOGS}/bad-password.log"
+          assert_no_release_apk
 
   # L1-P2 — the instrumented store gate. `android` proves the shell COMPILES;
   # this proves the engine underneath it. The schema frozen in this packet stands

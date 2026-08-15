@@ -16,6 +16,11 @@ test-results/
 playwright-report/
 blob-report/
 
+# Workflow artifacts downloaded from CI runs (debug APKs, reports, scorecards).
+# Build outputs of a run, never sources; from the release-signing milestone the
+# same directory also receives signed release binaries.
+ci-artifacts/
+
 # Standard ignores (P4 pass)
 .venv/
 __pycache__/
