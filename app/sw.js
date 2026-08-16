@@ -112,6 +112,10 @@ const OFFLINE_URLS = [
   '/m/v6/store/journal.js',
   '/m/v6/store/repo-journal.js',
   '/m/v6/store/import-legacy.js',
+  // DIA-P3 — the diary record path. Precached with the rest of the store
+  // because the diary is the app shell now, not an extra: a parent who opens
+  // the app offline must still be able to write down what happened today.
+  '/m/v6/store/records.js',
   '/m/v6/store/bridge.js',
   // DIA-P1 — the transfer seam. The three transfer/ modules it imports are
   // already precached above, for the handoff page; this is the app-side door

@@ -88,6 +88,29 @@ export const STORE_CONFIG = Object.freeze({
     // per round trip. SQLite's default parameter ceiling is 999, so this stays
     // well under it; it bounds the probe, not the import.
     legacyImportProbeBatch: 200,
+
+    // changed_in: DIA-DL-005 — the title of the area a diary entry lives in. A
+    // STABLE TOKEN, not a display string: this area is an internal container
+    // that no surface shows, and a title in the product's language would become
+    // a string to translate and, once written into a family's history, to
+    // migrate. What a parent reads is the diary surface's own heading.
+    diaryAreaTitle: 'diary',
+
+    // changed_in: DIA-DL-005 — the visibility class of that area, and the class
+    // the read path filters on. `participant_private` is not a cautious guess:
+    // PDR-026's annotation of 2026-08-11 keeps the grounding quote in the
+    // author's private area and gives the second parent a pointer to the
+    // author's records instead, "otherwise copying the quote into a shared
+    // assertion would leak private diary text". The quote comes out of a
+    // record, so the record is private by construction. A knob rather than a
+    // literal because it is asserted in three places — insert, lookup, read —
+    // and three literals are three chances to disagree.
+    diaryAreaVisibility: 'participant_private',
+
+    // changed_in: DIA-DL-005 — how many diary entries the list surface renders.
+    // A bound on the RENDER, never on what is stored: nothing truncates a
+    // parent's text and no write consults this number.
+    diaryListLimit: 200,
 });
 
 // The complete set of plugin methods this app is allowed to call.

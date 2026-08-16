@@ -92,6 +92,35 @@ def plugin_split(statements: str) -> list[str]:
     return flattened
 
 
+def js_string_constant(source: str, name: str, where: str) -> str:
+    """Read a `const NAME = '...' + '...';` string out of shipped JavaScript.
+
+    Fails closed in both directions: an absent constant and a constant whose
+    right-hand side is not a concatenation of single-quoted literals both raise,
+    because a parser that silently returned "" would turn every assertion built
+    on it into a test of the empty string.
+
+    Lives here since DIA-P3, when a second module needed it: the diary write
+    path's statements are read out of ``store/records.js`` for exactly the reason
+    ``test_write_path_projection.py`` reads ``MARKS_SQL`` out of ``journal.js`` —
+    a re-typed query is a copy, and the copy is what drifts.
+    """
+    match = re.search(rf"^const {re.escape(name)} =(.*?);$", source, re.MULTILINE | re.DOTALL)
+    if match is None:
+        raise AssertionError(f"{where} declares no `const {name}`")
+    body = match.group(1)
+    parts = re.findall(r"'([^']*)'", body)
+    if not parts:
+        raise AssertionError(f"`const {name}` is not a concatenation of single-quoted literals")
+    stripped = re.sub(r"'[^']*'", "", body)
+    if re.search(r"[A-Za-z_$]", stripped):
+        raise AssertionError(
+            f"`const {name}` interpolates something this reader cannot see; the test would"
+            " be running a different query from the app"
+        )
+    return "".join(parts)
+
+
 def schema_sql() -> str:
     return SCHEMA_PATH.read_text(encoding="utf-8")
 

@@ -29,7 +29,14 @@
 
 import * as localRepo from './repo-local.js';
 import { emitSignal } from './signals.js';
-import { appendChild, appendMark, completedFrom, loadChildren, loadMarks } from '../store/boot.js';
+import {
+    appendChild,
+    appendMark,
+    completedFrom,
+    loadChildren,
+    loadMarks,
+    storeFailureCode,
+} from '../store/boot.js';
 
 export const BACKEND = Object.freeze({
     local: 'local',
@@ -57,6 +64,20 @@ export function historyBackend() {
 /** True when a mark can actually be recorded somewhere. */
 export function canRecord() {
     return backend !== BACKEND.unavailable;
+}
+
+/**
+ * The id attribution points at, or null when there is no open store (DIA-P3).
+ *
+ * Exported rather than made a second module-level binding like `profiles`: this
+ * one is minted by the store at open and assigned here once, and a surface that
+ * could assign it could attribute a family datum to something that is not the
+ * device owner. The diary write path needs it because a record carries its
+ * author (slot 1), and on the localStorage backend there is no participant at
+ * all — which is the same fact as "this channel has no diary".
+ */
+export function selfParticipant() {
+    return selfParticipantId;
 }
 
 /**
@@ -101,14 +122,10 @@ export async function initHistory(storeOutcome = { opened: false, reason: 'not-n
     await refreshMarks();
 }
 
-// The typed store failures, as the closed codes the taxonomy declares. Derived
-// from the error CLASS rather than from its message: engine messages carry file
-// paths and statement text, which is not what a diagnostic is allowed to keep.
-const FAILURE_CLASS = Object.freeze({
-    StoreUnavailableError: 'unavailable',
-    StoreDiskFullError: 'disk_full',
-    StoreCorruptError: 'corrupt',
-});
+// The map that used to live here — error class to closed code — moved into
+// store/errors.js at DIA-P3, unchanged in what it says. It has two callers now:
+// this open path, and the diary write path, which must be able to tell a full
+// disk from a generic failure. One list, one place (`storeFailureCode`).
 
 function reportStoreOpen(storeOutcome) {
     const handle = storeOutcome.handle;
@@ -127,7 +144,7 @@ function reportStoreOpen(storeOutcome) {
         emitSignal('store.open', { outcome: 'not_native', failure_class: 'none' });
         return;
     }
-    const failureClass = FAILURE_CLASS[storeOutcome.reason] ?? 'other';
+    const failureClass = storeFailureCode(storeOutcome.reason);
     emitSignal('store.open', {
         outcome: 'failed',
         failure_class: failureClass,

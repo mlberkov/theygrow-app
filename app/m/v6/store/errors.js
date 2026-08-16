@@ -45,6 +45,52 @@ export class StoreUnavailableError extends StoreError {
     }
 }
 
+// The typed failures above, as the closed codes a diagnostic may carry. Derived
+// from the error CLASS, never from its message: engine messages carry file paths
+// and statement text, which is not what a diagnostic is allowed to keep.
+//
+// changed_in: DIA-DL-005 — moved here from core/state.js, where it was a private
+// map serving the OPEN path alone. Two write paths need it now — the diary
+// entry (DIA-P3) and the mark tick, which collapses every failure into one code
+// today — and a second copy of a closed list is a second thing to drift. Same
+// one-mapping-point rule store/transfer.js states for the transfer plugin's
+// refusal codes.
+//
+// This list must stay a subset of SIGNAL_CODES.failure_class in
+// core/signals.js. It is not imported from there on purpose: store/ has no edge
+// into core/ and gaining one for a constant would be a layering change. The two
+// are asserted to agree by app/tests/diary-write.spec.js, the way
+// app/tests/transfer-seam.spec.js asserts the mirrored refusal list.
+export const STORE_FAILURE_CODES = Object.freeze([
+    'unavailable',
+    'disk_full',
+    'corrupt',
+    'other',
+]);
+
+const FAILURE_CODE_BY_CLASS = Object.freeze({
+    StoreUnavailableError: 'unavailable',
+    StoreDiskFullError: 'disk_full',
+    StoreCorruptError: 'corrupt',
+});
+
+/**
+ * The closed code for a store failure, from an error or from its class name.
+ *
+ * Accepts either because the two callers hold different things: the open path
+ * kept only `error.name` across an async boundary (store/boot.js returns it as
+ * `reason`), while a write path has the error itself. Shaped as a UNARY function
+ * of one value so it can be used directly as a rejection handler —
+ * `markSkill(...).catch(storeFailureCode)` — which is how the mark surface will
+ * reach it without a second refactor.
+ *
+ * Anything it cannot name is 'other', never a guess and never a free string.
+ */
+export function storeFailureCode(reason) {
+    const name = typeof reason === 'string' ? reason : reason?.name;
+    return FAILURE_CODE_BY_CLASS[name] ?? 'other';
+}
+
 const DISK_FULL_MARKERS = ['sqlite_full', 'database or disk is full', 'disk is full'];
 const CORRUPT_MARKERS = ['sqlite_corrupt', 'database disk image is malformed', 'file is not a database'];
 

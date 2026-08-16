@@ -17,7 +17,6 @@ version floor out of `config.js` instead of trusting that the two agree.
 
 from __future__ import annotations
 
-import re
 import sqlite3
 from pathlib import Path
 
@@ -27,6 +26,7 @@ from .harness import (
     append_assertion,
     append_confirmation,
     current_mount,
+    js_string_constant,
     seed_child,
     seed_participant,
 )
@@ -47,34 +47,14 @@ OBSERVED_DATE = "2026-02-01"
 OBSERVED_INSTANT = 1_770_000_000_000
 
 
-def _js_string_constant(source: str, name: str) -> str:
-    """Read a `const NAME = '...' + '...';` string out of shipped JavaScript.
-
-    Fails closed in both directions: an absent constant and a constant whose
-    right-hand side is not a concatenation of single-quoted literals both raise,
-    because a parser that silently returns "" would turn every assertion built on
-    it into a test of the empty string.
-    """
-    match = re.search(rf"^const {re.escape(name)} =(.*?);$", source, re.MULTILINE | re.DOTALL)
-    if match is None:
-        raise AssertionError(f"{JOURNAL_JS.name} declares no `const {name}`")
-    body = match.group(1)
-    parts = re.findall(r"'([^']*)'", body)
-    if not parts:
-        raise AssertionError(f"`const {name}` is not a concatenation of single-quoted literals")
-    stripped = re.sub(r"'[^']*'", "", body)
-    if re.search(r"[A-Za-z_$]", stripped):
-        raise AssertionError(
-            f"`const {name}` interpolates something this reader cannot see; the test would"
-            " be running a different query from the app"
-        )
-    return "".join(parts)
+# The reader itself moved into harness.py at DIA-P3, when store/records.js
+# needed the same treatment. Nothing about what it accepts changed.
 
 
 @pytest.fixture
 def marks_sql() -> str:
     """The projection query the app actually ships."""
-    return _js_string_constant(JOURNAL_JS.read_text(encoding="utf-8"), "MARKS_SQL")
+    return js_string_constant(JOURNAL_JS.read_text(encoding="utf-8"), "MARKS_SQL", JOURNAL_JS.name)
 
 
 @pytest.fixture

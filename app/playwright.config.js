@@ -129,7 +129,14 @@ module.exports = defineConfig({
       // transfer-format (the transitional envelope, imported under Node the same
       // way store-unit imports the store). Leg (b) of that invariant is NOT
       // here: it presses the button in a real browser and belongs in `behavior`.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit)\.spec\.js/,
+      // DIA-P3 adds one: diary-write, the record path's control flow against the
+      // recorder — one transaction for the area and its first entry, an edit
+      // that is an UPDATE, a full disk classified rather than swallowed. What
+      // those statements MEAN is `pytest app/tests/schema`
+      // (test_diary_write_path.py) and whether a parent's entry actually lands
+      // is `android-instrumented`; neither claim is made here, and the file's
+      // header says so about itself.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

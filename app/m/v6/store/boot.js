@@ -27,6 +27,8 @@ import {
     loadChildren,
     loadMarks,
 } from './repo-journal.js';
+import { storeFailureCode } from './errors.js';
+import { createRecord, loadRecords, overwriteRecord } from './records.js';
 import { pendingImport, runImport } from './import-legacy.js';
 import {
     discardTransfer,
@@ -90,6 +92,9 @@ export async function initNativeStore({ now = () => Date.now() } = {}) {
 // everything behind it. The seam itself touches no Web Storage at all — it
 // drains bytes the native side staged — but a module outside the walked graph
 // is a module that guard never reads, and that is the property being kept.
+// DIA-P3 adds the diary record path on the same terms: surfaces/diary.js reaches
+// createRecord / overwriteRecord / loadRecords through this door and never
+// imports store/records.js itself.
 export {
     acknowledgeCursor,
     appendChild,
@@ -98,17 +103,21 @@ export {
     appendMark,
     childRow,
     completedFrom,
+    createRecord,
     discardTransfer,
     drainTransfer,
     existingEntryIds,
     isTransferAvailable,
     loadChildren,
     loadMarks,
+    loadRecords,
     openHandoff,
+    overwriteRecord,
     pendingImport,
     pendingTransfer,
     pickTransfer,
     projectSkillState,
     readSince,
     runImport,
+    storeFailureCode,
 };
