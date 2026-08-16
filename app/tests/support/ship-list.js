@@ -84,8 +84,10 @@ function offlineUrls(swSource) {
 }
 
 // Same-origin asset references: every href=/src= value starting with "/".
-// Verified exhaustive against the real shell — the only values this skips are
-// the external gtag script and the Telegram link, and there are no data: URIs,
+// Verified exhaustive against the real shell — the only value this skips is the
+// external gtag script (DIA-P2 removed the Telegram link, and the download
+// control it replaced carries no href in the markup at all: the release address
+// is set at runtime from the declared knob), and there are no data: URIs,
 // relative refs or srcset attributes. Assets referenced from JS string literals
 // (fetch('/kb-v1.json')) are out of reach by construction; see A1-P3-INV-001.
 function htmlAssetRefs(html) {

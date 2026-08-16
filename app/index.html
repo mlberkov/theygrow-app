@@ -9,6 +9,29 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-v2.png">
 
+    <!-- ОПУБЛИКОВАН ЛИ РЕЛИЗ APK (DIA-P2, changed_in: DIA-DL-004).
+         Одно значение, и оно меняется рукой владельца: `none` — релиза нет,
+         `published` — релиз опубликован и на странице релизов лежат APK и его
+         .sha256. Любое другое содержимое, как и отсутствие этого тега, значит
+         «нет»: кнопка загрузки не показывается, и посетитель не получает ни
+         404, ни пустой страницы под видом загрузки.
+
+         ПОЧЕМУ ЗДЕСЬ, А НЕ В МОДУЛЕ. Модули лежат под /m/v{N}/ и отдаются
+         `immutable, max-age=2592000`: байты по опубликованному адресу не
+         переписываются (A1-DL-004), поэтому флаг там стоил бы новой генерации
+         маунта, бампа CACHE_VERSION и промоушена — за один булев, при пяти уже
+         опубликованных генерациях. Шелл отдаётся `max-age=3600,
+         must-revalidate` и network-first воркером, так что здесь та же правка
+         стоит деплоя и доезжает до установленных клиентов на следующем
+         открытии. Словарь (имя тега и единственное «да»-значение) и адрес
+         остались объявленными в m/v{N}/channel/config.js.
+
+         ПОРЯДОК ДЛЯ ВЛАДЕЛЬЦА: сначала опубликовать релиз, потом переключить
+         это значение. Обратный порядок — это и есть мёртвое обещание, которое
+         этот тег существует, чтобы не допустить. См. docs/RUNBOOK.md, раздел
+         "Release build + APK distribution". -->
+    <meta name="theygrow-apk-release" content="none">
+
     <!-- Google tag (gtag.js) -->
     <script>
       // L1-P4: THE NATIVE CHANNEL CARRIES NO ANALYTICS. Owner decision, taken
@@ -83,17 +106,17 @@
     </script>
 
     <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v4/app.css">
+    <link rel="stylesheet" href="/m/v5/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v4/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
+         /m/v5/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
          store. Without these the browser discovers them only after
          app.js parses, and their own imports only after that — the boot-order
          cost A1-DL-004/005/006 each recorded and declined to pay.
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v4/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v5/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -106,48 +129,50 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v4/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v4/core/state.js">
-    <link rel="modulepreload" href="/m/v4/core/storage.js">
-    <link rel="modulepreload" href="/m/v4/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v4/core/signals.js">
-    <link rel="modulepreload" href="/m/v4/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v4/core/format.js">
-    <link rel="modulepreload" href="/m/v4/core/zpd.js">
-    <link rel="modulepreload" href="/m/v4/core/urgency.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v4/store/boot.js">
-    <link rel="modulepreload" href="/m/v4/store/store.js">
-    <link rel="modulepreload" href="/m/v4/store/journal.js">
-    <link rel="modulepreload" href="/m/v4/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v4/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v4/store/bridge.js">
-    <link rel="modulepreload" href="/m/v4/store/transfer.js">
-    <link rel="modulepreload" href="/m/v4/transfer/config.js">
-    <link rel="modulepreload" href="/m/v4/transfer/errors.js">
-    <link rel="modulepreload" href="/m/v4/transfer/format.js">
-    <link rel="modulepreload" href="/m/v4/store/config.js">
-    <link rel="modulepreload" href="/m/v4/store/errors.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v4/surfaces/import.js">
-    <link rel="modulepreload" href="/m/v4/export/run.js">
-    <link rel="modulepreload" href="/m/v4/export/build.js">
-    <link rel="modulepreload" href="/m/v4/export/readout.js">
-    <link rel="modulepreload" href="/m/v4/export/sink.js">
-    <link rel="modulepreload" href="/m/v4/export/text.js">
-    <link rel="modulepreload" href="/m/v4/export/readme.js">
-    <link rel="modulepreload" href="/m/v4/export/zip.js">
-    <link rel="modulepreload" href="/m/v4/export/pdf.js">
-    <link rel="modulepreload" href="/m/v4/export/ttf.js">
-    <link rel="modulepreload" href="/m/v4/export/config.js">
-    <link rel="modulepreload" href="/m/v4/export/errors.js">
+    <link rel="modulepreload" href="/m/v5/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v5/core/state.js">
+    <link rel="modulepreload" href="/m/v5/core/storage.js">
+    <link rel="modulepreload" href="/m/v5/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v5/core/signals.js">
+    <link rel="modulepreload" href="/m/v5/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v5/core/format.js">
+    <link rel="modulepreload" href="/m/v5/core/zpd.js">
+    <link rel="modulepreload" href="/m/v5/core/urgency.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v5/store/boot.js">
+    <link rel="modulepreload" href="/m/v5/store/store.js">
+    <link rel="modulepreload" href="/m/v5/store/journal.js">
+    <link rel="modulepreload" href="/m/v5/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v5/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v5/store/bridge.js">
+    <link rel="modulepreload" href="/m/v5/store/transfer.js">
+    <link rel="modulepreload" href="/m/v5/transfer/config.js">
+    <link rel="modulepreload" href="/m/v5/transfer/errors.js">
+    <link rel="modulepreload" href="/m/v5/transfer/format.js">
+    <link rel="modulepreload" href="/m/v5/store/config.js">
+    <link rel="modulepreload" href="/m/v5/store/errors.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v5/channel/config.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v5/surfaces/import.js">
+    <link rel="modulepreload" href="/m/v5/export/run.js">
+    <link rel="modulepreload" href="/m/v5/export/build.js">
+    <link rel="modulepreload" href="/m/v5/export/readout.js">
+    <link rel="modulepreload" href="/m/v5/export/sink.js">
+    <link rel="modulepreload" href="/m/v5/export/text.js">
+    <link rel="modulepreload" href="/m/v5/export/readme.js">
+    <link rel="modulepreload" href="/m/v5/export/zip.js">
+    <link rel="modulepreload" href="/m/v5/export/pdf.js">
+    <link rel="modulepreload" href="/m/v5/export/ttf.js">
+    <link rel="modulepreload" href="/m/v5/export/config.js">
+    <link rel="modulepreload" href="/m/v5/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -169,6 +194,23 @@
         <button id="updateDismiss" aria-label="Закрыть">&times;</button>
     </div>
 
+    <!-- АРХИВ СОХРАНЁН (DIA-P2). Подтверждение живёт СНАРУЖИ модалки архива и
+         переживает её закрытие: после удачного сохранения окно закрывается, а
+         эта строка остаётся, пока родитель её не уберёт. Две находки владельца
+         2026-08-16 — «подтверждения нет» и «окно не закрывается» — это один
+         дефект: подтверждение стояло внутри окна, которое родитель ожидал
+         увидеть закрытым, и приходило сразу после возврата из системного
+         выбора файла.
+
+         role="status", а не alert: сохранение прошло, тревожить нечем.
+         Класс .app-banner нужен правилу .app-banner.show — без класса ни одно
+         .show-правило не может совпасть, и это ровно тот дефект, который
+         app/tests/show-rule-coverage.spec.js ловит (EMV-P1-INV-001). -->
+    <div id="exportDoneBanner" class="app-banner" role="status">
+        <span id="exportDoneText"></span>
+        <button type="button" id="exportDoneDismiss" aria-label="Закрыть">&times;</button>
+    </div>
+
     <!-- Новый заголовок с профилем -->
     <header>
         <div class="header-top">
@@ -187,10 +229,18 @@
                      приложения» и вдобавок мертвый предмет для артефакта, весь
                      смысл которого — читаться через двадцать лет.
                      На десктопе иконка + подпись, на мобильном только иконка;
-                     aria-label и title дословно повторяют видимую подпись. -->
+                     aria-label и title дословно повторяют видимую подпись.
+
+                     DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
+                     канале (m/v5/surfaces/channel.js). В браузере архив не
+                     собирается вообще — веб-ветки в export/sink.js нет и не было
+                     (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
+                     происходит. Разметка одна на оба канала: это ветка времени
+                     выполнения, а не вторая сборка (LSC-P1-INV-002). -->
                 <button type="button"
                         class="header-action"
                         id="exportBtn"
+                        hidden
                         title="Сохранить архив"
                         aria-label="Сохранить архив">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
@@ -203,24 +253,36 @@
                     </svg>
                     <span class="header-action-label">Сохранить архив</span>
                 </button>
-                <!-- Чат сообщества. Иконка — обычный бумажный самолётик, общее
-                     соглашение «отправить/сообщение». Это НЕ фирменный знак
-                     Telegram: их логотип — их товарный знак, и мы его не
-                     воспроизводим. -->
-                <a href="https://t.me/+c-5y_69kmu8wNDky"
+                <!-- Приложение для Android (DIA-P2, ADR-047). Единственный канал
+                     распространения — прямой APK со страницы релизов, не
+                     магазин. Иконка — телефон со стрелкой внутрь: «положить
+                     файл на устройство», в отличие от стрелки архива, которая
+                     означает «достать файл наружу».
+
+                     Приходит СКРЫТОЙ и раскрывается только в браузере И только
+                     когда <meta name="theygrow-apk-release"> объявляет, что
+                     релиз опубликован. href проставляется из объявленного
+                     CHANNEL_CONFIG.apkReleaseUrl, а не из разметки: адрес
+                     продукта объявлен в одном месте.
+
+                     Здесь НЕТ onclick и никакой телеметрии — ни события GA4, ни
+                     сигнала (решение владельца 2026-08-16, гейт D). -->
+                <a class="header-action"
+                   id="apkBtn"
+                   hidden
                    target="_blank"
                    rel="noopener noreferrer"
-                   class="telegram-button"
-                   title="Чат сообщества"
-                   aria-label="Чат сообщества"
-                   onclick="trackEvent('telegram_click')">
-                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24"
+                   title="Скачать APK"
+                   aria-label="Скачать APK">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
                          stroke-linecap="round" stroke-linejoin="round"
                          aria-hidden="true" focusable="false">
-                        <path d="M21 3L3 10.5l7 2.5 2.5 7L21 3z"/>
-                        <path d="M10 13l11-10"/>
+                        <rect x="6" y="2" width="12" height="20" rx="2"/>
+                        <path d="M12 7v7"/>
+                        <path d="M9 11l3 3 3-3"/>
                     </svg>
+                    <span class="header-action-label">Скачать APK</span>
                 </a>
             </div>
         </div>
@@ -228,6 +290,17 @@
             Отслеживание развития навыков ребёнка по месяцам согласно возрастным нормам
         </div>
     </header>
+
+    <!-- ЕДИНСТВЕННАЯ КОПИЯ — ЗДЕСЬ (DIA-P2). Строка веб-канала, скрытая на
+         нативном. До этого пакета этот факт был сказан один раз — внутри модалки
+         архива, которая на вебе больше не открывается. Утверждение истинно
+         ровно сейчас и ровно на этом канале: пока перенос не подтверждён
+         (ADR-048 §5), localStorage этого браузера держит единственную копию
+         истории семьи, и резервной копии у неё нет нигде. Стоит над таблицей, а
+         не в окне: родитель должен встретить это, не открывая ничего. -->
+    <p id="webChannelNote" class="channel-note" hidden>
+        Всё, что вы отмечаете здесь, хранится только в этом браузере: резервной копии у этих данных нет. Архив умеет собирать только приложение на телефоне.
+    </p>
 
     <!-- Таблица -->
     <div class="table-wrapper">
@@ -329,7 +402,6 @@
             <p class="export-plain">Фотографии, видео и звукозаписи в архив не входят.</p>
             <p class="export-plain">Резервной копии этих данных в облаке нет.</p>
             <p>Архив не зашифрован: ключ теряется быстрее, чем данные. Любой, кто получит этот файл, сможет его прочитать — храните его так же, как хранили бы бумажный семейный альбом.</p>
-            <p id="exportUnavailable" class="export-unavailable" hidden>В браузере архив не создаётся: он собирается из данных приложения на телефоне. Это относится и к данным, которые вы видите сейчас, — резервной копии у них нет.</p>
             <p id="exportStatus" class="export-status" hidden></p>
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="exportCloseBtn">Закрыть</button>
@@ -392,12 +464,12 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v4/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v5/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v4/app.js for boot order, and the modulepreload block in the head
+         m/v5/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v4/app.js"></script>
+    <script type="module" src="/m/v5/app.js"></script>
 
     <!-- PWA Install Prompt -->
     <script>
@@ -528,6 +600,6 @@
     </script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v4/sw-register.js"></script>
+    <script type="module" src="/m/v5/sw-register.js"></script>
 </body>
 </html>

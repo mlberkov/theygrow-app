@@ -355,18 +355,21 @@ test.describe('the interface says the two things it must not soften', () => {
         }
     });
 
-    test('the export control lives in the header, immediately left of the chat control', () => {
+    test('the export control lives in the header, and ships unrevealed', () => {
         // Owner act (LSC-DL-003 (u)): the control sits in the header, not the
-        // footer. Asserted as ORDER rather than as a pixel position, because
-        // "immediately to the left" is the intent and a coordinate would just
-        // re-encode today's stylesheet.
+        // footer. DIA-P2 adds the second half — it ships `hidden`, and only the
+        // channel that can produce an archive reveals it. STATIC (AGENTS.md
+        // §11): this is the composition of the markup. That the WEB channel
+        // really does not offer it, and that the NATIVE branch really does, is
+        // app/tests/channel-composition.spec.js, which loads the page.
         const header = /<header>[\s\S]*?<\/header>/.exec(SHELL);
         expect(header, 'the shell has no header').not.toBeNull();
-        const exportAt = header[0].indexOf('id="exportBtn"');
-        const chatAt = header[0].indexOf('class="telegram-button"');
-        expect(exportAt, 'the export control is not in the header').toBeGreaterThan(-1);
-        expect(chatAt, 'the chat control is not in the header').toBeGreaterThan(-1);
-        expect(exportAt, 'the export control must precede the chat control').toBeLessThan(chatAt);
+        const control = /<button[^>]*id="exportBtn"[^>]*>/.exec(header[0]);
+        expect(control, 'the export control is not in the header').not.toBeNull();
+        expect(
+            /\bhidden\b/.test(control[0]),
+            'the export control ships revealed — the web channel would offer an archive it cannot produce'
+        ).toBeTruthy();
 
         const footer = /<footer class="control-footer">[\s\S]*?<\/footer>/.exec(SHELL);
         expect(footer, 'the shell has no control footer').not.toBeNull();
@@ -376,17 +379,17 @@ test.describe('the interface says the two things it must not soften', () => {
         ).toBeFalsy();
     });
 
-    test('the chat control does not reproduce a third party brand mark', () => {
-        // A plain paper plane is the convention; the Telegram logo is their
-        // trademark. Asserted as the absence of the enclosing-circle path the
-        // brand mark needs, plus the absence of a filled glyph.
-        const chat = /<a[^>]*class="telegram-button"[\s\S]*?<\/a>/.exec(SHELL);
-        expect(chat, 'the chat control is missing').not.toBeNull();
-        expect(chat[0]).toContain('stroke="currentColor"');
-        expect(
-            /fill="(?!none)[^"]+"/.test(chat[0]),
-            'the chat glyph is filled — a brand mark rather than an outline paper plane'
-        ).toBeFalsy();
+    test('the chat control is gone from the shell entirely', () => {
+        // DIA-P2: the capture bridge is retired with this milestone, so the
+        // community-chat link goes with it — markup, stylesheet and the one GA4
+        // call site that hung on it. Asserted as absence in both files, because
+        // a leftover rule for a control nobody ships is the kind of residue that
+        // gets copied forward at the next mount bump.
+        const css = fs.readFileSync(path.join(APP_ROOT, 'm', MOUNT.dir, 'app.css'), 'utf8');
+        expect(SHELL).not.toContain('telegram-button');
+        expect(SHELL).not.toContain('t.me/');
+        expect(css, 'the stylesheet still dresses a control the shell no longer has')
+            .not.toContain('telegram');
     });
 
     test('every icon-only control carries a non-empty accessible name', () => {
@@ -433,12 +436,85 @@ test.describe('the interface says the two things it must not soften', () => {
         expect(visible[1].trim()).toBe(aria[1]);
     });
 
-    test('the web channel says where the archive comes from instead of hiding', () => {
-        // The action is unavailable off-device because there is no journal to
-        // project. A missing button would teach a parent nothing about where
-        // their data actually lives, so the surface states it.
-        expect(SHELL).toContain('id="exportUnavailable"');
-        expect(SURFACE).toContain('isExportSinkAvailable');
+    test('the download control name is one string in three places', () => {
+        // The same rule the export control carries, for the same reason: the
+        // mobile control is this control with the label hidden, so a reworded
+        // label that left the two attributes behind would give the two viewports
+        // different names for the same action.
+        const control = /<a[^>]*id="apkBtn"[\s\S]*?<\/a>/.exec(SHELL);
+        expect(control, 'the download control is missing').not.toBeNull();
+        const aria = /aria-label\s*=\s*"([^"]*)"/.exec(control[0]);
+        const title = /title\s*=\s*"([^"]*)"/.exec(control[0]);
+        const visible = /<span class="header-action-label">([^<]*)<\/span>/.exec(control[0]);
+        expect(aria).not.toBeNull();
+        expect(title).not.toBeNull();
+        expect(visible).not.toBeNull();
+        expect(title[1]).toBe(aria[1]);
+        expect(visible[1].trim()).toBe(aria[1]);
+    });
+
+    test('the download control ships unrevealed and carries no address of its own', () => {
+        // TWO PROPERTIES, ONE DEFECT BETWEEN THEM. The control must not be
+        // offered before an asset exists — the repository has no tag and no
+        // release, so a visible link would open an empty page dressed as a
+        // download — and its address must be declared once, in the knob surface,
+        // rather than written into markup where the next reader would find two
+        // of them. STATIC: whether it is actually withheld at runtime, and
+        // whether it appears once the shell declares a published release, is
+        // app/tests/channel-composition.spec.js.
+        const control = /<a[^>]*id="apkBtn"[^>]*>/.exec(SHELL);
+        expect(control, 'the download control is missing').not.toBeNull();
+        expect(
+            /\bhidden\b/.test(control[0]),
+            'the download control ships revealed — a visitor would meet a page with nothing on it'
+        ).toBeTruthy();
+        expect(
+            /\bhref\s*=/.test(control[0]),
+            'the download control carries a hard-coded href — the address is declared in channel/config.js'
+        ).toBeFalsy();
+        expect(SHELL).toContain('name="theygrow-apk-release"');
+
+        // The address exists exactly once in the shipped tree, in the knob.
+        const declared = fs.readFileSync(
+            path.join(APP_ROOT, 'm', MOUNT.dir, 'channel', 'config.js'),
+            'utf8'
+        );
+        expect(declared, 'the knob surface does not declare the release address')
+            .toContain('apkReleaseUrl:');
+        const elsewhere = SHIPPED.filter((rel) => rel.endsWith('.js') || rel.endsWith('.html'))
+            .filter((rel) => !rel.endsWith(`m/${MOUNT.dir}/channel/config.js`))
+            .filter((rel) =>
+                fs.readFileSync(path.join(APP_ROOT, rel), 'utf8').includes('/releases/')
+            );
+        expect(
+            elsewhere,
+            'the release address appears outside the knob surface — it is declared once or not at all'
+        ).toEqual([]);
+    });
+
+    test('the web channel still says the copy it holds is the only one', () => {
+        // SUPERSEDES 'the web channel says where the archive comes from instead
+        // of hiding' (L1-P3). That test asserted the shape of the OLD answer:
+        // the modal shipped to both channels, hid its run button on the web and
+        // explained itself in a paragraph. DIA-P2 stops offering the control on
+        // a channel that cannot perform it, which makes that paragraph
+        // unreachable — markup no user can open, guarded by a test, is the
+        // EMV-DL-001 defect exactly.
+        //
+        // THE FACT DID NOT GO WITH IT, and that is what this test now holds. It
+        // is true, it is time-bounded (ADR-048 §5 — until a transfer is
+        // confirmed, the browser holds the only copy), and it now sits where a
+        // parent meets it without opening anything.
+        expect(SHELL, 'the unreachable paragraph is back').not.toContain('id="exportUnavailable"');
+        const note = /<p id="webChannelNote"[\s\S]*?<\/p>/.exec(SHELL);
+        expect(note, 'the web channel says nothing about where the only copy is').not.toBeNull();
+        expect(note[0]).toContain('только в этом браузере');
+        expect(note[0]).toContain('резервной копии');
+        // Ships unrevealed, like both channel actions: it is the web channel
+        // that reveals it, and it must not appear inside the app.
+        expect(/\bhidden\b/.test(note[0])).toBeTruthy();
+        // That it is actually on screen in a browser and absent in the app is
+        // app/tests/channel-composition.spec.js — this half is markup.
     });
 });
 

@@ -164,7 +164,14 @@ module.exports = defineConfig({
       // BROWSER at the production origin, never inside the Capacitor WebView,
       // and running it there would assert a web-channel surface against a
       // channel that never serves it.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer)\.spec\.js/,
+      //
+      // DIA-P2 adds channel-composition: what each delivery channel OFFERS,
+      // read off a rendered page rather than out of the markup. It is in this
+      // project and not in `native` below for the reason its own header gives —
+      // it simulates the native branch with an init script, and running it
+      // under a profile that also serves a different web root would confuse two
+      // independent variables.
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

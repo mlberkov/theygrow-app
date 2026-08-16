@@ -169,6 +169,16 @@ public class ExportTransferTest {
                         "the export did not report success — the surface said: " + status,
                         "saved",
                         status);
+
+                // THE TWO OWNER FINDINGS OF 2026-08-16, OBSERVED RATHER THAN
+                // ASSUMED (DIA-P2). The first is already discharged by the
+                // assertion above: the confirmation is what this run polled,
+                // and it lives outside the dialog, so it is still on screen
+                // after the dialog goes. The second is this one.
+                assertEquals(
+                        "the archive dialog stayed open after a successful save",
+                        "closed",
+                        dialogState(scenario));
             } finally {
                 Intents.release();
             }
@@ -423,10 +433,15 @@ public class ExportTransferTest {
         assertEquals(
                 "the export control was not offered on the native channel", "pressed", dispatched);
 
-        // The surface's own status line is the completion signal: it is set to
-        // "Собираю архив…" before the run and replaced when the run ends, either
-        // way. Polling it rather than a flag of the test's own means the thing
-        // waited on is the thing a parent would be looking at.
+        // WHAT THE SURFACE SAYS WHEN IT IS DONE, AND WHERE IT SAYS IT (DIA-P2).
+        // Until that packet the completion signal was #exportStatus inside the
+        // dialog: "Собираю архив…" during the run, replaced by the verdict
+        // either way. Two owner findings from the 2026-08-16 smoke moved the
+        // success half OUT of the dialog — the dialog now closes and the
+        // confirmation stands in #exportDoneBanner until it is dismissed — so
+        // this poll reads the banner for success and the status line for
+        // failure. It is still the thing a parent would be looking at, which is
+        // the reason it is polled rather than a flag of the test's own.
         //
         // THE VERDICT IS REDUCED TO AN ASCII TOKEN IN JAVASCRIPT, not compared in
         // Java. evaluateJavascript hands back a JSON string, and whether a
@@ -439,11 +454,30 @@ public class ExportTransferTest {
         return pollFor(
                 scenario,
                 "(function () {"
+                    + "var banner = document.getElementById('exportDoneBanner');"
+                    + "var done = document.getElementById('exportDoneText').textContent;"
+                    + "if (banner.classList.contains('show')) {"
+                    + "  return done.indexOf('сохранён') !== -1 ? 'saved' : 'other:' + done;"
+                    + "}"
                     + "var s = document.getElementById('exportStatus').textContent;"
                     + "if (!s || s.indexOf('Собираю') !== -1) { return null; }"
-                    + "return s.indexOf('сохранён') !== -1 ? 'saved' : 'other:' + s;"
+                    + "return 'other:' + s;"
                     + "})()",
                 EXPORT_TIMEOUT_MS);
+    }
+
+    /**
+     * Whether the archive dialog is still open.
+     *
+     * <p>Its own assertion rather than a clause inside {@link #pressExport}: a
+     * dialog that failed to close should say so in those words, not time out
+     * waiting for a confirmation that is already on screen.
+     */
+    private String dialogState(ActivityScenario<MainActivity> scenario) {
+        return evaluate(
+                scenario,
+                "(document.getElementById('exportModal').classList.contains('show')"
+                    + " ? 'open' : 'closed')");
     }
 
     // --- measurement ------------------------------------------------------
