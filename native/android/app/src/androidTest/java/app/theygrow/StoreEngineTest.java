@@ -267,51 +267,88 @@ public class StoreEngineTest {
         assertFalse("store/errors.js declares no disk-full markers", markers.isEmpty());
 
         long pages = Long.parseLong(queryScalar("PRAGMA page_count"));
-        database.execSQL("PRAGMA max_page_count = " + pages);
+        clampPageCount(pages);
 
-        StringBuilder body = new StringBuilder();
-        while (body.length() < 64_000) {
-            body.append("текст, который не поместится ");
-        }
-
-        String message = null;
-        // Written until one is refused. A single attempt could fit in a
-        // partially-filled page and pass this test by not being full at all.
-        for (int attempt = 0; attempt < 200 && message == null; attempt++) {
-            try {
-                database.execSQL(
-                        "INSERT INTO record (id, area_id, author_participant_id, kind, body,"
-                                + " event_date_local, entry_at_utc, entry_utc_offset_min,"
-                                + " updated_at_utc) VALUES (?, 'a-1', 'p-1', 'text', ?,"
-                                + " '2026-01-01', 1, 0, 1)",
-                        new Object[] {"r-full-" + attempt, body.toString()});
-            } catch (Exception refused) {
-                message = String.valueOf(refused.getMessage());
+        try {
+            StringBuilder body = new StringBuilder();
+            while (body.length() < 64_000) {
+                body.append("текст, который не поместится ");
             }
-        }
-        assertTrue(
-                "the engine never refused a write, so this test says nothing about a full"
-                        + " database",
-                message != null);
-        Log.i(TAG, "engine said, on a full database: " + message);
 
-        String said = message.toLowerCase(Locale.ROOT);
-        boolean recognised = false;
-        for (String marker : markers) {
-            if (said.contains(marker)) {
-                recognised = true;
+            String message = null;
+            // Written until one is refused. A single attempt could fit in a
+            // partially-filled page and pass this test by not being full at all.
+            for (int attempt = 0; attempt < 200 && message == null; attempt++) {
+                try {
+                    database.execSQL(
+                            "INSERT INTO record (id, area_id, author_participant_id, kind, body,"
+                                    + " event_date_local, entry_at_utc, entry_utc_offset_min,"
+                                    + " updated_at_utc) VALUES (?, 'a-1', 'p-1', 'text', ?,"
+                                    + " '2026-01-01', 1, 0, 1)",
+                            new Object[] {"r-full-" + attempt, body.toString()});
+                } catch (Exception refused) {
+                    message = String.valueOf(refused.getMessage());
+                }
             }
-        }
-        assertTrue(
-                "the bundled engine words a full database as \""
-                        + message
-                        + "\", which store/errors.js does not recognise: "
-                        + markers
-                        + " — every disk-full refusal in the product would degrade to a generic"
-                        + " failure",
-                recognised);
+            assertTrue(
+                    "the engine never refused a write, so this test says nothing about a full"
+                            + " database",
+                    message != null);
+            Log.i(TAG, "engine said, on a full database: " + message);
 
-        database.execSQL("PRAGMA max_page_count = 1073741823");
+            String said = message.toLowerCase(Locale.ROOT);
+            boolean recognised = false;
+            for (String marker : markers) {
+                if (said.contains(marker)) {
+                    recognised = true;
+                }
+            }
+            assertTrue(
+                    "the bundled engine words a full database as \""
+                            + message
+                            + "\", which store/errors.js does not recognise: "
+                            + markers
+                            + " — every disk-full refusal in the product would degrade to a"
+                            + " generic failure",
+                    recognised);
+        } finally {
+            // RELEASED WHERE IT RUNS WHATEVER THE ASSERTIONS DID. Until this
+            // packet the release was the last statement of the body, so a red
+            // leg never reached it. Here the ceiling sits on a per-test probe
+            // database that @After deletes, so the leak was bounded — the move
+            // is for one rule across both instrumented files, and because the
+            // sibling DiaryEntryTest, whose store OUTLIVES the test, is where
+            // the same omission actually poisoned the next leg (run
+            // 31971968427: "arming: state=full;rows=0").
+            releaseQuietly();
+        }
+    }
+
+    /**
+     * Sets the page ceiling, through the path the binding supports.
+     *
+     * <p>NOT {@code execSQL}. {@code PRAGMA max_page_count = N} RETURNS the new
+     * ceiling as a row, and {@code execSQL} routes to
+     * {@code executeForChangedRowCount}, which refuses any statement that yields
+     * one — run 31971968427 red this line with "Queries can be performed using
+     * SQLiteDatabase query or rawQuery methods only". The app's own seam draws
+     * the same distinction for the same reason, and says so where it draws it
+     * ({@code app/m/v6/store/bridge.js}, {@code pragma()}).
+     */
+    private void clampPageCount(long pages) {
+        queryScalar("PRAGMA max_page_count = " + pages);
+    }
+
+    /** Lifts the ceiling, reporting rather than asserting: see the finally above. */
+    private void releaseQuietly() {
+        try {
+            Log.i(TAG, "ceiling released, now: " + queryScalar("PRAGMA max_page_count = 1073741823"));
+        } catch (RuntimeException failed) {
+            // Never rethrown from a finally: an exception here would REPLACE the
+            // failure the leg was reporting, which is the one thing a cleanup
+            // must not do.
+            Log.w(TAG, "the ceiling could not be released", failed);
+        }
     }
 
     /** DISK_FULL_MARKERS, read out of the shipped module in the APK. */

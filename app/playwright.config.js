@@ -136,7 +136,14 @@ module.exports = defineConfig({
       // (test_diary_write_path.py) and whether a parent's entry actually lands
       // is `android-instrumented`; neither claim is made here, and the file's
       // header says so about itself.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit)\.spec\.js/,
+      // DIA-P3R adds one: undeclared-reference, a source scan over the shipped
+      // mount for the one shape that cost this milestone a packet — a SPREAD of
+      // an identifier the module never declares. It is deliberately narrow and
+      // says so about itself: general no-undef needs a scope-accurate parser,
+      // this repository carries no eslint on purpose, and the class it belongs
+      // to is bought by diary-save.spec.js in `behavior`, which EXECUTES the
+      // path rather than reading it.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -185,7 +192,20 @@ module.exports = defineConfig({
       // and a handler that ran. The disk-full refusal is deliberately NOT among
       // them: reaching it needs a store that opens, and that is
       // DiaryEntryTest on android-instrumented.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface)\.spec\.js/,
+      // DIA-P3R adds diary-save: the diary's SUCCESS path, which until run
+      // 31971968427 had no executor anywhere off-device. diary-surface reaches
+      // the surface with no store behind it, so every leg there ends in a
+      // refusal before the store is ever called — and a bare ReferenceError on
+      // the line that calls it went unseen through 1104 green tests. This one
+      // installs a seam at the BRIDGE boundary that resolves, so the whole
+      // shipped chain executes. It is here rather than in `contract` for the
+      // same reason diary-surface is: it is a fact about a rendered page and a
+      // handler that ran. It is NOT in `native` below, on the argument that
+      // file's placement already records for channel-composition — that project
+      // serves a different web root, and a leg that also simulates the shell
+      // would vary two things at once. What it does NOT claim is anything about
+      // SQLite, and its own header says so.
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

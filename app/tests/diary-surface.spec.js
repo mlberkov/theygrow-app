@@ -20,13 +20,26 @@
 // SQLCipher fails on their device.
 //
 // WHAT IS DELIBERATELY NOT CLAIMED HERE. Nothing about an entry actually being
-// written, and nothing about the DISK-FULL refusal. Reaching either needs a
-// store that opens, and faking one in a browser would prove the fake
-// (`DIA-DL-004` alternative 9 rejected exactly that shape for the export). Both
-// belong to `DiaryEntryTest` on `android-instrumented`, where the engine is
-// real and a genuine SQLITE_FULL is forced with `PRAGMA max_page_count` — DIA-P3
-// checkpoint 4. The disk-full string is NOT asserted anywhere in this file, so
-// nobody can read a green here as covering it.
+// written, and nothing about the DISK-FULL refusal. The disk-full string is NOT
+// asserted anywhere in this file, so nobody can read a green here as covering
+// it: reaching it needs a store that opens and a genuine SQLITE_FULL, and that
+// is `DiaryEntryTest` on `android-instrumented`, where the engine is real and
+// the ceiling is forced with `PRAGMA max_page_count` — DIA-P3 checkpoint 4.
+// `DIA-DL-004` alternative 9 rejected faking a store to reach that refusal, and
+// that rejection stands untouched.
+//
+// THE OTHER HALF OF THAT SENTENCE WAS DRAWN TOO WIDE, AND RUN 31971968427 SENT
+// THE BILL (DIA-P3R). "Faking a store would prove the fake" is true of the
+// disk-full refusal and false of the SUCCESS path, and applying it to both left
+// the diary's success path with no executor anywhere off-device — every leg in
+// this file ends in a refusal BEFORE the store is called, so a bare
+// `ReferenceError` on the line that calls it went unseen through 1104 green
+// tests until an emulator found it. The success path now has an executor,
+// `app/tests/diary-save.spec.js`, which drives this same shipped surface against
+// a seam at the BRIDGE boundary that resolves. It proves the surface asks the
+// store for the right thing and renders what comes back; it proves nothing about
+// SQLite, and it does not touch the disk-full refusal, which stays exactly where
+// the paragraph above puts it.
 
 const { test, expect } = require('@playwright/test');
 const { gotoApp, STATES } = require('./support/seed');

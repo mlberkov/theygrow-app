@@ -49,6 +49,35 @@ import org.junit.runner.RunWith;
  * SAME ACT IS REPEATED AND MUST SUCCEED. Without that control, a leg would go
  * green against a surface that refused everything for any reason at all.
  *
+ * <p>AND IT MUST PROVE ITSELF FOR EACH SHAPE SEPARATELY, which run 31971968427
+ * is why this now says so. "Full" is not a property of the database, it is a
+ * property of the next write: the filler exhausts what {@code record}'s pages
+ * will take, and the tick writes four small rows into {@code journal_entry} /
+ * {@code assertion} / {@code confirmation}, which fitted in THOSE tables' own
+ * partially-filled leaves and landed —
+ * {@code {"changes":{"changes":4,"lastId":1,"values":[]}}} at 21:00:24.770, on a
+ * store the arming had just called full. The mark leg was therefore never about
+ * a full disk at all. So the arming now reaches the ceiling with BOTH shapes,
+ * record and journal, and returns both refusals rather than assuming the second
+ * from the first. It also refuses to call anything but a {@code
+ * StoreDiskFullError} "full": a constraint violation reported as fullness would
+ * arm nothing and say it had.
+ *
+ * <p>A SECOND FAULT IN THAT SAME LEG, of a different kind: the tick's wait
+ * returned 200 ms BEFORE the bridge answered, because it polled {@code
+ * box.checked}, which {@code box.click()} sets synchronously. It read the
+ * pre-decision document and reported it as the app's verdict, down to {@code
+ * unavailable=visible} — which is only the resting state of a paragraph that
+ * ships without {@code hidden} ({@code app/index.html}). A wait must key on
+ * something the app SETS when it has decided; see {@code tickFirstSkill}.
+ *
+ * <p>AND THE RELEASE MUST NOT DEPEND ON THE ASSERTIONS PASSING. In that run the
+ * mark leg failed before reaching its release, and the diary leg that followed
+ * armed against a store that was still clamped: {@code arming:
+ * state=full;rows=0}. Zero filler rows written, because the first one was
+ * already refused — an arming that "succeeded" without arming anything. Both
+ * disk-full legs now release in a {@code finally}.
+ *
  * <p>WHAT THIS TEST DOES NOT REACH, so no green here is read as more than it is.
  * The emulator is not the family's phone: it is a fresh API-34 image, and a
  * device whose storage is actually exhausted also fails in ways SQLite never
@@ -177,38 +206,56 @@ public class DiaryEntryTest {
 
             String armed = fillToCeiling(scenario);
             Log.i(TAG, "arming: " + armed);
-            assertEquals(
-                    "the store never reached its ceiling, so nothing below is about a full disk: "
-                            + armed,
-                    "full",
-                    field(armed, "state"));
+            try {
+                assertEquals(
+                        "the store never reached its ceiling, so nothing below is about a full"
+                                + " disk: " + armed,
+                        "full",
+                        field(armed, "state"));
+                // THIS leg's act is a record write, so the record-shaped refusal
+                // is the one that arms it. The journal-shaped one is asserted by
+                // the mark leg, which is the leg whose act writes journal rows.
+                assertEquals(
+                        "the store refused the filler for some reason other than a full disk,"
+                                + " so nothing below is about a full disk: " + armed,
+                        "full:StoreDiskFullError",
+                        field(armed, "refusal"));
 
-            assertEquals("the diary was not offered", "pressed", openCompose(scenario));
-            String verdict = fillAndSave(scenario, "2026-02-01", "Впервые сам встал у дивана");
+                assertEquals("the diary was not offered", "pressed", openCompose(scenario));
+                String verdict = fillAndSave(scenario, "2026-02-01", "Впервые сам встал у дивана");
 
-            Log.i(TAG, "refusal verdict: " + verdict);
-            assertEquals("the parent was not told the disk is full: " + verdict, "refused-disk-full", verdict);
+                Log.i(TAG, "refusal verdict: " + verdict);
+                assertEquals(
+                        "the parent was not told the disk is full: " + verdict,
+                        "refused-disk-full",
+                        verdict);
 
-            String state = surfaceState(scenario);
-            Log.i(TAG, "surface after refusal: " + state);
-            assertEquals("the text the parent typed was lost: " + state, "kept", field(state, "text"));
-            assertEquals("the day they chose was lost: " + state, "kept", field(state, "date"));
-            assertEquals("the window closed under a refusal: " + state, "open", field(state, "modal"));
-            assertEquals("the form was taken away: " + state, "visible", field(state, "form"));
-            assertEquals("the parent cannot try again: " + state, "enabled", field(state, "save"));
+                String state = surfaceState(scenario);
+                Log.i(TAG, "surface after refusal: " + state);
+                assertEquals("the text the parent typed was lost: " + state, "kept", field(state, "text"));
+                assertEquals("the day they chose was lost: " + state, "kept", field(state, "date"));
+                assertEquals("the window closed under a refusal: " + state, "open", field(state, "modal"));
+                assertEquals("the form was taken away: " + state, "visible", field(state, "form"));
+                assertEquals("the parent cannot try again: " + state, "enabled", field(state, "save"));
 
-            assertEquals("a refused entry was written anyway", "0", field(readBack(scenario, leg), "count"));
+                assertEquals(
+                        "a refused entry was written anyway",
+                        "0",
+                        field(readBack(scenario, leg), "count"));
 
-            // THE CONTROL. Release the ceiling and press the same button again:
-            // it must save. Without this, a surface that refused everything
-            // would pass the assertions above.
-            releaseCeiling(scenario);
-            assertEquals(
-                    "the same press failed with the ceiling released, so the refusal above was"
-                            + " not about a full disk",
-                    "listed",
-                    pressSave(scenario));
-            assertEquals("1", field(readBack(scenario, leg), "count"));
+                // THE CONTROL. Release the ceiling and press the same button
+                // again: it must save. Without this, a surface that refused
+                // everything would pass the assertions above.
+                releaseCeiling(scenario);
+                assertEquals(
+                        "the same press failed with the ceiling released, so the refusal above was"
+                                + " not about a full disk",
+                        "listed",
+                        pressSave(scenario));
+                assertEquals("1", field(readBack(scenario, leg), "count"));
+            } finally {
+                releaseQuietly(scenario);
+            }
         }
     }
 
@@ -220,30 +267,46 @@ public class DiaryEntryTest {
 
             String armed = fillToCeiling(scenario);
             Log.i(TAG, "arming: " + armed);
-            assertEquals("the store never reached its ceiling: " + armed, "full", field(armed, "state"));
+            try {
+                assertEquals(
+                        "the store never reached its ceiling: " + armed, "full", field(armed, "state"));
+                // THE ASSERTION THIS LEG WAS MISSING, and its absence is why it
+                // red on an artefact rather than on a defect. The act below
+                // writes JOURNAL rows; a ceiling that only refuses `record`
+                // writes leaves that act free to succeed, which is exactly what
+                // run 31971968427 recorded. So the refusal that arms this leg is
+                // the journal-shaped one.
+                assertEquals(
+                        "the store still accepts journal writes, so the tick below is not being"
+                                + " performed on a full disk: " + armed,
+                        "full:StoreDiskFullError",
+                        field(armed, "journalRefusal"));
 
-            String verdict = tickFirstSkill(scenario);
-            Log.i(TAG, "tick verdict: " + verdict);
+                String verdict = tickFirstSkill(scenario);
+                Log.i(TAG, "tick verdict: " + verdict);
 
-            // THE TICK IS WITHDRAWN, AND THE REASON IS THE RIGHT ONE. A checkbox
-            // that stayed checked would assert a mark the store never took; a
-            // message about the store not opening would send the parent to
-            // restart the app, which does not free space.
-            assertEquals("the tick was not withdrawn: " + verdict, "unchecked", field(verdict, "checkbox"));
-            assertEquals("the parent was not told: " + verdict, "show", field(verdict, "modal"));
-            assertEquals("the full disk was reported as a broken store: " + verdict, "visible", field(verdict, "diskFull"));
-            assertEquals("both explanations were shown at once: " + verdict, "hidden", field(verdict, "unavailable"));
+                // THE TICK IS WITHDRAWN, AND THE REASON IS THE RIGHT ONE. A
+                // checkbox that stayed checked would assert a mark the store
+                // never took; a message about the store not opening would send
+                // the parent to restart the app, which does not free space.
+                assertEquals("the tick was not withdrawn: " + verdict, "unchecked", field(verdict, "checkbox"));
+                assertEquals("the parent was not told: " + verdict, "show", field(verdict, "modal"));
+                assertEquals("the full disk was reported as a broken store: " + verdict, "visible", field(verdict, "diskFull"));
+                assertEquals("both explanations were shown at once: " + verdict, "hidden", field(verdict, "unavailable"));
 
-            // The control, as above: with the ceiling released the same tick
-            // sticks.
-            releaseCeiling(scenario);
-            String again = tickFirstSkill(scenario);
-            Log.i(TAG, "tick after release: " + again);
-            assertEquals(
-                    "the tick failed with the ceiling released, so the refusal above was not"
-                            + " about a full disk: " + again,
-                    "checked",
-                    field(again, "checkbox"));
+                // The control, as above: with the ceiling released the same tick
+                // sticks.
+                releaseCeiling(scenario);
+                String again = tickFirstSkill(scenario);
+                Log.i(TAG, "tick after release: " + again);
+                assertEquals(
+                        "the tick failed with the ceiling released, so the refusal above was not"
+                                + " about a full disk: " + again,
+                        "checked",
+                        field(again, "checkbox"));
+            } finally {
+                releaseQuietly(scenario);
+            }
         }
     }
 
@@ -433,16 +496,29 @@ public class DiaryEntryTest {
                             + "})()");
         assertEquals("no unticked skill row was there to tick", "clicked", dispatched);
 
-        // The tick is asynchronous: the write happens, and only then is the DOM
-        // rolled back or left alone. Polled until the app has finished deciding,
-        // which is either of the two outcomes and never a timeout on both.
+        // WAITING FOR SOMETHING THE APP SETS, NOT FOR SOMETHING THE CLICK SET.
+        //
+        // The old predicate returned as soon as `box.checked` was true — which
+        // `box.click()` makes true synchronously, before the write is even
+        // dispatched. It therefore never waited at all: run 31971968427 logged
+        // the verdict at 21:00:24.570, four milliseconds after the executeSet
+        // left for native and two hundred before it came back. What it reported
+        // was the document mid-act, including `unavailable=visible`, which is
+        // just the resting state of a paragraph that ships without `hidden`.
+        //
+        // Both of the app's outcomes are written by the app AFTER the write
+        // resolved (surfaces/skill-completion.js): a refusal un-ticks the box and
+        // shows the window, a success adds `skill-completed` to the row. Either
+        // one means it has decided; neither is true before it has.
         return pollFor(
                 scenario,
                 "(function () {"
                     + "var box = window.__diaBox;"
+                    + "var row = box.closest('tr[data-skill-id]');"
                     + "var modal = document.getElementById('storeUnavailableModal');"
                     + "var shown = modal.classList.contains('show');"
-                    + "if (!shown && !box.checked) { return null; }"
+                    + "var kept = !!row && row.classList.contains('skill-completed');"
+                    + "if (!shown && !kept) { return null; }"
                     + "var diskFull = document.getElementById('storeDiskFullNote');"
                     + "var unavailable = document.getElementById('storeUnavailableNote');"
                     + "return ['checkbox=' + (box.checked ? 'checked' : 'unchecked'),"
@@ -490,7 +566,8 @@ public class DiaryEntryTest {
     }
 
     /**
-     * Lowers the page ceiling to the current size and then REACHES it.
+     * Lowers the page ceiling to the current size and then REACHES it, in both
+     * of the shapes the acts under test write.
      *
      * <p>The clamp alone is not a full disk: SQLite refuses to set a maximum
      * below the current page count, and a small row may still fit in a
@@ -499,6 +576,22 @@ public class DiaryEntryTest {
      * smaller than any row the acts under test write. The refusal of the last
      * filler is the evidence that the store is full, and it is returned rather
      * than assumed.
+     *
+     * <p>THEN THE SAME THING AGAIN FOR THE JOURNAL, because "full" is a property
+     * of the next write and not of the file. The filler above exhausts what
+     * {@code record}'s pages will take; a mark writes small rows into
+     * {@code journal_entry} and {@code assertion}, whose own leaves had room —
+     * so in run 31971968427 the mark landed on a store this method had just
+     * called full. The probe is the mark path's own shape (one transaction, an
+     * entry plus its detail) with {@code kind='note'} and no skill, so the rows
+     * it does manage to write move nothing in the projected skill state. Its
+     * refusal is returned as {@code journalRefusal}.
+     *
+     * <p>ONLY A DISK-FULL REFUSAL COUNTS AS FULL. Anything else — a constraint
+     * violation, a foreign key, a typo in a column list — is rethrown and
+     * surfaces as a failed script. Reporting it as fullness would arm nothing
+     * and say it had, which is the whole failure mode this method exists to
+     * prevent.
      */
     private String fillToCeiling(ActivityScenario<MainActivity> scenario) {
         return await(
@@ -530,17 +623,53 @@ public class DiaryEntryTest {
                     + " ['dia-p3-filler-' + made + '-' + Date.now(), 'dia-p3-filler-area',"
                     + " window.__diaAuthor, 'text', body, '2026-01-01', Date.now(), 0,"
                     + " Date.now()]); };"
+                    // A refusal is only evidence of a FULL disk when it is the
+                    // full-disk class. Anything else is rethrown: see the
+                    // method comment.
+                    + "var refused = function (error) {"
+                    + " if (!error || error.name !== 'StoreDiskFullError') { throw error; }"
+                    + " return 'full:' + error.name; };"
                     + "var loop = function (size, left) {"
                     + " if (left <= 0) { return Promise.resolve('budget'); }"
                     + " return write(size).then(function () { made += 1;"
-                    + "  return loop(size, left - 1); },"
-                    + "  function (error) { return 'full:' + (error && error.name); }); };"
+                    + "  return loop(size, left - 1); }, refused); };"
+                    // The mark path's own shape: one transaction carrying a
+                    // journal entry and its detail. kind='note' with a NULL
+                    // skill is what the schema's paired CHECK makes expressible,
+                    // and it keeps every probe that DOES land out of
+                    // v_child_skill_state — the projection the acts read.
+                    + "var journalled = 0;"
+                    + "var probe = function () {"
+                    + " var jid = 'dia-p3-arm-' + journalled + '-' + Date.now();"
+                    + " var at = Date.now();"
+                    + " return bridge.executeSet(["
+                    + "  { statement: 'INSERT INTO journal_entry (id, kind,"
+                    + " author_participant_id, subject_child_id, visibility_class, origin,"
+                    + " event_date_local, event_at_utc, event_utc_offset_min, entry_at_utc,"
+                    + " entry_utc_offset_min) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',"
+                    + "    values: [jid, 'assertion', window.__diaAuthor, window.__diaChild,"
+                    + "     'child_shared', 'authored', '2026-01-01', at, 0, at, 0] },"
+                    + "  { statement: 'INSERT INTO assertion (journal_id, kind, skill_id,"
+                    + " effective_from_date, prerequisite_propagation, source_record_id,"
+                    + " supersedes_assertion_id) VALUES (?, ?, ?, ?, ?, ?, ?)',"
+                    + "    values: [jid, 'note', null, '2026-01-01', 'none', null, null] }"
+                    + " ], { transaction: true }); };"
+                    + "var journalLoop = function (left) {"
+                    + " if (left <= 0) { return Promise.resolve('budget'); }"
+                    + " return probe().then(function () { journalled += 1;"
+                    + "  return journalLoop(left - 1); }, refused); };"
                     + "return loop(8000, 400).then(function (big) {"
                     + " if (big === 'budget') { return 'state=budget;rows=' + made; }"
                     + " return loop(200, 400).then(function (small) {"
                     + "  if (small === 'budget') { return 'state=budget;rows=' + made; }"
-                    + "  return ['state=full', 'rows=' + made, 'ceiling=' + ceiling,"
-                    + "   'refusal=' + small].join(';'); }); }); }); }); })");
+                    + "  return journalLoop(200).then(function (journal) {"
+                    + "   if (journal === 'budget') {"
+                    + "    return 'state=journal-budget;rows=' + made"
+                    + "     + ';journalRows=' + journalled; }"
+                    + "   return ['state=full', 'rows=' + made, 'ceiling=' + ceiling,"
+                    + "    'refusal=' + small, 'journalRows=' + journalled,"
+                    + "    'journalRefusal=' + journal].join(';'); });"
+                    + "  }); }); }); }); })");
     }
 
     /**
@@ -550,6 +679,14 @@ public class DiaryEntryTest {
      * family's, and `record` is the one table whose erasure is specified
      * behaviour. The pragma is per-connection, so releasing it restores the
      * store for whatever runs next in this process.
+     *
+     * <p>THE JOURNAL PROBES THAT LANDED ARE NOT DELETED, and cannot be: the
+     * append-only triggers refuse DELETE on `journal_entry` outright, which is
+     * the property the whole schema is built on. That is the price of arming
+     * the journal path at all, it is bounded by the record filler running first,
+     * and the count is returned so it is a measured cost rather than a silent
+     * one. The probes carry this leg's own child id and a NULL skill, so nothing
+     * any other leg reads can see them.
      */
     private void releaseCeiling(ActivityScenario<MainActivity> scenario) {
         String released =
@@ -566,6 +703,30 @@ public class DiaryEntryTest {
                             + " ['dia-p3-filler-area']); })"
                             + ".then(function () { return 'released'; }); })");
         assertEquals("the store was left armed for the next test", "released", released);
+    }
+
+    /**
+     * The same release, in a {@code finally}, reporting instead of asserting.
+     *
+     * <p>WHY IT EXISTS. In run 31971968427 the mark leg failed at its first
+     * assertion and never reached its release, so the diary leg after it armed
+     * against a store that was still clamped and logged {@code arming:
+     * state=full;rows=0} — an arming that wrote nothing because everything was
+     * already refused, reported as success. The store outlives every
+     * ActivityScenario in this process, so one leg's leftovers are the next
+     * leg's premise; the release therefore belongs where it runs whatever the
+     * assertions did.
+     *
+     * <p>WHY IT SWALLOWS. An exception thrown from a {@code finally} REPLACES
+     * the failure the leg was reporting. A cleanup that hides the red it was
+     * cleaning up after is worse than no cleanup, so this one logs.
+     */
+    private void releaseQuietly(ActivityScenario<MainActivity> scenario) {
+        try {
+            releaseCeiling(scenario);
+        } catch (Throwable failed) {
+            Log.w(TAG, "the ceiling could not be released after this leg", failed);
+        }
     }
 
     // --- WebView plumbing, same shape as the sibling suites ------------------
