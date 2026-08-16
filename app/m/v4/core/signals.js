@@ -40,6 +40,13 @@
 // Closed code lists, keyed by FIELD. A field named here may only ever carry one
 // of these strings; any other string is refused.
 export const SIGNAL_CODES = Object.freeze({
+    // DIA-DL-001 adds three codes for `history.handoff`. This list is SHARED
+    // across kinds — a field named here may carry any of these in any kind — so
+    // widening it widens every kind at once. That is accepted rather than
+    // overlooked: the alternative is a per-kind code table, which buys tighter
+    // typing at the cost of a second place for a code to be declared and a
+    // second thing to forget. What the widening cannot do is admit free text,
+    // which is the property the whole surface rests on.
     outcome: Object.freeze([
         'opened',
         'not_native',
@@ -47,6 +54,16 @@ export const SIGNAL_CODES = Object.freeze({
         'complete',
         'interrupted',
         'nothing_selected',
+        // DIA-DL-001: the handoff was handed to the browser and this device is
+        // now waiting for the parent to come back.
+        'handed_off',
+        // DIA-DL-001: something arrived and was refused before it was staged.
+        // WHICH refusal is the `refusal` field below; this says only that the
+        // transfer did not start.
+        'refused',
+        // DIA-DL-001: nothing was staged and nothing was refused — the ordinary
+        // state on every launch that is not a return from the handoff page.
+        'no_transfer',
     ]),
     // The typed store failures from store/errors.js, as codes. Derived from the
     // control-flow class rather than from an exception message, because engine
@@ -59,6 +76,52 @@ export const SIGNAL_CODES = Object.freeze({
         'other',
     ]),
     reason: Object.freeze(['no_subject', 'store_unavailable', 'write_failed']),
+
+    // changed_in: DIA-DL-001 — which way the history travelled. Two values and
+    // no third: a link the app registered, or a file the parent picked.
+    transport: Object.freeze(['link', 'file']),
+
+    // changed_in: DIA-DL-001 — why a transfer did not start, as a closed code.
+    //
+    // THIS LIST IS THE VOCABULARY, and it is shared by three places that must
+    // agree: HistoryTransferPlugin.java records one of these on every refusal,
+    // TransferFormatError carries one as its `reason`, and this is what a
+    // payload may say out loud. The bounded EVIDENCE behind a refusal — the
+    // offending key name, the declared byte count beside the actual one, the
+    // ceiling in force — goes to the device console and stops there. A code can
+    // be counted; evidence cannot be, and free text is what a payload may never
+    // carry.
+    refusal: Object.freeze([
+        'none',
+        // No app handled the link. Detected by the browser itself, not guessed:
+        // Chrome navigates to browser_fallback_url and the page switches.
+        'no_handler',
+        // An option key or query key nobody declared.
+        'foreign_key',
+        // A payload past the link ceiling, or options past theirs.
+        'options_ceiling',
+        // Declared byte count and actual disagree. THE TRUNCATION CASE.
+        'size_mismatch',
+        // The bytes arrived whole by count and are not the bytes that were sent.
+        'checksum_mismatch',
+        // An envelope version this build does not read, in either direction.
+        'format_version',
+        // The parent closed the document picker. A decision, not a failure.
+        'cancelled',
+        // The build has no PWA origin configured — see TRANSFER_CONFIG.handoffOrigin.
+        'handoff_unconfigured',
+        // The app asked to open a URL the plugin does not serve. Our own bug if
+        // it ever happens, and worth its own code precisely for that reason.
+        'handoff_foreign_url',
+        // No activity on the device would handle a plain web URL.
+        'no_browser',
+        // The picked document could not be read at all.
+        'unreadable',
+        // A drain asked for a range the staged transfer does not have. Ours too.
+        'bad_range',
+        // A drain named a transfer the plugin is not holding.
+        'no_transfer',
+    ]),
 });
 
 export const SIGNAL_TAXONOMY = Object.freeze({
@@ -140,6 +203,38 @@ export const SIGNAL_TAXONOMY = Object.freeze({
         boolean: Object.freeze([]),
         numeric: Object.freeze(['archive_bytes', 'chunks', 'export_ms']),
         producingStage: 'XPT-P1',
+        emittedNow: true,
+    }),
+
+    // changed_in: DIA-DL-001 — what one browser-to-native handoff did.
+    //
+    // It exists for the same reason `export.run` does: the thing it describes is
+    // INVISIBLE from the device otherwise. A handoff crosses two process
+    // boundaries and a browser, and when it does not arrive there is nothing on
+    // screen to say whether the link was never delivered, or was delivered and
+    // refused, or arrived truncated. The owner-run device smoke is the one leg
+    // no test automates, and this line is what that leg reads.
+    //
+    // COUNTS, TIMINGS AND CLOSED CODES ONLY, and the absences are the design:
+    // no child's name, no birthdate, no skill id, no filename, no URI, no
+    // digest. `profiles` is how many profiles arrived — a count, and the only
+    // number here that is about the family at all. `transport` says which of the
+    // two paths carried it; `refusal` says why one did not start. The bounded
+    // evidence behind a refusal stays on the device console (see the plugin);
+    // what is countable is here, and nothing else can be.
+    'history.handoff': Object.freeze({
+        fields: Object.freeze([
+            'outcome',
+            'transport',
+            'refusal',
+            'bytes',
+            'chunks',
+            'profiles',
+            'handoff_ms',
+        ]),
+        boolean: Object.freeze([]),
+        numeric: Object.freeze(['bytes', 'chunks', 'profiles', 'handoff_ms']),
+        producingStage: 'DIA-P1',
         emittedNow: true,
     }),
 });

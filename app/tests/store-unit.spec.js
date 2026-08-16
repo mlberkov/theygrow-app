@@ -43,17 +43,34 @@ const dynamicImport = new Function('specifier', 'return import(specifier)');
 
 let loadRoot = null;
 
+// THE COPY PRESERVES THE MOUNT'S DIRECTORY LAYOUT, and since DIA-P1 it has to.
+//
+// Until that packet every store module imported only its siblings, so a FLAT
+// copy of store/ was faithful. store/transfer.js imports `../transfer/config.js`
+// — the transfer knobs live in their own surface, beside the handoff page that
+// shares them — and a flat copy turned that into a module resolution failure
+// that reads as "boot.js is not import-safe off the browser". The layout is
+// therefore reproduced rather than flattened: the marker package.json sits at
+// the temp root and each directory is copied under its own name, so every
+// relative specifier resolves exactly as it does in the mount.
+const COPIED_DIRS = ['store', 'transfer'];
+
 test.beforeAll(() => {
     loadRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'theygrow-store-'));
     fs.writeFileSync(path.join(loadRoot, 'package.json'), '{"type":"module"}');
-    for (const name of fs.readdirSync(STORE_DIR)) {
-        const from = path.join(STORE_DIR, name);
-        if (!fs.statSync(from).isFile()) continue;
-        fs.copyFileSync(from, path.join(loadRoot, name));
-        expect(
-            fs.readFileSync(path.join(loadRoot, name)).equals(fs.readFileSync(from)),
-            `${name} was not copied verbatim — these tests would be testing a different file`
-        ).toBeTruthy();
+    for (const dir of COPIED_DIRS) {
+        const from = path.join(APP_ROOT, 'm', MOUNT.dir, dir);
+        const to = path.join(loadRoot, dir);
+        fs.mkdirSync(to, { recursive: true });
+        for (const name of fs.readdirSync(from)) {
+            const source = path.join(from, name);
+            if (!fs.statSync(source).isFile()) continue;
+            fs.copyFileSync(source, path.join(to, name));
+            expect(
+                fs.readFileSync(path.join(to, name)).equals(fs.readFileSync(source)),
+                `${dir}/${name} was not copied verbatim — these tests would be testing a different file`
+            ).toBeTruthy();
+        }
     }
 });
 
@@ -61,7 +78,9 @@ test.afterAll(() => {
     if (loadRoot) fs.rmSync(loadRoot, { recursive: true, force: true });
 });
 
-const load = (name) => dynamicImport(pathToFileURL(path.join(loadRoot, name)).href);
+// Names stay bare ('config.js') at the call sites: they mean the STORE's module,
+// which is what every existing caller in this file intends.
+const load = (name) => dynamicImport(pathToFileURL(path.join(loadRoot, 'store', name)).href);
 
 test.describe('the store modules are inert until called', () => {
     test('importing every module on a platform with no Capacitor changes nothing', async () => {

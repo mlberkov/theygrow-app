@@ -98,6 +98,10 @@ const OFFLINE_URLS = [
   '/m/v4/store/repo-journal.js',
   '/m/v4/store/import-legacy.js',
   '/m/v4/store/bridge.js',
+  // DIA-P1 — the transfer seam. The three transfer/ modules it imports are
+  // already precached above, for the handoff page; this is the app-side door
+  // to them, and it is inert on the web exactly as store/bridge.js is.
+  '/m/v4/store/transfer.js',
   '/m/v4/store/config.js',
   '/m/v4/store/errors.js',
   // L1-P3: the export contour. Precached for the same reason the store modules

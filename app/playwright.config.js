@@ -129,7 +129,7 @@ module.exports = defineConfig({
       // transfer-format (the transitional envelope, imported under Node the same
       // way store-unit imports the store). Leg (b) of that invariant is NOT
       // here: it presses the button in a real browser and belongs in `behavior`.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format)\.spec\.js/,
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

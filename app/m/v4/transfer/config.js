@@ -104,7 +104,82 @@ export const TRANSFER_CONFIG = Object.freeze({
     // managers, share sheets and download lists.
     fallbackFilename: 'theygrow-transfer.json',
     fallbackMimeType: 'application/json',
+
+    // --- the receiving side (DIA-P1, checkpoint C) ------------------------
+
+    // changed_in: DIA-DL-001 — the PWA base URL the app opens the handoff page
+    // at, WITHOUT a trailing slash.
+    //
+    // IT IS EMPTY, AND THAT IS A RECORDED STATE RATHER THAN AN OVERSIGHT. The
+    // PWA's serving URL is not written down anywhere in this repository: the
+    // RUNBOOK's "Live-infra divergence" carries the Cloud Run service name and
+    // the region, and deliberately not the host — which contains a
+    // project-scoped hash this repo has never held. So there is no value here
+    // to derive and none to copy, and inventing one would ship an app that
+    // opens a page that does not exist.
+    //
+    // The posture is the one this repository already uses for an identifier it
+    // does not hold: an EMPTY DEFAULT BEHIND A FAIL-CLOSED GUARD, exactly as
+    // app/cloudbuild.yaml handles `_API_UPSTREAM_URL` and `_PWA_RUNTIME_SA`.
+    // Until the owner fills it in, `openHandoff` refuses with
+    // `handoff_unconfigured` before it builds any intent, the surface says so in
+    // plain Russian instead of opening nothing, and the file fallback stays
+    // reachable. Filling it in is a numbered step of the owner procedure in
+    // docs/RUNBOOK.md, performed before the device smoke.
+    //
+    // Mirrored as HANDOFF_ORIGIN in HistoryTransferPlugin.java, and the two are
+    // asserted equal by app/tests/transfer-seam.spec.js — including while both
+    // are empty, so the pair cannot drift apart before either is set.
+    handoffOrigin: '',
+
+    // changed_in: DIA-DL-001 — the path of the handoff page on that origin. It
+    // IS in this repository (app/transfer.html), so unlike the origin it is a
+    // literal rather than an owner-fill.
+    handoffPath: '/transfer.html',
+
+    // changed_in: DIA-DL-001 — how many RAW bytes of the staged transfer ride
+    // one readChunk response. The mirror image of EXPORT_CONFIG.sinkChunkBytes
+    // and the same number for the same reason: 256 KiB is an order of magnitude
+    // under the ~1 MB binder limit even after base64 inflates it to ~349 KiB, so
+    // no single call on this path can approach the limit however a future
+    // Capacitor version decides to move or persist it. The direction is
+    // reversed — the app DRAINS a buffer the native side staged, rather than
+    // filling one — and the bound matters on this side too, because a response
+    // crosses the same binder transaction an argument does.
+    transferChunkBytes: 262144,
+
+    // changed_in: DIA-DL-001 — the ceiling on any transfer call's serialized
+    // options, enforced by the plugin before it acts. Mirrors
+    // LAUNCH_OPTIONS_MAX_BYTES in HistoryTransferPlugin.java and carries the
+    // same 4096 as the export sink, for the same stated reason: its job is not
+    // to be tight, it is to make "a payload rode a bridge call" impossible to
+    // reintroduce silently.
+    launchOptionsMaxBytes: 4096,
 });
+
+// The complete set of methods this app is allowed to call on the transfer
+// plugin.
+//
+// The same supply-chain boundary ALLOWED_PLUGIN_METHODS draws around
+// CapacitorSQLite and ALLOWED_SINK_METHODS draws around the export sink, drawn
+// again here. THE BOUNDARY IS NOT THE COUNT, IT IS WHAT THE METHODS CAN REACH:
+// there is no write method, no delete method, no list method and no "read a path
+// of your choosing" method. `pickTransfer` opens the system document picker, so
+// the ONE file this plugin can ever read is the one the parent chose in that
+// moment — ACTION_OPEN_DOCUMENT needs no storage permission at all, the mirror
+// of the ACTION_CREATE_DOCUMENT argument LSC-P3-INV-002 makes for the sink.
+// `openHandoff` starts a browser at one URL the plugin itself decides.
+//
+// changed_in: DIA-DL-001 — declared at five, and
+// app/tests/transfer-seam.spec.js asserts this exact set, so the list cannot
+// grow without a deliberate test edit.
+export const ALLOWED_TRANSFER_METHODS = Object.freeze([
+    'openHandoff',
+    'pendingTransfer',
+    'readChunk',
+    'discardTransfer',
+    'pickTransfer',
+]);
 
 // The transitional envelope's identity.
 //

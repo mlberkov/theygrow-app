@@ -15,19 +15,23 @@
 // current ones rather than copied into the repo:
 //
 //   shell  — app/index.html with every `m/v{cur}/` occurrence rewritten to the
-//            previous mount. The identity this buys is stated as of the last
-//            bump rather than once and for all: EVERY packet that has edited
-//            index.html since EMV-P1 has edited it by mount repoint and by
+//            previous mount, and — since DIA-P1 — with any delivery hint the
+//            previous mount does not carry pruned out.
+//
+//            THE HISTORICAL-BYTES CLAIM IS OVER, AND THIS IS WHERE IT ENDED.
+//            Until DIA-P1 this paragraph said that every packet editing
+//            index.html since EMV-P1 had edited it by mount repoint and by
 //            nothing else — EMV-P1 itself, then XPT-P1 — so rewriting the
-//            current shell back one generation reproduces the shell that
-//            generation actually published. (At EMV-P3 that was verified
-//            byte-for-byte against 711b5bc, the last commit on main before
-//            EMV-P1; the anchor moves forward with each bump, and the claim
-//            holds only while "repoint only" stays true.) A later packet
-//            editing index.html for any other reason turns this into "the
-//            current shell repointed at the previous mount", which is still the
-//            right fixture for the mechanism but is no longer the historical
-//            bytes. The spec states this bound too.
+//            current shell back one generation reproduced the shell that
+//            generation actually published (verified byte-for-byte at EMV-P3
+//            against 711b5bc). It also said, in as many words, that a later
+//            packet editing index.html for any other reason turns this into
+//            "the current shell repointed at the previous mount". DIA-P1 is
+//            that packet: it added four delivery hints and the handoff controls
+//            in #importModal. So the fixture is now the WEAKER of the two
+//            things, deliberately and on the record — still the right fixture
+//            for the MECHANISM, no longer the historical bytes, and the spec
+//            states that bound too.
 //   worker — app/sw.js under the same rewrite, with CACHE_VERSION decremented
 //            and — since DIA-P1 — with any precache entry the previous mount
 //            does not carry pruned out (see the block that does it for why that
@@ -121,7 +125,7 @@ function previousGeneration(appRoot) {
 
   const version = priorCacheVersion(workerSource);
 
-  const shell = rewriteMount(shellSource, current, previous, 'app/index.html');
+  const rewrittenShell = rewriteMount(shellSource, current, previous, 'app/index.html');
   const worker = rewriteMount(workerSource, current, previous, 'app/sw.js').replace(
     `const CACHE_VERSION = '${version.current}';`,
     `const CACHE_VERSION = '${version.prior}';`
@@ -151,6 +155,22 @@ function previousGeneration(appRoot) {
   // generation introduced. What is dropped is returned rather than swallowed, so
   // the spec can print it and a reader can see the fixture is smaller than the
   // current worker and why.
+  // The SHELL has the same problem the precache does, and it shows up
+  // differently: a modulepreload hint pointing at a module the previous
+  // generation never carried does not fail an install — it 404s, four times, in
+  // a page the spec is watching for console errors. Same attribution as below
+  // (the delivery guard already proves every CURRENT hint resolves), same
+  // remedy: the previous generation did not hint what it did not ship.
+  const droppedHints = [];
+  const shell = rewrittenShell.replace(
+    /^[ \t]*<link rel="modulepreload" href="([^"]+)">\n/gm,
+    (line, href) => {
+      if (fs.existsSync(path.join(appRoot, href.replace(/^\//, '')))) return line;
+      droppedHints.push(href);
+      return '';
+    }
+  );
+
   const added = [];
   const precache = [];
   for (const url of offlineUrls(worker)) {
@@ -197,8 +217,9 @@ function previousGeneration(appRoot) {
     shell,
     worker: staged,
     // What the current generation added and the previous one therefore never
-    // precached. Returned rather than swallowed — see the block above.
+    // precached or hinted. Returned rather than swallowed — see the blocks above.
     addedSincePrevious: added,
+    droppedHints,
   };
 }
 

@@ -129,6 +129,10 @@
     <link rel="modulepreload" href="/m/v4/store/repo-journal.js">
     <link rel="modulepreload" href="/m/v4/store/import-legacy.js">
     <link rel="modulepreload" href="/m/v4/store/bridge.js">
+    <link rel="modulepreload" href="/m/v4/store/transfer.js">
+    <link rel="modulepreload" href="/m/v4/transfer/config.js">
+    <link rel="modulepreload" href="/m/v4/transfer/errors.js">
+    <link rel="modulepreload" href="/m/v4/transfer/format.js">
     <link rel="modulepreload" href="/m/v4/store/config.js">
     <link rel="modulepreload" href="/m/v4/store/errors.js">
     <link rel="modulepreload" href="/m/v4/surfaces/export.js">
@@ -283,10 +287,22 @@
             <p class="export-plain">Браузерная версия продолжает работать со своим хранилищем. Отметка, поставленная в браузере ПОСЛЕ этого переноса, здесь не появится, пока перенос не будет запущен ещё раз. Отметки, сделанные здесь, в браузере не появятся никогда.</p>
             <p>У перенесённых отметок нет даты наблюдения: в браузере она не записывалась. Они получат дату переноса, и в архиве будет прямо сказано, что настоящая дата неизвестна.</p>
             <p>Отметьте, кого перенести. Снятый профиль можно перенести позже — а вот отменить перенос нельзя: журнал только пополняется.</p>
+
+            <!-- DIA-P1 — предложение начать перенос. Показывается, когда со
+                 стороны браузера ещё ничего не пришло; после возврата на его
+                 месте появляется список профилей и кнопка «Перенести».
+                 Родителю не показывают выбор между «ссылкой» и «файлом»:
+                 запасной путь включается сам, а объяснение — одна строка
+                 (#importFallback) и та же кнопка. См. ADR-048 §3. -->
+            <p id="importHandoffOffer" hidden>История лежит в браузере, и приложение её оттуда не видит. Нажмите — откроется браузер, там будет одна кнопка, и вы вернётесь сюда.</p>
+
             <div id="importChoices" class="import-choices"></div>
+            <p id="importFallback" class="export-status" hidden></p>
             <p id="importStatus" class="export-status" hidden></p>
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="importCloseBtn">Не сейчас</button>
+                <button type="button" class="modal-button modal-button-secondary" id="importPickBtn" hidden>Выбрать файл</button>
+                <button type="button" class="modal-button modal-button-primary" id="importHandoffBtn" hidden>Открыть браузер</button>
                 <button type="button" class="modal-button modal-button-primary" id="importRunBtn">Перенести</button>
             </div>
         </div>

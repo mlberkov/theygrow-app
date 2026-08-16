@@ -28,6 +28,14 @@ import {
     loadMarks,
 } from './repo-journal.js';
 import { pendingImport, runImport } from './import-legacy.js';
+import {
+    discardTransfer,
+    drainTransfer,
+    isTransferAvailable,
+    openHandoff,
+    pendingTransfer,
+    pickTransfer,
+} from './transfer.js';
 
 let handle = null;
 
@@ -76,6 +84,12 @@ export async function initNativeStore({ now = () => Date.now() } = {}) {
 // L1-P4 adds the repository half for the same reason: core/state.js reaches the
 // journal through this one door, so store/ keeps exactly one entrance from core/
 // and the seam scan keeps reaching everything behind it.
+// DIA-P1 adds the transfer seam for the same reason: surfaces/import.js reaches
+// it through this one door, so store/ keeps exactly one entrance from the
+// surfaces layer and the storage-seam scan (LSC-P1-INV-001) keeps reaching
+// everything behind it. The seam itself touches no Web Storage at all — it
+// drains bytes the native side staged — but a module outside the walked graph
+// is a module that guard never reads, and that is the property being kept.
 export {
     acknowledgeCursor,
     appendChild,
@@ -84,10 +98,16 @@ export {
     appendMark,
     childRow,
     completedFrom,
+    discardTransfer,
+    drainTransfer,
     existingEntryIds,
+    isTransferAvailable,
     loadChildren,
     loadMarks,
+    openHandoff,
     pendingImport,
+    pendingTransfer,
+    pickTransfer,
     projectSkillState,
     readSince,
     runImport,
