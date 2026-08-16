@@ -88,16 +88,20 @@ public class HistoryTransferPlugin extends Plugin {
     /**
      * The PWA base URL the handoff page is opened at, and the path on it.
      *
-     * <p>EMPTY BY DESIGN AND FAIL-CLOSED. The serving URL is not recorded
-     * anywhere in this repository — {@code docs/RUNBOOK.md} carries the Cloud Run
-     * service name and the region and deliberately not the host — so there is no
-     * value to copy here. It mirrors {@code TRANSFER_CONFIG.handoffOrigin} in
-     * the mount's {@code transfer/config.js}, and {@code
-     * app/tests/transfer-seam.spec.js} asserts the two agree while both are
-     * empty, so they cannot drift apart before either is set. With it empty
-     * {@link #openHandoff} refuses by name and starts nothing.
+     * <p>The product's PUBLIC address, named as the handoff page's home in
+     * ADR-048 §1 — deliberately not the live-infra naming (the Cloud Run service,
+     * its region, its generated host), which stays in {@code docs/RUNBOOK.md}.
+     *
+     * <p>THE EMPTY-VALUE GUARD IN {@link #openHandoff} STAYS. Its subject is now
+     * a value that has been emptied — by a refactor, a bad merge, a build that
+     * strips a constant — rather than one never supplied. A knob whose unset
+     * state is a silent no-op is worse than one that is missing.
+     *
+     * <p>Mirrors {@code TRANSFER_CONFIG.handoffOrigin} in the mount's {@code
+     * transfer/config.js}; {@code app/tests/transfer-seam.spec.js} asserts the
+     * two agree and that the refusal branch still exists.
      */
-    static final String HANDOFF_ORIGIN = "";
+    static final String HANDOFF_ORIGIN = "https://theygrow.app";
 
     static final String HANDOFF_PATH = "/transfer.html";
 

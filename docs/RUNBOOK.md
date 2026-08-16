@@ -62,7 +62,7 @@ Three places in this file, and the header comment of all three build-configs, us
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
-   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v3/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v3/app.js"` and `curl -fsSI "$TAG_URL/m/v3/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v3/sw-register.js` carries the same headers. Repeat for the current mount version after a bump.
+   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v4/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v4/app.js"` and `curl -fsSI "$TAG_URL/m/v4/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v4/sw-register.js` carries the same headers. Repeat for the current mount version after a bump.
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
 4. **Promote.** Shift 100% traffic to the just-smoked revision:
    `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
@@ -303,7 +303,7 @@ Canonical names to create: Cloud Run service **`theygrow-api-staging`**, databas
 1. **When to bump.** Any change to the bytes of a file under a published mount version — a one-character CSS fix included. The mount version is a content generation, not a semver: it carries no meaning beyond "these bytes are not those bytes".
 2. **Bump to a new mount version (`/m/v{N+1}/`)** — copy-forward, never rename:
    1. `cp -r app/m/v{N} app/m/v{N+1}`, then make the change **in the new directory only**. `app/m/v{N}/` stays on disk **byte-untouched** so any client holding cached HTML that references it keeps resolving it for the cache lifetime (vault ADR-024: a published immutable asset is never rewritten or removed in place — the `ICON-DL-001` / `A0-DL-001` precedent for superseded icon filenames).
-   2. **Repoint the mount's own self-references, inside the new directory.** Since L1-P2/L1-P3 the mount contains absolute URLs pointing back into itself, and they are typed knobs rather than incidental strings: `STORE_CONFIG.schemaUrl` (`store/config.js`) and `EXPORT_CONFIG.declarationUrl` / `fontUrl` / `iccUrl` (`export/config.js`). Left at `v{N}` they make the new generation fetch the frozen one's DDL, declaration, font and colour profile — which *works* while both are shipped and byte-identical, and breaks the day `v{N}` is retired. Each repointed value takes a `changed_in:` line naming the bump's decision-log id, per ADR-013. Also sweep the new directory for `m/v{N}` in comments; a copied comment that names the old mount is a false statement about the file it now sits in. (Added at EMV-P1, which executed this checklist and found the step missing — see `EMV-DL-001` (d).)
+   2. **The mount's own self-references need NO repointing — they derive (DIA-P1).** `STORE_CONFIG.schemaUrl` (`store/config.js`) and `EXPORT_CONFIG.declarationUrl` / `fontUrl` / `iccUrl` (`export/config.js`) are computed from `import.meta.url`, so whichever generation is executing, those URLs name that generation's assets. **This step used to read "repoint the four by hand", and it was performed three times** (`/m/v1/`→`/m/v2/` at EMV-P1, which found the step missing entirely — `EMV-DL-001` (d) — then `/m/v3/` at XPT-P1, then the derivation at DIA-P1). Left at `v{N}` a literal did not 404: it fetched the frozen generation's DDL, declaration, font and colour profile, which *works* while both are shipped and byte-identical and breaks the day `v{N}` is retired. That failure mode is now structural rather than remembered — `DIA-P1-INV-003` reds on a literal coming back, and its executing half reds on a derivation that addresses nothing. **What still needs a hand here:** sweep the new directory for `m/v{N}` in comments; a copied comment that names the old mount is a false statement about the file it now sits in.
    3. `app/index.html` — repoint every `/m/v{N}/…` reference at `v{N+1}`. Since A1-P6 that is ~18 references, not three: the stylesheet `<link>`, the two `<script type="module" src>` entries, **and the fifteen `<link rel="modulepreload">` hints**. A missed hint is not a functional break — it is a cross-version fetch of bytes nothing evaluates, plus the round trip the hint was meant to remove — and `A1-P6-INV-001` fails on it by name.
    4. `app/sw.js` — repoint **every** `/m/v{N}/…` entry in `OFFLINE_URLS`. Since A1-P4 that list covers the whole module graph (`app.js` plus each file under `core/` and, since A1-P5, under `surfaces/`), not just the two files the shell names — `cache.addAll` is atomic and an unrepointed entry fails the install outright.
    5. `app/sw.js` — bump `CACHE_VERSION` (delivers the new shell to installed users via the network-first SW + `#updateBanner` path, `PWA-DL-001`; `activate()` purges the old generation). Required for the precache to be re-filled from the *new* URLs — not, on its own, sufficient to refresh an *existing* URL (see above).
@@ -536,7 +536,7 @@ The three-level parity suite (DOM snapshot + visual regression + behavioural smo
 
 **Installed-client upgrade path** (EMV-P3, `EMV-P3-INV-001`). A second cookie-keyed switch on the same server serves the **previously published generation** — `app/index.html` and `app/sw.js` rewritten from the current mount to the previous one with `CACHE_VERSION` decremented (`app/tests/support/prev-generation.js`), while `/m/v{N-1}/**` is served from disk as the frozen generation it is. `app/tests/upgrade-path.spec.js` installs that generation, lets it precache, then takes the switch away and serves the current build, and asserts what the upgraded client evaluates and sees — on both legs: the client that **accepts** the update banner, and the client that **never touches it** and simply opens the app again. Both are asserted because the second is the majority case; the measured outcome is that both land on the current mount, the unaccepting one on its next navigation (network-first shell + a mount URL it has no cached copy of). It runs in `behavior` only — the update channel is inert in the Capacitor shell (`LSC-DL-001`). **Its fidelity bound, which the promotion smoke depends on:** the staged generation is the one this repo published (verified byte-identical to the shell at `711b5bc`), *not* the bytes any particular live client holds, and no test can see a real device's cache age. That is why **Promotion + rollback** step 5 checks an actually-installed client and is not optional. When only one mount version is shipped — after an owner retires the old one — the property is vacuous by construction and the two tests **skip with that reason printed**.
 
-**Ship-list drift guard** (A1-P3, a second and different guard). The parity server serves from the `app/` directory **on disk**, so a file `app/Dockerfile` forgets to `COPY` passes the whole suite and 404s only in production — and `app/Dockerfile` has no wildcard `COPY`. `app/tests/delivery-contract.spec.js` therefore parses the real `COPY` list and asserts, in both directions, that everything the shipped shell references is shipped by the image *and* precached by name in `OFFLINE_URLS`. Since A1-P4 it asserts the same two things about a **third** surface — the transitive static `import` graph reached from the shell's `<script type="module">` entries (`A1-P4-INV-001`), which is the only thing standing between a new `core/` or `surfaces/` file and a production 404 that no other test can see. Since A1-P6 there is a **fourth** direction: the `<link rel="modulepreload">` hint set must equal that import graph exactly, in both directions (`A1-P6-INV-001`). That direction is also why the third is rooted where it is — hints are `href=` attributes, so seeding the walk from every `.js` the shell names would make it delete the whole graph as "entries" and assert nothing at all, silently (`A1-DL-007` (d)). The second direction is what keeps a copy-forward mount bump honest: every generation ever published stays shipped (`/m/v1/`, `/m/v2/` and `/m/v3/` as of XPT-P1), so a shell pointing at the current mount while `OFFLINE_URLS` still listed the previous one would otherwise be invisible. The parser fails **closed** — any `COPY` form it does not fully understand throws rather than guessing. It does **not** consult `app/.dockerignore`: never add a pattern there matching `m/`.
+**Ship-list drift guard** (A1-P3, a second and different guard). The parity server serves from the `app/` directory **on disk**, so a file `app/Dockerfile` forgets to `COPY` passes the whole suite and 404s only in production — and `app/Dockerfile` has no wildcard `COPY`. `app/tests/delivery-contract.spec.js` therefore parses the real `COPY` list and asserts, in both directions, that everything the shipped shell references is shipped by the image *and* precached by name in `OFFLINE_URLS`. Since A1-P4 it asserts the same two things about a **third** surface — the transitive static `import` graph reached from the shell's `<script type="module">` entries (`A1-P4-INV-001`), which is the only thing standing between a new `core/` or `surfaces/` file and a production 404 that no other test can see. Since A1-P6 there is a **fourth** direction: the `<link rel="modulepreload">` hint set must equal that import graph exactly, in both directions (`A1-P6-INV-001`). That direction is also why the third is rooted where it is — hints are `href=` attributes, so seeding the walk from every `.js` the shell names would make it delete the whole graph as "entries" and assert nothing at all, silently (`A1-DL-007` (d)). The second direction is what keeps a copy-forward mount bump honest: every generation ever published stays shipped (`/m/v1/` through `/m/v4/` as of DIA-P1), so a shell pointing at the current mount while `OFFLINE_URLS` still listed the previous one would otherwise be invisible. The parser fails **closed** — any `COPY` form it does not fully understand throws rather than guessing. It does **not** consult `app/.dockerignore`: never add a pattern there matching `m/`.
 
 ### Android shell (Capacitor) — L1-P1
 
@@ -699,6 +699,86 @@ Capacitor bridge injected, so **both of its channels run the localStorage path**
 journal backend does on a real device is covered by `android-instrumented` — which is a
 `pull_request` / `workflow_dispatch` job, not a per-push gate — and by this sequence. If you change
 the write path and only the parity suite is green, you have not tested the write path.
+
+### The browser-to-native history transfer — DIA-P1 (owner-run)
+
+> **Owner device action.** Every step below is performed by the owner on a real handset with a real
+> browser. Claude Code does not run any of it, and nothing in CI can: `android-instrumented` boots an
+> emulator that has never held the family's browser storage, and the parity suite drives a
+> synthetic origin.
+
+**Why this sequence exists at all.** Until DIA-P1 the app's import offer was dead code. The family's
+history lives in `localStorage` under the **production origin**, in the parent's browser; the
+Capacitor WebView's origin is `https://localhost`, a different storage partition, so the L1-P4
+importer — complete and idempotent since then — had never had a source. This transfer is the source,
+and the sequence below is the only place the whole path is ever exercised end to end.
+
+**Read this before starting: the reinstall is expected, and it costs nothing.** The CI debug signing
+key is **minted per run** — there is no keystore restore in `ci.yml` — so every CI-built APK installs
+as a fresh application identity and **wipes the native sandbox**. That is not a hazard here, it is the
+premise: the transfer source is in the browser, not in the app sandbox, so it survives the reinstall
+untouched. The device currently holds a debug APK whose sandbox was recreated on 2026-08-16 and
+contains a test profile only. Losing it costs nothing.
+
+1. **Get an APK that carries this branch.** GitHub → **Actions** → **CI** → **Run workflow**, pick
+   `feat/l2-local-diary`. On the dispatch path the `android` job is skipped and
+   `android-instrumented` uploads `theygrow-debug-apk` itself, so one dispatch yields both the
+   instrumented verdict and the installable build. **Read the instrumented result before installing
+   anything** — if `HistoryTransferTest` is red, the device smoke will not tell you anything the job
+   has not already told you better.
+2. **Install it.** `adb install -r app-debug.apk`, or transfer the file and allow installation from
+   unknown sources. The previous sandbox is gone; that is step 0 of this procedure working, not a
+   fault.
+3. **Confirm the app is empty and says so.** Launch it. The skills table renders and no marks are
+   ticked. The transfer offer appears — «История лежит в браузере…» — with an **Открыть браузер**
+   button. If it does not appear, stop: nothing below will work and the fault is before the browser.
+4. **Open the handoff page from BOTH browser entry points, and record what each one saw.** This is the
+   step that turns an assumption into an observation, so do not collapse it into one:
+   1. **From the installed PWA.** Open the tracker the way the family normally does — the installed
+      icon — and navigate to `/transfer.html` on that origin. Record whether the page reports profiles
+      or says «В этом браузере не сохранено ни одного профиля».
+   2. **From an ordinary Chrome tab.** Same origin, same path, typed into the address bar. Record the
+      same thing.
+   3. **Write both answers down**, even when they agree. The premise the transfer rests on is that an
+      installed WebAPK and an ordinary tab share one `localStorage` partition for that origin. It is
+      almost certainly true and it is **not verified anywhere in this repository**; this step is where
+      it becomes a fact with a date on it. If the two disagree, the transfer must be run from
+      whichever entry point sees the history, and that divergence is a finding worth its own entry.
+5. **Press the button on the page.** Expect the app to come to the front. If instead the page tells
+   you a file was saved to downloads, the link had no handler — that is the automatic fallback
+   working (`browser_fallback_url`), not a failure. Continue at step 6b.
+6. **Complete the transfer in the app.**
+   1. **Link path:** the transfer modal lists the child profile with its mark count and a
+      **Перенести** button. Press it.
+   2. **File path:** the modal shows one line of instruction and a **Выбрать файл** button. Press it,
+      pick the file the browser saved, and then press **Перенести**.
+   Either way the status line ends with «Перенесено: детей 1, отметок N».
+7. **Verify the marks actually landed — in the journal, not in the status line.** Close the modal.
+   The skills table now shows the ticked skills the browser held. Force-stop the app, relaunch it,
+   and confirm they are **still** ticked: that is the difference between a surface that rendered and a
+   journal that was written. Then save the archive (**Сохранить архив**) and open it on a computer:
+   in `text/skills.txt` the imported marks carry `origin: migrated_legacy` and
+   `event_date_basis: import_date_unknown`.
+8. **Confirm the browser is UNCHANGED.** Go back to the browser, open the tracker, and check that
+   every profile and every mark is still there, exactly as in step 4. **This is the band invariant of
+   the whole milestone and the reason half its tests exist**: that `localStorage` is the only copy of
+   this family's history, and nothing in this milestone clears or mutates it. The handoff page reads
+   and does not write; the importer does not touch its source (`LSC-P4-INV-002`).
+9. **Record the result** in the smoke note: which entry points saw the history at step 4, which path
+   the transfer took (link or file), how many marks arrived, whether they survived the restart, and
+   that the browser was unchanged. Never a child's name or anything that points at a person.
+
+**Clearing the browser is a separate, explicit owner action, taken AFTER a confirmed transfer — and
+no packet in this milestone performs it.** Nothing in the code removes, rewrites or marks the source
+consumed; the decision and the moment are the owner's alone.
+
+**What no step above can show.** Whether a real browser truncates a URI between the fixture size and
+the 16 KiB `linkMaxBytes` ceiling. Nothing measures that: the instrumented leg fires a synthetic
+Intent rather than driving Chrome, and a real history is about 2.5 KB, so this smoke runs far below
+the ceiling. It is bounded rather than open — a shortened URI fails the declared byte count or the
+digest, the receiver refuses it before staging, and the app falls to the file path — and
+`HistoryTransferTest.the_receiver_refuses_a_truncated_link` executes exactly that refusal on an input
+it builds itself.
 
 ### `/api` (FastAPI)
 

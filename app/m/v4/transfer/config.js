@@ -110,27 +110,29 @@ export const TRANSFER_CONFIG = Object.freeze({
     // changed_in: DIA-DL-001 — the PWA base URL the app opens the handoff page
     // at, WITHOUT a trailing slash.
     //
-    // IT IS EMPTY, AND THAT IS A RECORDED STATE RATHER THAN AN OVERSIGHT. The
-    // PWA's serving URL is not written down anywhere in this repository: the
-    // RUNBOOK's "Live-infra divergence" carries the Cloud Run service name and
-    // the region, and deliberately not the host — which contains a
-    // project-scoped hash this repo has never held. So there is no value here
-    // to derive and none to copy, and inventing one would ship an app that
-    // opens a page that does not exist.
+    // WHY THIS VALUE IS HERE AND NOT AN OWNER-FILL. It is the product's PUBLIC
+    // surface — the address a parent already types to reach the tracker — named
+    // as the handoff page's home in ADR-048 §1. That is a different kind of
+    // string from the live-infra naming this repository deliberately withholds:
+    // the Cloud Run service name, its region and its generated host stay in
+    // docs/RUNBOOK.md under "Live-infra divergence" and are not repeated here,
+    // because those describe where the thing is deployed. This describes where
+    // the product IS, and it ships inside a distributed APK regardless.
     //
-    // The posture is the one this repository already uses for an identifier it
-    // does not hold: an EMPTY DEFAULT BEHIND A FAIL-CLOSED GUARD, exactly as
-    // app/cloudbuild.yaml handles `_API_UPSTREAM_URL` and `_PWA_RUNTIME_SA`.
-    // Until the owner fills it in, `openHandoff` refuses with
+    // THE FAIL-CLOSED GUARD STAYS, and its subject has changed rather than
+    // disappeared. It no longer protects against an absent value; it protects
+    // against an emptied one — a refactor, a bad merge, a build that strips the
+    // constant. With this empty, `openHandoff` refuses with
     // `handoff_unconfigured` before it builds any intent, the surface says so in
     // plain Russian instead of opening nothing, and the file fallback stays
-    // reachable. Filling it in is a numbered step of the owner procedure in
-    // docs/RUNBOOK.md, performed before the device smoke.
+    // reachable. A knob whose unset state is a silent no-op is worse than one
+    // that is missing.
     //
     // Mirrored as HANDOFF_ORIGIN in HistoryTransferPlugin.java, and the two are
-    // asserted equal by app/tests/transfer-seam.spec.js — including while both
-    // are empty, so the pair cannot drift apart before either is set.
-    handoffOrigin: '',
+    // asserted equal by app/tests/transfer-seam.spec.js — which also asserts the
+    // empty-value refusal branch still exists, so the guard cannot be dropped on
+    // the grounds that the value is now set.
+    handoffOrigin: 'https://theygrow.app',
 
     // changed_in: DIA-DL-001 — the path of the handoff page on that origin. It
     // IS in this repository (app/transfer.html), so unlike the origin it is a
