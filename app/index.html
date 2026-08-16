@@ -106,17 +106,17 @@
     </script>
 
     <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v5/app.css">
+    <link rel="stylesheet" href="/m/v6/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v5/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
+         /m/v6/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
          store. Without these the browser discovers them only after
          app.js parses, and their own imports only after that — the boot-order
          cost A1-DL-004/005/006 each recorded and declined to pay.
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v5/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v6/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -129,50 +129,50 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v5/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v5/core/state.js">
-    <link rel="modulepreload" href="/m/v5/core/storage.js">
-    <link rel="modulepreload" href="/m/v5/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v5/core/signals.js">
-    <link rel="modulepreload" href="/m/v5/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v5/core/format.js">
-    <link rel="modulepreload" href="/m/v5/core/zpd.js">
-    <link rel="modulepreload" href="/m/v5/core/urgency.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v5/store/boot.js">
-    <link rel="modulepreload" href="/m/v5/store/store.js">
-    <link rel="modulepreload" href="/m/v5/store/journal.js">
-    <link rel="modulepreload" href="/m/v5/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v5/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v5/store/bridge.js">
-    <link rel="modulepreload" href="/m/v5/store/transfer.js">
-    <link rel="modulepreload" href="/m/v5/transfer/config.js">
-    <link rel="modulepreload" href="/m/v5/transfer/errors.js">
-    <link rel="modulepreload" href="/m/v5/transfer/format.js">
-    <link rel="modulepreload" href="/m/v5/store/config.js">
-    <link rel="modulepreload" href="/m/v5/store/errors.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/channel.js">
-    <link rel="modulepreload" href="/m/v5/channel/config.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v5/surfaces/import.js">
-    <link rel="modulepreload" href="/m/v5/export/run.js">
-    <link rel="modulepreload" href="/m/v5/export/build.js">
-    <link rel="modulepreload" href="/m/v5/export/readout.js">
-    <link rel="modulepreload" href="/m/v5/export/sink.js">
-    <link rel="modulepreload" href="/m/v5/export/text.js">
-    <link rel="modulepreload" href="/m/v5/export/readme.js">
-    <link rel="modulepreload" href="/m/v5/export/zip.js">
-    <link rel="modulepreload" href="/m/v5/export/pdf.js">
-    <link rel="modulepreload" href="/m/v5/export/ttf.js">
-    <link rel="modulepreload" href="/m/v5/export/config.js">
-    <link rel="modulepreload" href="/m/v5/export/errors.js">
+    <link rel="modulepreload" href="/m/v6/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v6/core/state.js">
+    <link rel="modulepreload" href="/m/v6/core/storage.js">
+    <link rel="modulepreload" href="/m/v6/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v6/core/signals.js">
+    <link rel="modulepreload" href="/m/v6/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v6/core/format.js">
+    <link rel="modulepreload" href="/m/v6/core/zpd.js">
+    <link rel="modulepreload" href="/m/v6/core/urgency.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v6/store/boot.js">
+    <link rel="modulepreload" href="/m/v6/store/store.js">
+    <link rel="modulepreload" href="/m/v6/store/journal.js">
+    <link rel="modulepreload" href="/m/v6/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v6/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v6/store/bridge.js">
+    <link rel="modulepreload" href="/m/v6/store/transfer.js">
+    <link rel="modulepreload" href="/m/v6/transfer/config.js">
+    <link rel="modulepreload" href="/m/v6/transfer/errors.js">
+    <link rel="modulepreload" href="/m/v6/transfer/format.js">
+    <link rel="modulepreload" href="/m/v6/store/config.js">
+    <link rel="modulepreload" href="/m/v6/store/errors.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v6/channel/config.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/import.js">
+    <link rel="modulepreload" href="/m/v6/export/run.js">
+    <link rel="modulepreload" href="/m/v6/export/build.js">
+    <link rel="modulepreload" href="/m/v6/export/readout.js">
+    <link rel="modulepreload" href="/m/v6/export/sink.js">
+    <link rel="modulepreload" href="/m/v6/export/text.js">
+    <link rel="modulepreload" href="/m/v6/export/readme.js">
+    <link rel="modulepreload" href="/m/v6/export/zip.js">
+    <link rel="modulepreload" href="/m/v6/export/pdf.js">
+    <link rel="modulepreload" href="/m/v6/export/ttf.js">
+    <link rel="modulepreload" href="/m/v6/export/config.js">
+    <link rel="modulepreload" href="/m/v6/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -232,7 +232,7 @@
                      aria-label и title дословно повторяют видимую подпись.
 
                      DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
-                     канале (m/v5/surfaces/channel.js). В браузере архив не
+                     канале (m/v6/surfaces/channel.js). В браузере архив не
                      собирается вообще — веб-ветки в export/sink.js нет и не было
                      (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
                      происходит. Разметка одна на оба канала: это ветка времени
@@ -464,12 +464,12 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v5/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v6/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v5/app.js for boot order, and the modulepreload block in the head
+         m/v6/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v5/app.js"></script>
+    <script type="module" src="/m/v6/app.js"></script>
 
     <!-- PWA Install Prompt -->
     <script>
@@ -600,6 +600,6 @@
     </script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v5/sw-register.js"></script>
+    <script type="module" src="/m/v6/sw-register.js"></script>
 </body>
 </html>

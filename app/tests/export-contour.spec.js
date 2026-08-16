@@ -475,6 +475,17 @@ test.describe('the interface says the two things it must not soften', () => {
         expect(SHELL).toContain('name="theygrow-apk-release"');
 
         // The address exists exactly once in the shipped tree, in the knob.
+        //
+        // DIA-P3: "once" means one DECLARATION SITE, not one file on disk. The
+        // exclusion below is `m/v{N}/channel/config.js` for ANY generation, not
+        // only the running one, because a copy-forward bump leaves the frozen
+        // generation shipped and it carries the same knob — the same
+        // declaration, not a second one. This first went red at the /m/v5/ ->
+        // /m/v6/ bump, which is the first bump since DIA-P2 introduced the knob,
+        // so the guard had never met a second generation of it before. The
+        // defect it is really about — the address written into markup or into a
+        // module beside the knob — is still caught: every other shipped .js and
+        // .html is scanned, including the frozen generations' surfaces.
         const declared = fs.readFileSync(
             path.join(APP_ROOT, 'm', MOUNT.dir, 'channel', 'config.js'),
             'utf8'
@@ -482,7 +493,7 @@ test.describe('the interface says the two things it must not soften', () => {
         expect(declared, 'the knob surface does not declare the release address')
             .toContain('apkReleaseUrl:');
         const elsewhere = SHIPPED.filter((rel) => rel.endsWith('.js') || rel.endsWith('.html'))
-            .filter((rel) => !rel.endsWith(`m/${MOUNT.dir}/channel/config.js`))
+            .filter((rel) => !/m\/v\d+\/channel\/config\.js$/.test(rel))
             .filter((rel) =>
                 fs.readFileSync(path.join(APP_ROOT, rel), 'utf8').includes('/releases/')
             );
