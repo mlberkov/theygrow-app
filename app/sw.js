@@ -34,6 +34,19 @@ const OFFLINE_URLS = [
   '/offline.html',
   '/manifest.json',
   '/kb-v1.json',
+  // DIA-P1 — the browser-to-native handoff page and its module graph. It is
+  // precached because the handoff needs no network at all: it reads the
+  // localStorage of this same origin and hands the result to the app on the
+  // same device, so a parent on a bad connection can still move their history.
+  // Its entry is named here because the shell references it; the three modules
+  // it imports are named for the same reason index.html names its graph.
+  //
+  // (No apostrophe in this block, deliberately — see the trap named below.)
+  '/transfer.html',
+  '/m/v4/transfer/handoff-page.js',
+  '/m/v4/transfer/config.js',
+  '/m/v4/transfer/errors.js',
+  '/m/v4/transfer/format.js',
   // Versioned module mount (A1-DL-004): the shell references these by URL, so
   // they are precached by name. Content changes ship as a NEW mount version
   // (/m/v4/...), never as new bytes at these URLs — inside the 30-day immutable
@@ -122,6 +135,16 @@ const OFFLINE_URLS = [
   '/icons/favicon-32.png'
 ];
 
+// Navigable pages this image ships that are NOT the app shell (DIA-P1).
+//
+// A navigation to one of these must not be mirrored into the cache entry keyed
+// '/', which is the app shell's offline copy — see the fetch handler for what
+// that costs. Kept as an explicit list rather than a pattern because the set is
+// closed and small: it is exactly the HTML files in app/Dockerfile's COPY list
+// other than index.html, and app/tests/delivery-contract.spec.js asserts that
+// correspondence rather than leaving the two to drift.
+const NON_SHELL_PAGES = ['/offline.html', '/transfer.html'];
+
 // Install: precache offline essentials.
 // NOTE: no skipWaiting() here — the new worker parks in `waiting` until driven
 // by a SKIP_WAITING message (see below). This keeps the SW neutral to the P2
@@ -177,12 +200,28 @@ self.addEventListener('fetch', (event) => {
   // freshly deployed index.html on the next navigation, no hard-refresh needed.
   // The successful response is mirrored into the cache keyed to '/' so the
   // offline fallback copy stays current.
+  //
+  // DIA-P1 — THE MIRROR IS NOW CONDITIONAL, AND THE CONDITION IS LOAD-BEARING.
+  // Until this packet every navigation was mirrored to '/', on the premise that
+  // every navigable path IS the app shell: nginx's `try_files $uri $uri/
+  // /index.html` makes any unknown path serve index.html, and /offline.html was
+  // reached from the cache rather than navigated to. /transfer.html breaks that
+  // premise — it is a real, separately-shipped page a parent navigates to on
+  // purpose — and mirroring it would overwrite the app shell's offline copy
+  // with the handoff page. The next offline boot of '/' would then show the
+  // handoff page instead of the app, permanently, for every client that had
+  // ever opened the transfer link. Named rather than pattern-matched: the set of
+  // HTML pages this image ships is small, closed, and asserted against
+  // app/Dockerfile's COPY list by app/tests/delivery-contract.spec.js.
   if (request.mode === 'navigate') {
+    const mirrorsTheShell = !NON_SHELL_PAGES.includes(url.pathname);
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          if (mirrorsTheShell) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          }
           return response;
         })
         .catch(() =>

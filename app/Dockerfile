@@ -30,6 +30,14 @@ COPY icons/ /usr/share/nginx/html/icons/
 COPY sw.js /usr/share/nginx/html/sw.js
 COPY offline.html /usr/share/nginx/html/offline.html
 
+# Страница переноса истории из браузера в приложение (DIA-P1). Отдельная
+# оболочка, а не маршрут внутри index.html: она НЕ грузит app.js, который на
+# старте вызывает removeOrphanedAgeFilter() — единственную запись в
+# localStorage в графе модулей. Под этим origin в localStorage лежит
+# единственная копия истории семьи, так что «страница только читает» —
+# структурное свойство оболочки, а не обещание. См. ADR-048, PDR-034 §1.
+COPY transfer.html /usr/share/nginx/html/transfer.html
+
 # Копируем entrypoint (A3-P1): рендерит конфиг, минтит ID-токен для /api-прокси,
 # обновляет его и передаёт управление nginx. Плоская двухаргументная форма COPY —
 # без --chmod/--from, без wildcard: ship-list-гард в app/tests/delivery-contract.spec.js

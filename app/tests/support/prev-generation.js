@@ -28,12 +28,25 @@
 //            current shell repointed at the previous mount", which is still the
 //            right fixture for the mechanism but is no longer the historical
 //            bytes. The spec states this bound too.
-//   worker — app/sw.js under the same rewrite, with CACHE_VERSION decremented.
-//            Behaviourally the worker that generation shipped; byte-different
-//            from it by the one comment block EMV-P1 added. Byte-difference is
-//            not incidental here, it is the mechanism: an installed client only
-//            discovers an update because the fetched /sw.js differs from the one
-//            it registered.
+//   worker — app/sw.js under the same rewrite, with CACHE_VERSION decremented
+//            and — since DIA-P1 — with any precache entry the previous mount
+//            does not carry pruned out (see the block that does it for why that
+//            attribution is sound). Behaviourally the worker that generation
+//            shipped; byte-different from it by the comment blocks added since.
+//            Byte-difference is not incidental here, it is the mechanism: an
+//            installed client only discovers an update because the fetched
+//            /sw.js differs from the one it registered.
+//
+//            ONE RESIDUAL UNFAITHFULNESS, NAMED RATHER THAN LEFT TO BE FOUND:
+//            the pruning key is "does this path exist on disk", so a non-mount
+//            page the current generation added — /transfer.html at DIA-P1 —
+//            DOES exist and is therefore still precached by the staged worker,
+//            though the previous generation never listed it. It costs the
+//            fixture nothing: cache.addAll succeeds, and every property the
+//            upgrade-path spec asserts is about getting OFF the previous mount,
+//            which this does not touch. Reconstructing the previous list
+//            exactly would mean re-deriving it from the staged shell, i.e.
+//            reimplementing the worker instead of rewriting it.
 //
 // WHAT IT IS NOT. It is not the bytes any PARTICULAR live client holds. A live
 // client holds whatever generation was current when it last updated, and its
@@ -116,15 +129,64 @@ function previousGeneration(appRoot) {
 
   // cache.addAll is atomic: one missing path fails the staged install outright,
   // and the browser reports that as an unhandled rejection inside the worker
-  // rather than as anything naming this file. The two mounts have identical file
-  // sets today; if a future generation adds a module the previous one never had,
-  // this throws with the path instead of leaving a mystery.
+  // rather than as anything naming this file.
+  //
+  // DIA-P1 — THIS USED TO THROW, AND THE THROW WAS RIGHT UNTIL A GENERATION ADDED
+  // A MODULE. The sentence that stood here said "the two mounts have identical
+  // file sets today; if a future generation adds a module the previous one never
+  // had, this throws with the path instead of leaving a mystery." That is exactly
+  // what happened: DIA-P1 added the handoff page and its three modules, and the
+  // rewrite produced a previous-generation worker precaching /m/v{prev}/transfer/…
+  // — paths that generation never carried and never listed. It threw with the
+  // path, as designed, and the mystery was avoided.
+  //
+  // The right repair is to make the fixture FAITHFUL rather than to relax it: the
+  // previous generation's worker did not precache what the previous generation
+  // did not ship, so an entry that does not resolve after the rewrite is dropped.
+  // That attribution is sound rather than convenient, and only because it is
+  // established elsewhere: app/tests/delivery-contract.spec.js already asserts
+  // that EVERY entry of the CURRENT OFFLINE_URLS is shipped by app/Dockerfile and
+  // exists on disk. So by the time this runs, an entry that is missing after the
+  // rewrite cannot be a typo — the only thing it can be is a path the current
+  // generation introduced. What is dropped is returned rather than swallowed, so
+  // the spec can print it and a reader can see the fixture is smaller than the
+  // current worker and why.
+  const added = [];
+  const precache = [];
   for (const url of offlineUrls(worker)) {
-    if (!fs.existsSync(path.join(appRoot, url.replace(/^\//, '')))) {
-      throw new Error(
-        `prev-generation: the staged worker precaches "${url}", which is not on disk — the previous mount does not carry it`
-      );
+    if (fs.existsSync(path.join(appRoot, url.replace(/^\//, '')))) {
+      precache.push(url);
+      continue;
     }
+    added.push(url);
+  }
+  const staged = added.length
+    ? worker.replace(
+        /const OFFLINE_URLS = \[[\s\S]*?\n\];/,
+        `const OFFLINE_URLS = [\n${precache.map((url) => `  '${url}',`).join('\n')}\n];`
+      )
+    : worker;
+
+  // The rewrite missing an entry is a different failure from the one above and
+  // must not hide inside it: a current-mount path surviving into the staged
+  // worker would install the CURRENT generation while the fixture claimed to be
+  // installing the previous one, and every assertion built on it would be about
+  // the wrong bytes.
+  // offlineUrls() returns a Set — the delivery guard consumes it with .has().
+  const survived = Array.from(offlineUrls(staged)).filter((url) =>
+    url.includes(`m/${current.version}/`)
+  );
+  if (survived.length) {
+    throw new Error(
+      `prev-generation: the mount rewrite left ${survived.join(', ')} at the CURRENT generation — the staged worker is not the previous one`
+    );
+  }
+  // Anti-vacuity: a repair that dropped everything would stage a worker that
+  // precaches nothing, install cleanly, and make the upgrade path assert nothing.
+  if (!offlineUrls(staged).has(`/m/${previous.version}/app.css`)) {
+    throw new Error(
+      'prev-generation: the staged precache no longer carries the previous mount stylesheet — the fixture would prove nothing'
+    );
   }
 
   return {
@@ -133,7 +195,10 @@ function previousGeneration(appRoot) {
     cacheName: `theygrow-${version.prior}`,
     currentCacheName: `theygrow-${version.current}`,
     shell,
-    worker,
+    worker: staged,
+    // What the current generation added and the previous one therefore never
+    // precached. Returned rather than swallowed — see the block above.
+    addedSincePrevious: added,
   };
 }
 

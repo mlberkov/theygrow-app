@@ -285,7 +285,10 @@ const {
 // HTML files the image ships and the shell boots from. Parameterised rather
 // than hardcoded: offline.html still carries inline <style>/<script> that a
 // later A1 packet will extract, and the guard must already be watching it.
-const SHIPPED_HTML = ['index.html', 'offline.html'];
+// DIA-P1 adds transfer.html, the browser-to-native handoff page — a third shell
+// with its own module entry and its own hints, which is why every direction
+// below unions across shells rather than checking one.
+const SHIPPED_HTML = ['index.html', 'offline.html', 'transfer.html'];
 
 const APP_ROOT = path.resolve(__dirname, '..');
 const SHIP = shippedPaths(fs.readFileSync(path.join(APP_ROOT, 'Dockerfile'), 'utf8'));

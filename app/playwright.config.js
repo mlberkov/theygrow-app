@@ -124,7 +124,12 @@ module.exports = defineConfig({
       // EMV-P5-INV-001. It reads the tree and boots nothing, which is what it
       // says about itself — a reference left at the frozen generation resolves
       // rather than 404s, so nothing else in this suite would ever notice it.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage|mount-reference)\.spec\.js/,
+      // DIA-P1 checkpoint B adds two: handoff-source (leg (a) of the band
+      // invariant — the handoff page imports no writer and calls none) and
+      // transfer-format (the transitional envelope, imported under Node the same
+      // way store-unit imports the store). Leg (b) of that invariant is NOT
+      // here: it presses the button in a real browser and belongs in `behavior`.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -152,7 +157,14 @@ module.exports = defineConfig({
       // is here rather than in `contract` because its whole subject is what the
       // shipped config modules COMPUTE when a browser evaluates them at a real
       // origin — a claim no source scan can carry (AGENTS.md §11).
-      testMatch: /(behavior|upgrade-path|mount-derivation)\.spec\.js/,
+      // DIA-P1 checkpoint B adds handoff-transfer: leg (b) of the band
+      // invariant, which seeds a real source, presses the button and compares
+      // the whole of localStorage before and after. It is deliberately NOT in
+      // the `native` project below — the handoff page runs in the parent's
+      // BROWSER at the production origin, never inside the Capacitor WebView,
+      // and running it there would assert a web-channel surface against a
+      // channel that never serves it.
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,
