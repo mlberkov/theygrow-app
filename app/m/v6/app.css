@@ -293,7 +293,13 @@ header h1 {
     color: #333;
 }
 
-.modal-form-group input {
+/* DIA-P3: textarea попадает в оба правила вместе с input. До этого пакета в
+   приложении не было ни одного многострочного поля — единственная форма
+   спрашивала имя и дату, — и селектор по одному `input` оставил бы поле
+   дневника без ширины, отступов и видимого фокуса. Дефект был бы в правиле, а
+   не в новом окне, поэтому меняются правила, а не добавляется третье. */
+.modal-form-group input,
+.modal-form-group textarea {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #ddd;
@@ -302,9 +308,62 @@ header h1 {
     transition: border-color 0.2s;
 }
 
-.modal-form-group input:focus {
+.modal-form-group input:focus,
+.modal-form-group textarea:focus {
     outline: none;
     border-color: var(--primary-purple);
+}
+
+/* font-family наследуется намеренно: без этого textarea уезжает в моноширинный
+   шрифт браузера, и текст про ребёнка выглядит как лог. resize: vertical —
+   родитель может дописать длинную запись, но не может сломать ширину окна. */
+.modal-form-group textarea {
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 120px;
+}
+
+/* Список записей дневника (DIA-P3). Прокручивается сам, а не тянет окно:
+   diaryListLimit ограничивает отрисовку двумя сотнями, и двести записей
+   вытолкнули бы кнопки за нижний край экрана. */
+.diary-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.diary-entry {
+    border-bottom: 1px solid #eee;
+    padding: 12px 0;
+}
+
+.diary-entry-date {
+    color: var(--text-secondary, #666);
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+/* pre-wrap, потому что абзацы родителя — это его абзацы: перенос строки в
+   записи про ребёнка не должен схлопываться в пробел. overflow-wrap ловит
+   длинное слово без пробелов, которое иначе растянуло бы окно. */
+.diary-entry-body {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}
+
+.diary-entry-edit {
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: none;
+    color: var(--primary-purple);
+    font-size: 13px;
+    cursor: pointer;
 }
 
 /* Ряд действий диалога (DIA-P2, находка владельца 2026-08-16: кнопки не прижаты

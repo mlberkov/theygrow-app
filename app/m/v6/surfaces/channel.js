@@ -75,6 +75,13 @@ export function wireChannel({ doc = document } = {}) {
     const archiveButton = doc.getElementById('exportBtn');
     if (archiveButton) archiveButton.hidden = !native;
 
+    // Дневник (DIA-P3). Раскрывается там же, где архив, и по той же причине:
+    // хранилище дневника — устройственное, а в браузере store/bridge.js инертен
+    // по построению, так что на вебе эта кнопка открывала бы окно, в котором
+    // ничего нельзя ни прочитать, ни записать.
+    const diaryButton = doc.getElementById('diaryBtn');
+    if (diaryButton) diaryButton.hidden = !native;
+
     const downloadLink = doc.getElementById('apkBtn');
     if (downloadLink) {
         const offered = shouldOfferApk(declaredReleaseState(doc), native);

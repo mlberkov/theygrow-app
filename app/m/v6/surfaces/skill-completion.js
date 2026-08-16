@@ -6,6 +6,7 @@
 
 import { canRecord, getCurrentProfile, getCompletedSkills, markSkill } from '../core/state.js';
 import { emitSignal } from '../core/signals.js';
+import { storeFailureCode } from '../store/boot.js';
 import { getSkillRowsForCategory } from '../core/dom-utils.js';
 import { refreshAllZpdReadiness } from '../core/zpd.js';
 import { openCreateProfileModal } from './profile.js';
@@ -43,9 +44,21 @@ function updateCategoryCounter(skillRow) {
 // Молчаливый откат галочки — это ровно та рассинхронизация DOM и данных,
 // которую честная деградация здесь и убирает: родитель должен узнать, что
 // отметка НЕ сохранена, а не догадаться об этом через неделю.
-function showStoreUnavailable() {
+//
+// DIA-P3: у окна теперь ДВА объяснения, и показывается ровно одно. До этого
+// пакета полный диск приходил сюда с той же строкой, что и неоткрывшееся
+// хранилище, — «попробуйте закрыть и открыть приложение», от чего свободного
+// места не прибавляется. Причина берётся из КЛАССА ошибки (storeFailureCode),
+// а не из сообщения движка, и это единственное, что здесь изменилось.
+function showStoreUnavailable(failureClass = null) {
     const modal = document.getElementById('storeUnavailableModal');
-    if (modal) modal.classList.add('show');
+    if (!modal) return;
+    const diskFull = failureClass === 'disk_full';
+    const diskFullNote = document.getElementById('storeDiskFullNote');
+    const unavailableNote = document.getElementById('storeUnavailableNote');
+    if (diskFullNote) diskFullNote.hidden = !diskFull;
+    if (unavailableNote) unavailableNote.hidden = diskFull;
+    modal.classList.add('show');
 }
 
 export function wireSkillCompletion() {
@@ -105,11 +118,21 @@ export async function toggleSkillCompletion(skillId, isCompleted) {
         return;
     }
 
-    const recorded = await markSkill(skillId, isCompleted).catch(() => false);
-    if (!recorded) {
+    // DIA-P3: отказ КЛАССИФИЦИРУЕТСЯ, а не схлопывается в один код. Раньше здесь
+    // стояло `.catch(() => false)`, и полный диск, сломанное хранилище и любая
+    // другая ошибка приходили к родителю одной и той же строкой — это и есть
+    // разрыв, о котором ADR-046 §1.1, на пути, которым семья пользуется чаще
+    // всего. storeFailureCode — унарная функция ошибки, поэтому она встаёт
+    // прямо в .catch(); ничего другого на этой поверхности не поменялось.
+    const outcome = await markSkill(skillId, isCompleted).catch(storeFailureCode);
+    if (outcome !== true) {
         rejectMark(skillId, isCompleted);
-        emitSignal('write.refused', { reason: 'write_failed' });
-        showStoreUnavailable();
+        // `false` значит «писать было некуда», и это не класс ошибки хранилища:
+        // обе такие причины отсечены выше, так что сюда он приходит только в
+        // гонке. Закрытый код всё равно должен быть закрытым.
+        const failureClass = outcome === false ? 'other' : outcome;
+        emitSignal('write.refused', { reason: 'write_failed', failure_class: failureClass });
+        showStoreUnavailable(failureClass);
         return;
     }
 

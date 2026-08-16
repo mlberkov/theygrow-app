@@ -234,7 +234,12 @@ test.describe('the .modal.show rule resolves the surfaces the app opens by class
   // becomes visible in use: the handler paths are not exercised here and would
   // not red if they broke. Those belong to android-instrumented and remain
   // residual debt (LSC-DL-005 debt 13).
-  for (const id of ['importModal', 'storeUnavailableModal', 'exportModal']) {
+  // DIA-P3 adds #diaryModal to the same list, on the same terms: its trigger
+  // (#diaryBtn) is revealed on the native channel only, so what is asserted here
+  // is the RULE resolving for it and nothing about the diary being reachable.
+  // That the control appears where it should, and that the surface refuses
+  // honestly when the store does, is app/tests/diary-surface.spec.js.
+  for (const id of ['importModal', 'storeUnavailableModal', 'exportModal', 'diaryModal']) {
     test(`the .modal.show rule resolves #${id} to display: block`, async ({ page }) => {
       await gotoApp(page, { state: STATES.seeded });
 

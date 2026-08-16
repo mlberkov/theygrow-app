@@ -109,10 +109,20 @@
     <link rel="stylesheet" href="/m/v6/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v6/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
-         store. Without these the browser discovers them only after
-         app.js parses, and their own imports only after that — the boot-order
-         cost A1-DL-004/005/006 each recorded and declined to pay.
+         /m/v6/ graph — FORTY-SIX today. The count is written here as a series
+         because the series is the point: fifteen at A1-P6, twenty-one once
+         L1-P2 added the native store, and forty-six since DIA-P3 added the
+         diary. It had been left at twenty-one through four packets, which read
+         as a claim about the list below rather than as the history it is; the
+         number is only worth carrying if it is the current one, so it is
+         corrected here rather than left to drift further.
+
+         Nobody needs to count by hand to check it: app/tests/delivery-contract.
+         spec.js asserts this set EQUALS the walked import graph in both
+         directions (A1-P6-INV-001), which is the guard that actually holds the
+         list right. Without these hints the browser discovers the modules only
+         after app.js parses, and their own imports only after that — the
+         boot-order cost A1-DL-004/005/006 each recorded and declined to pay.
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
@@ -161,6 +171,7 @@
     <link rel="modulepreload" href="/m/v6/store/errors.js">
     <link rel="modulepreload" href="/m/v6/surfaces/channel.js">
     <link rel="modulepreload" href="/m/v6/channel/config.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/diary.js">
     <link rel="modulepreload" href="/m/v6/surfaces/export.js">
     <link rel="modulepreload" href="/m/v6/surfaces/import.js">
     <link rel="modulepreload" href="/m/v6/export/run.js">
@@ -253,6 +264,38 @@
                         <path d="M4 19h16"/>
                     </svg>
                     <span class="header-action-label">Сохранить архив</span>
+                </button>
+                <!-- Дневник (DIA-P3). Иконка — раскрытая тетрадь с пером:
+                     «записать своими словами», в отличие от галочки в таблице,
+                     которая утверждает про ребёнка. Это разные объекты: отметка
+                     — приписанное утверждение и живёт в неизменяемом журнале,
+                     запись дневника — собственный текст родителя и правится
+                     перезаписью (PDR-026 §4, правило 1).
+
+                     Приходит СКРЫТОЙ и раскрывается только на нативном канале
+                     (m/v6/surfaces/channel.js): дневник пишется в устройственное
+                     хранилище, а в браузере его нет вообще — store/bridge.js там
+                     инертен по построению (LSC-P1-INV-001). Предлагать действие,
+                     которого на этом канале не происходит, — ровно тот дефект,
+                     который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
+
+                     Ни GA4-события, ни onclick здесь нет (решение владельца
+                     2026-08-16, гейт D). -->
+                <button type="button"
+                        class="header-action"
+                        id="diaryBtn"
+                        hidden
+                        title="Дневник"
+                        aria-label="Дневник">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/>
+                        <path d="M20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/>
+                        <path d="M16 3l2 2-4 4h-2V7z"/>
+                    </svg>
+                    <span class="header-action-label">Дневник</span>
                 </button>
                 <!-- Приложение для Android (DIA-P2, ADR-047). Единственный канал
                      распространения — прямой APK со страницы релизов, не
@@ -386,12 +429,81 @@
         <div class="modal-content">
             <span class="modal-close" id="storeUnavailableClose">&times;</span>
             <h2>Отметка не сохранена</h2>
-            <p>Хранилище на этом устройстве не открылось, поэтому записать отметку некуда. Галочка снята: показывать её означало бы утверждать, что отметка сохранена.</p>
+            <!-- Место закончилось — DIA-P3, и это ДРУГАЯ причина с другим
+                 лечением. Раньше полный диск попадал сюда же и читался как
+                 «хранилище не открылось»: родителю предлагали перезапустить
+                 приложение, чего свободного места не прибавит. Строка приходит
+                 скрытой и раскрывается только когда причина классифицирована
+                 как disk_full (store/errors.js), а соседний абзац при этом
+                 прячется — две причины никогда не показываются вместе. -->
+            <p id="storeDiskFullNote" hidden>На устройстве закончилось место, поэтому записать отметку не удалось. Галочка снята: показывать её означало бы утверждать, что отметка сохранена. Освободите место — и отметьте навык снова.</p>
+            <p id="storeUnavailableNote">Хранилище на этом устройстве не открылось, поэтому записать отметку некуда. Галочка снята: показывать её означало бы утверждать, что отметка сохранена.</p>
             <p class="export-plain">Уже записанные данные не потеряны и не изменены — приложение просто не может их сейчас прочитать.</p>
             <p>Попробуйте закрыть и открыть приложение. Если это повторяется, сохраните архив при первой возможности, когда хранилище откроется.</p>
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="storeUnavailableCloseBtn">Закрыть</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Дневник (DIA-P3). Одно окно, две панели: список записей и форма.
+         Второе модальное окно поверх первого было бы стопкой, которой у этой
+         оболочки никогда не было; переключение панелей — это `hidden`, тот же
+         приём, что у скрытых кнопок в #importModal.
+
+         СПИСОК — ЭТО И ЕСТЬ ПОДТВЕРЖДЕНИЕ. После сохранения окно НЕ
+         закрывается: запись появляется первой в списке, там, куда родитель уже
+         смотрит. Отдельного баннера здесь нет намеренно — находка владельца
+         2026-08-16 (DIA-DL-004) была про подтверждение внутри окна, которое
+         вот-вот исчезнет; это окно не исчезает.
+
+         Текст записи ставится только через textContent (m/v6/surfaces/diary.js).
+         Это семейный текст: он не проходит через innerHTML нигде. -->
+    <div id="diaryModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="diaryModalClose">&times;</span>
+            <h2>Дневник</h2>
+
+            <div id="diaryListPane">
+                <!-- Пустой случай называет условие ИСТОЧНИКА: записей нет.
+                     Не «ничего не произошло» и не «начните вести дневник». -->
+                <p id="diaryEmpty" class="export-plain" hidden>Записей пока нет.</p>
+                <!-- Две причины, по которым писать некуда, и они лечатся
+                     разным. Показывается ровно одна (m/v6/surfaces/diary.js). -->
+                <p id="diaryNoStore" class="export-status" hidden>Дневник хранится в приложении на этом устройстве, а хранилище сейчас не открылось. Записать пока некуда — закройте и откройте приложение. Уже записанное не потеряно.</p>
+                <p id="diaryNoChild" class="export-status" hidden>Сначала создайте профиль ребёнка — запись дневника ведётся о ком-то, и без профиля её некуда отнести. Профиль создаётся в меню вверху.</p>
+                <ul id="diaryList" class="diary-list"></ul>
+                <div class="modal-buttons">
+                    <button type="button" class="modal-button modal-button-secondary" id="diaryCloseBtn">Закрыть</button>
+                    <button type="button" class="modal-button modal-button-primary" id="diaryNewBtn">Новая запись</button>
+                </div>
+            </div>
+
+            <!-- ПОЛЯ ПОМЕЧЕНЫ aria-required, А НЕ required, И ЭТО РЕШЕНИЕ.
+                 С `required` браузер перехватывает отправку сам и показывает
+                 собственный пузырь — на своём языке, своими словами и мимо
+                 #diaryStatus. На этой поверхности отказ читает родитель, который
+                 только что написал про своего ребёнка, и он должен быть сказан
+                 одним голосом с остальными отказами: что записи НЕТ, что текст
+                 на месте, что делать дальше. Семантика поля при этом не
+                 теряется — aria-required сообщает её вспомогательным
+                 технологиям, — а проверку выполняет m/v6/surfaces/diary.js,
+                 который её и объясняет. -->
+            <form id="diaryForm" hidden>
+                <div class="modal-form-group">
+                    <label for="diaryEventDate">Когда это было:</label>
+                    <input type="date" id="diaryEventDate" name="diaryEventDate" aria-required="true">
+                </div>
+                <div class="modal-form-group">
+                    <label for="diaryBody">Что произошло:</label>
+                    <textarea id="diaryBody" name="diaryBody" rows="6" aria-required="true"></textarea>
+                </div>
+                <p id="diaryStatus" class="export-status" hidden></p>
+                <div class="modal-buttons">
+                    <button type="button" class="modal-button modal-button-secondary" id="diaryCancelBtn">Отмена</button>
+                    <button type="submit" class="modal-button modal-button-primary" id="diarySaveBtn">Сохранить</button>
+                </div>
+            </form>
         </div>
     </div>
 

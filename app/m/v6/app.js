@@ -35,6 +35,7 @@ import { wireSkillCompletion } from './surfaces/skill-completion.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
 import { wireChannel } from './surfaces/channel.js';
+import { wireDiary } from './surfaces/diary.js';
 import { wireExport } from './surfaces/export.js';
 import { offerImportIfPending, wireImport } from './surfaces/import.js';
 import { initNativeStore } from './store/boot.js';
@@ -71,6 +72,7 @@ async function init(storeOutcome) {
     wireSkillModal();
     wireActivities();
     wireOnboarding();
+    wireDiary();
     wireExport();
     wireSkillCompletion();
     wireImport();

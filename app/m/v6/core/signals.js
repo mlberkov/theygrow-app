@@ -178,11 +178,41 @@ export const SIGNAL_TAXONOMY = Object.freeze({
     // (ADR-015). The reason is a closed code; the skill it was about is
     // deliberately absent, because which skills a parent is trying to mark is
     // exactly the shape of family data a diagnostic must not accumulate.
+    // changed_in: DIA-DL-005 — two things. It now also covers a DIARY entry
+    // refused before it reached the store (no child to attribute it to), which
+    // is the same fact about the same shape of act. And `failure_class` joins
+    // the fields: until this packet every failed mark reported `write_failed`
+    // and nothing else, so a full disk and a broken store were one code — the
+    // gap ADR-046 §1.1 is about, on the path the family uses most. The class
+    // comes from the error CLASS via store/errors.js storeFailureCode(), never
+    // from an engine message.
     'write.refused': Object.freeze({
-        fields: Object.freeze(['reason']),
+        fields: Object.freeze(['reason', 'failure_class']),
         boolean: Object.freeze([]),
         numeric: Object.freeze([]),
         producingStage: 'L1-P4',
+        emittedNow: true,
+    }),
+
+    // changed_in: DIA-DL-005 — what one diary entry did (DIA-P3).
+    //
+    // The first write a PARENT performs by typing rather than by ticking, so it
+    // is the first place where "the store refused and the parent lost what they
+    // wrote" becomes possible. ADR-046 §1 puts the whole weight there: a journal
+    // that silently fails to record an observation breaks the single source of
+    // truth invisibly, which is worse than a crash.
+    //
+    // COUNTS, TIMINGS AND CLOSED CODES ONLY, and one field deserves saying out
+    // loud: `chars` is a LENGTH. Not the text, not a prefix of it, not a hash of
+    // it — the number of characters, which is the only thing that tells a
+    // refused empty entry from a refused real one. What the parent wrote cannot
+    // reach this payload structurally: emitSignal accepts numbers, booleans,
+    // null and declared codes, and there is no path that takes a free string.
+    'diary.write': Object.freeze({
+        fields: Object.freeze(['outcome', 'failure_class', 'chars', 'write_ms']),
+        boolean: Object.freeze([]),
+        numeric: Object.freeze(['chars', 'write_ms']),
+        producingStage: 'DIA-P3',
         emittedNow: true,
     }),
 

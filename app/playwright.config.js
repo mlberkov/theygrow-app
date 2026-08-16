@@ -178,7 +178,14 @@ module.exports = defineConfig({
       // it simulates the native branch with an init script, and running it
       // under a profile that also serves a different web root would confuse two
       // independent variables.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition)\.spec\.js/,
+      // DIA-P3 adds diary-surface: which channel offers the diary, that the
+      // window actually opens, and — the claim it exists for — that a refused
+      // entry leaves the parent's text in the field. It is here and not in
+      // `contract` because every one of those is a fact about a rendered page
+      // and a handler that ran. The disk-full refusal is deliberately NOT among
+      // them: reaching it needs a store that opens, and that is
+      // DiaryEntryTest on android-instrumented.
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

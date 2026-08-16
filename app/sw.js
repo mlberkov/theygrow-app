@@ -140,6 +140,7 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
+  '/m/v6/surfaces/diary.js',
   '/m/v6/surfaces/export.js',
   '/m/v6/surfaces/import.js',
   '/m/v6/export/run.js',
