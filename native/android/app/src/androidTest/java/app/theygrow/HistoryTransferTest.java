@@ -75,7 +75,25 @@ import org.junit.runner.RunWith;
  *       {@link ActivityScenario} in this process, so a child id shared between
  *       legs means the second one imports nothing and asserts against a world the
  *       first one already finished with.
+ *   <li><b>An action step returns what it DID, and a leg asserts it</b> — the
+ *       fourth rule, added by DIA-DL-003 after run 31954630121. A press that
+ *       returns {@code 'clicked'} whether or not it pressed anything cannot
+ *       report its own failure, and neither can a wait that watches the
+ *       container rather than the offer. Both halves now live in
+ *       {@link #offerAndPress}, and {@link #the_harness_arms_prove_themselves}
+ *       fires that same helper at DOM states it builds in-run.
  * </ul>
+ *
+ * <p><b>AND ONE LEG WAS STILL UNABLE TO, A ROUND LATER.</b> Run 31954630121
+ * brought 25 of 26 legs green and confirmed the teardown mechanism by
+ * measurement — this class fell from 5 m 32.60 s to 2 m 20.77 s — with
+ * {@link #the_transfer_writes_nothing_to_web_storage} the single red, again for
+ * a fault of its own. {@code app.js} calls {@code offerImportIfPending()} at
+ * boot; nothing is staged on a fresh emulator, so {@code surfaces/import.js}
+ * hides the run button and shows the modal. A wait that watched only for
+ * {@code .show} was therefore answered by that BOOT-TIME invitation, before the
+ * delivered profile existed, and the press that followed found a hidden button,
+ * declined to click it, and said {@code 'clicked'} anyway (DIA-DL-003).
  *
  * <p>THE PARCEL LEG CARRIES ITS OWN CONTROL, for the reason {@code
  * ExportTransferTest} states: "the saved state is small" would stay green if the
@@ -144,30 +162,11 @@ public class HistoryTransferTest {
             deliver(scenario, link(envelope));
 
             // The surface is driven the way a parent drives it: the modal has to
-            // OFFER the profile, and the button has to be pressed.
-            String offered =
-                    pollFor(
-                            scenario,
-                            "(function () {"
-                                + "var m = document.getElementById('importModal');"
-                                + "if (!m || m.className.indexOf('show') === -1) { return null; }"
-                                + "var boxes = document.querySelectorAll("
-                                + "'#importChoices input[type=\\\"checkbox\\\"]');"
-                                + "return boxes.length ? String(boxes.length) : null;"
-                                + "})()",
-                            TRANSFER_TIMEOUT_MS);
-            assertEquals("the transfer offered a number of profiles other than one", "1", offered);
-
-            assertEquals(
-                    "the transfer button was not offered",
-                    "pressed",
-                    evaluate(
-                            scenario,
-                            "(function () {"
-                                + "var b = document.getElementById('importRunBtn');"
-                                + "if (!b || b.hidden || b.disabled) { return 'not-offered'; }"
-                                + "b.click(); return 'pressed';"
-                                + "})()"));
+            // OFFER the profile, and the button has to be pressed. Both halves
+            // live in offerAndPress() — this leg's shape is where the band's
+            // device leg got its repair from, so it is shared rather than copied
+            // (DIA-DL-003). One profile, this leg's own count.
+            offerAndPress(scenario, 1);
 
             String status = pollForImportStatus(scenario);
             assertEquals("the import did not report success: " + status, "imported", status);
@@ -480,6 +479,19 @@ public class HistoryTransferTest {
      * meant only that an untouched storage was untouched. The control below
      * measures exactly that: the same {@code []} the old assertion demanded, taken
      * from a world in which nothing has happened yet.
+     *
+     * <p><b>AND IT PRESSES A BUTTON THAT IS ACTUALLY THERE.</b> In run
+     * 31954630121 this was the one red of twenty-six, and the product was again
+     * not implicated: the logcat carries {@code history.handoff outcome=complete
+     * transport=link refusal=none bytes=209 chunks=1 profiles=1} — the profile
+     * WAS delivered and offered — and then carries no {@code history.import} and
+     * no status line at all, because {@code runImportFromUi} is bound to a real
+     * click and no click happened. The wait watched {@code .show}, which
+     * {@code offerImportIfPending()} sets at BOOT for the handoff invitation
+     * with the run button hidden, and the press was guarded only by
+     * {@code hidden} and returned {@code 'clicked'} regardless. Both are now
+     * {@link #offerAndPress}, which waits for the OFFER and reports
+     * {@code 'not-offered'} rather than pressing nothing quietly (DIA-DL-003).
      */
     @Test
     public void the_transfer_writes_nothing_to_web_storage() throws Exception {
@@ -516,17 +528,14 @@ public class HistoryTransferTest {
 
             Envelope envelope = buildEnvelopeInApp(scenario, 3);
             deliver(scenario, link(envelope));
-            pollFor(
-                    scenario,
-                    "(function () {"
-                        + "var m = document.getElementById('importModal');"
-                        + "return (m && m.className.indexOf('show') !== -1) ? 'shown' : null;"
-                        + "})()",
-                    TRANSFER_TIMEOUT_MS);
-            evaluate(
-                    scenario,
-                    "(function () { var b = document.getElementById('importRunBtn');"
-                        + " if (b && !b.hidden) { b.click(); } return 'clicked'; })()");
+
+            // THE OFFER, THEN THE PRESS, THROUGH THE STEP THAT CAN SAY IT DID
+            // NEITHER. What stood here waited for `.show` — which the boot-time
+            // handoff invitation had already set — and then reported 'clicked'
+            // for a press it declined to make, so this leg spent 2 m 2.61 s of
+            // run 31954630121 waiting for a status no one was going to write
+            // (DIA-DL-003). One profile, this leg's own count.
+            offerAndPress(scenario, 1);
 
             String status = pollForImportStatus(scenario);
             // Sampled HERE, before the read-back below loads any further module,
@@ -561,7 +570,8 @@ public class HistoryTransferTest {
     // ---------------------------------------------------------------------
 
     /**
-     * The arm-check for the three repairs that are predicates rather than paths.
+     * The arm-check for the repairs that are predicates and steps rather than
+     * paths — three from DIA-P1R (A-C), and the offer-and-press of DIA-P1R2 (D).
      *
      * <p><b>THIS IS A HARNESS CHECK AND EXECUTES NO PRODUCT PATH</b> (AGENTS.md
      * §11). It asserts nothing about the transfer; it asserts that the
@@ -575,6 +585,23 @@ public class HistoryTransferTest {
      * token — and its regression guard lives in
      * {@link #no_bridge_call_carries_the_payload}, not here. Saying so is better
      * than an assertion that pretends the predicate covers it.
+     *
+     * <p><b>SECTION D IS THE MUTATION DEMONSTRATION FOR DIA-P1R2, AND IT RUNS ON
+     * EVERY DISPATCH RATHER THAN ONCE.</b> Removing the offer wait or the press
+     * from the band's device leg and dispatching would produce one bit, at the
+     * cost of a full run, and leave no standing guard. Instead D builds the DOM
+     * state that broke that leg — a modal carrying {@code show} with no profile
+     * listed, then one listed and the button still not pressable — and fires
+     * {@link #offerAndPress} ITSELF at it, the same method the two transfer legs
+     * call. It must fail, it must name the press, and no click may reach the
+     * button; the OLD forms are printed green on the identical input beside it.
+     * {@code 'pressed'} is then shown to mean a handler actually ran.
+     *
+     * <p>D touches NO product element: its subtree is its own, under
+     * {@code __dia_probe_host__}, and it asserts that subtree gone from the
+     * document before it finishes — a teardown that silently did not happen
+     * would otherwise read as a clean run, which is the very failure this packet
+     * exists to make impossible.
      */
     @Test
     public void the_harness_arms_prove_themselves() throws Exception {
@@ -660,7 +687,210 @@ public class HistoryTransferTest {
                         + " undefined — the read-back's repair rests on that and must be re-derived",
                     "[object Set]|length=undefined|size=0",
                     kind);
+
+            // --- D. the offer wait and the press, at a DOM this arm builds ----
+            //
+            // THIS IS THE MUTATION, RUN EVERY TIME instead of once. The state
+            // that broke the band's device leg is reproduced here in a subtree
+            // of the arm's own: a modal carrying `show` with no profile listed
+            // and a hidden button — which is exactly what
+            // offerImportIfPending() leaves behind at boot. The repaired steps
+            // are required to refuse it, and the OLD forms are printed green on
+            // the same input beside them.
+            assertEquals(
+                    "the probe subtree was not built, so section D asserts nothing",
+                    "built",
+                    evaluate(
+                            scenario,
+                            probeScript(
+                                    "(function () {"
+                                        + "var host = document.createElement('div');"
+                                        + "host.id = '__dia_probe_host__';"
+                                        + "var m = document.createElement('div');"
+                                        + "m.id = '__MODAL__'; m.className = 'show';"
+                                        + "var c = document.createElement('div');"
+                                        + "c.id = '__CHOICES__';"
+                                        + "var b = document.createElement('button');"
+                                        + "b.id = '__BTN__'; b.hidden = true;"
+                                        + "window.__diaProbePresses = 0;"
+                                        + "b.addEventListener('click', function () {"
+                                        + " window.__diaProbePresses += 1; });"
+                                        + "m.appendChild(c); m.appendChild(b);"
+                                        + "host.appendChild(m); document.body.appendChild(host);"
+                                        + "return document.getElementById('__BTN__')"
+                                        + " ? 'built' : 'not-built';"
+                                        + "})()")));
+
+            // D1 — THE WAIT. A shown modal listing no profile is not an offer.
+            String legacyOffer = evaluate(scenario, legacyOfferScript(Surface.PROBE));
+            String repairedOffer = evaluate(scenario, offerScript(Surface.PROBE));
+            Log.i(
+                    TAG,
+                    "arm — wait on a shown modal listing NO profile (the boot-time handoff"
+                            + " invitation): old=" + legacyOffer
+                            + " new=" + repairedOffer);
+            assertNull(
+                    "the repaired wait accepts a modal that lists no profile — which is the"
+                        + " boot-time handoff invitation, and is what answered the band's device"
+                        + " leg before its transfer had arrived",
+                    repairedOffer);
+            assertEquals(
+                    "the OLD `.show`-only wait no longer answers on a modal that lists nothing —"
+                        + " the contrast this arm exists to draw has evaporated",
+                    "shown",
+                    legacyOffer);
+
+            // D2 — THE PRESS, AT LEG LEVEL. One profile listed, button still not
+            // pressable: the helper the two transfer legs call must fail HERE,
+            // and must say so about the press.
+            assertEquals(
+                    "the probe was not given a profile to list",
+                    "listed",
+                    evaluate(
+                            scenario,
+                            probeScript(
+                                    "(function () {"
+                                        + "var c = document.getElementById('__CHOICES__');"
+                                        + "var box = document.createElement('input');"
+                                        + "box.type = 'checkbox'; box.checked = true;"
+                                        + "c.appendChild(box);"
+                                        + "var boxes = c.querySelectorAll("
+                                        + "'input[type=\\\"checkbox\\\"]');"
+                                        + "return boxes.length === 1 ? 'listed' : 'not-listed';"
+                                        + "})()")));
+
+            AssertionError refused = null;
+            try {
+                offerAndPress(scenario, Surface.PROBE, 1, PROBE_BUDGET_MS);
+            } catch (AssertionError expected) {
+                refused = expected;
+            }
+            assertNotNull(
+                    "offer-and-press passed against a button that cannot be pressed, so the step"
+                        + " this packet repaired still cannot report its own failure",
+                    refused);
+            Log.i(
+                    TAG,
+                    "arm — offer-and-press against an unpressable button: "
+                            + refused.getMessage());
+            assertTrue(
+                    "the failure does not name the press, so its reader would go looking for a"
+                        + " product defect the way run 31954630121's did: " + refused.getMessage(),
+                    refused.getMessage().contains("the transfer button was not offered"));
+            assertEquals(
+                    "the repaired press reported a refusal and clicked anyway",
+                    "0",
+                    evaluate(scenario, PROBE_PRESSES));
+
+            String legacyPress = evaluate(scenario, legacyPressScript(Surface.PROBE));
+            String legacyPresses = evaluate(scenario, PROBE_PRESSES);
+            Log.i(
+                    TAG,
+                    "arm — press on a hidden button: old=" + legacyPress
+                            + " (clicks delivered: " + legacyPresses + ")"
+                            + " new=not-offered (clicks delivered: 0). The old verdict is run"
+                            + " 31954630121's one red, in one line.");
+            assertEquals(
+                    "the OLD press form no longer reports a press it did not make — the silent"
+                        + " pass this arm reproduces has gone",
+                    "clicked",
+                    legacyPress);
+            assertEquals(
+                    "the OLD form pressed a hidden button, so the two forms are not being"
+                        + " compared on the same input",
+                    "0",
+                    legacyPresses);
+
+            // D3 — AND 'pressed' MEANS A HANDLER RAN. Otherwise the repaired
+            // step would be a second way of saying 'clicked'.
+            assertEquals(
+                    "the probe button was not made pressable",
+                    "offered",
+                    evaluate(
+                            scenario,
+                            probeScript(
+                                    "(function () {"
+                                        + "var b = document.getElementById('__BTN__');"
+                                        + "b.hidden = false;"
+                                        + "return b.hidden ? 'still-hidden' : 'offered';"
+                                        + "})()")));
+            assertEquals(
+                    "the repaired wait does not count the one profile it is shown",
+                    "1",
+                    evaluate(scenario, offerScript(Surface.PROBE)));
+            assertEquals(
+                    "the repaired press refuses a button that is present, shown and enabled",
+                    "pressed",
+                    evaluate(scenario, pressScript(Surface.PROBE)));
+            assertEquals(
+                    "the press said 'pressed' without a handler running, so 'pressed' does not"
+                        + " mean the button was pressed",
+                    "1",
+                    evaluate(scenario, PROBE_PRESSES));
+
+            // D4 — the other unpressable state. `runImportFromUi` disables the
+            // button for the duration of an import, so this is a real one.
+            assertEquals(
+                    "the probe button was not disabled",
+                    "disabled",
+                    evaluate(
+                            scenario,
+                            probeScript(
+                                    "(function () {"
+                                        + "var b = document.getElementById('__BTN__');"
+                                        + "b.disabled = true;"
+                                        + "return b.disabled ? 'disabled' : 'still-enabled';"
+                                        + "})()")));
+            assertEquals(
+                    "the repaired press presses a disabled button",
+                    "not-offered",
+                    evaluate(scenario, pressScript(Surface.PROBE)));
+            assertEquals(
+                    "a disabled button was clicked",
+                    "1",
+                    evaluate(scenario, PROBE_PRESSES));
+
+            // AND THE ARM CLEANS UP AFTER ITSELF, OBSERVABLY. A teardown that
+            // silently did not happen must not read as a clean run — the same
+            // discipline this whole packet is about, applied to the arm's own
+            // fixture. The removal step says what it DID, and the document is
+            // then asked independently.
+            assertEquals(
+                    "the probe subtree was already gone before its teardown ran, so what the"
+                        + " assertions above fired at is not what this removed",
+                    "removed",
+                    evaluate(
+                            scenario,
+                            "(function () {"
+                                + "var h = document.getElementById('__dia_probe_host__');"
+                                + "if (!h) { return 'absent'; }"
+                                + "h.parentNode.removeChild(h);"
+                                + "delete window.__diaProbePresses;"
+                                + "return 'removed';"
+                                + "})()"));
+            assertNull(
+                    "the probe subtree is still in the app's document after its own teardown"
+                        + " reported it removed",
+                    evaluate(
+                            scenario,
+                            "(function () {"
+                                + "var h = document.getElementById('__dia_probe_host__');"
+                                + "return h ? 'present' : null;"
+                                + "})()"));
         });
+    }
+
+    /** How long the arm gives a wait it EXPECTS to be refused before it. */
+    private static final long PROBE_BUDGET_MS = 2_000;
+
+    /** How many clicks the arm's probe button has actually received. */
+    private static final String PROBE_PRESSES = "String(window.__diaProbePresses)";
+
+    /** Substitutes the probe's ids into one of the arm's own fixture scripts. */
+    private static String probeScript(String script) {
+        return script.replace("__MODAL__", Surface.PROBE.modal)
+                .replace("__CHOICES__", Surface.PROBE.choices)
+                .replace("__BTN__", Surface.PROBE.button);
     }
 
     // ---------------------------------------------------------------------
@@ -767,6 +997,14 @@ public class HistoryTransferTest {
      * be installed afterwards, which left a window in which a drain would have
      * gone unrecorded — never hit, and not a window worth keeping.
      *
+     * <p><b>THE WAKE AND THE ASK BOTH REPORT WHAT THEY DID.</b> The wake returns
+     * the visibility state it dispatched into, because {@code import.js}'s
+     * listener does nothing at all on a hidden document; and the
+     * {@code pendingTransfer} ask records a REJECTION into the same slot its
+     * answer would have gone to, so {@link #pollForRefusal} surfaces a bridge
+     * failure as a wrong refusal code rather than expiring silently on a null
+     * that will never change (DIA-DL-003).
+     *
      * <p><b>THE LAUNCH INTENT IS PUT BACK, AND THAT IS A HARNESS COMPENSATION
      * THAT MAKES THIS ACTIVITY DIVERGE FROM PRODUCTION.</b> In production the
      * VIEW Intent stays current after {@code MainActivity.onNewIntent} calls
@@ -836,14 +1074,30 @@ public class HistoryTransferTest {
                     target.setIntent(launch);
                 });
 
-        evaluate(
-                scenario,
-                "(function () {"
-                    + "window.Capacitor.nativePromise('TheyGrowTransfer', 'pendingTransfer', {})"
-                    + ".then(function (r) { window.__diaPending = r; });"
-                    + "document.dispatchEvent(new Event('visibilitychange'));"
-                    + "return 'woken';"
-                    + "})()");
+        // THE WAKE SAYS WHETHER IT COULD HAVE WOKEN ANYTHING, AND THE ASK SAYS
+        // WHEN IT WAS REFUSED. Both are the same defect class as the press this
+        // packet repairs (DIA-DL-003). `import.js`'s listener returns before it
+        // asks the plugin for anything unless the document is visible, so a
+        // 'woken' that meant only "the script ran" would leave six legs timing
+        // out on a poll with nothing named; and a REJECTED pendingTransfer used
+        // to leave `__diaPending.present` null for ever, which is how the four
+        // guard legs would have spent their whole budget saying nothing.
+        assertEquals(
+                "the surface was not woken: the document was not visible, so import.js's"
+                    + " visibility listener returned before it asked the plugin for anything",
+                "woken",
+                evaluate(
+                        scenario,
+                        "(function () {"
+                            + "window.Capacitor.nativePromise('TheyGrowTransfer',"
+                            + " 'pendingTransfer', {})"
+                            + ".then(function (r) { window.__diaPending = r; },"
+                            + " function (e) { window.__diaPending = { present: 'error',"
+                            + " refusal: 'bridge_error:' + (e && (e.message || e)) }; });"
+                            + "document.dispatchEvent(new Event('visibilitychange'));"
+                            + "return document.visibilityState === 'visible'"
+                            + " ? 'woken' : 'not-visible:' + document.visibilityState;"
+                            + "})()"));
     }
 
     /** Waits for the plugin's verdict about what it is holding. */
@@ -854,7 +1108,144 @@ public class HistoryTransferTest {
                     + "if (window.__diaPending.present === null) { return null; }"
                     + "return window.__diaPending.refusal;"
                     + "})()",
-                EVALUATE_TIMEOUT_MS);
+                EVALUATE_TIMEOUT_MS,
+                "the plugin to say what it is holding — pendingTransfer neither answered nor"
+                        + " reported a bridge failure");
+    }
+
+    // ---------------------------------------------------------------------
+    // the offer and the press, in one place, said in terms of what they DID
+    // ---------------------------------------------------------------------
+
+    /**
+     * The three element ids one offer-and-press sequence is driven through.
+     *
+     * <p>Ids are a PARAMETER and not a constant so that
+     * {@link #the_harness_arms_prove_themselves} can fire the very steps the legs
+     * use at a subtree it builds itself, instead of at the product's modal. Same
+     * substitution idiom this file already uses for {@code __BASE__},
+     * {@code __SKILLS__} and {@code __CHILD__}.
+     */
+    private static final class Surface {
+        final String modal;
+        final String choices;
+        final String button;
+
+        Surface(String modal, String choices, String button) {
+            this.modal = modal;
+            this.choices = choices;
+            this.button = button;
+        }
+
+        /** The product's import modal, as {@code index.html} declares it. */
+        static final Surface PRODUCT =
+                new Surface("importModal", "importChoices", "importRunBtn");
+
+        /** The arm's own subtree — built in-run, asserted gone afterwards. */
+        static final Surface PROBE =
+                new Surface("__dia_probe_modal__", "__dia_probe_choices__", "__dia_probe_btn__");
+    }
+
+    /**
+     * Has the modal OFFERED a profile — and how many?
+     *
+     * <p>The offer, not the container. {@code offerImportIfPending()} adds
+     * {@code show} to this same modal at boot for the handoff invitation, with no
+     * profile listed and the run button hidden, so {@code .show} alone answers
+     * "yes" in a world where there is nothing to press (DIA-DL-003). Returns
+     * {@code null} for "not yet", per the bargain {@link #answered} names.
+     */
+    private static String offerScript(Surface surface) {
+        return ("(function () {"
+                        + "var m = document.getElementById('__MODAL__');"
+                        + "if (!m || m.className.indexOf('show') === -1) { return null; }"
+                        + "var boxes = document.querySelectorAll("
+                        + "'#__CHOICES__ input[type=\\\"checkbox\\\"]');"
+                        + "return boxes.length ? String(boxes.length) : null;"
+                        + "})()")
+                .replace("__MODAL__", surface.modal)
+                .replace("__CHOICES__", surface.choices);
+    }
+
+    /**
+     * Presses the transfer button, and says which of the two things it did.
+     *
+     * <p>{@code 'pressed'} is claimed only after {@code click()} has been called
+     * on a button that is present, not {@code hidden} and not {@code disabled} —
+     * the three states in which {@code runImportFromUi} would never run.
+     */
+    private static String pressScript(Surface surface) {
+        return ("(function () {"
+                        + "var b = document.getElementById('__BTN__');"
+                        + "if (!b || b.hidden || b.disabled) { return 'not-offered'; }"
+                        + "b.click(); return 'pressed';"
+                        + "})()")
+                .replace("__BTN__", surface.button);
+    }
+
+    /**
+     * The wait as the band's device leg had it, kept ONLY as the arm's control.
+     *
+     * <p>Nothing waits through it. It exists so
+     * {@link #the_harness_arms_prove_themselves} can show it answering
+     * {@code 'shown'} on the exact DOM state that made run 31954630121's one red
+     * — the boot-time handoff invitation, with no profile listed.
+     */
+    private static String legacyOfferScript(Surface surface) {
+        return ("(function () {"
+                        + "var m = document.getElementById('__MODAL__');"
+                        + "return (m && m.className.indexOf('show') !== -1) ? 'shown' : null;"
+                        + "})()")
+                .replace("__MODAL__", surface.modal);
+    }
+
+    /**
+     * The press as that leg had it, kept ONLY as the arm's control.
+     *
+     * <p>It returns {@code 'clicked'} whether or not it clicked anything, which
+     * is the whole of DIA-P1R2: a step that cannot report its own failure, and a
+     * leg that therefore spent its budget waiting for a consequence that was
+     * never going to arrive.
+     */
+    private static String legacyPressScript(Surface surface) {
+        return ("(function () { var b = document.getElementById('__BTN__');"
+                        + " if (b && !b.hidden) { b.click(); } return 'clicked'; })()")
+                .replace("__BTN__", surface.button);
+    }
+
+    /** Drives the product's modal: the offer, this leg's count, and the press. */
+    private void offerAndPress(ActivityScenario<MainActivity> scenario, int expectedProfiles) {
+        offerAndPress(scenario, Surface.PRODUCT, expectedProfiles, TRANSFER_TIMEOUT_MS);
+    }
+
+    /**
+     * The same sequence, against any surface and any budget.
+     *
+     * <p>The wide form exists for one reason: the arm calls THIS method — the one
+     * the legs call, not a re-implementation of it — against a button it has made
+     * unpressable, and requires it to fail and to name the press. A repair whose
+     * demonstration runs different code is not a demonstration.
+     */
+    private void offerAndPress(
+            ActivityScenario<MainActivity> scenario,
+            Surface surface,
+            int expectedProfiles,
+            long budget) {
+        String offered =
+                pollFor(
+                        scenario,
+                        offerScript(surface),
+                        budget,
+                        "the transfer to offer a profile to import — the modal listed none");
+        assertEquals(
+                "the transfer offered a number of profiles other than " + expectedProfiles,
+                String.valueOf(expectedProfiles),
+                offered);
+        assertEquals(
+                "the transfer button was not offered, so nothing was pressed and no import can"
+                    + " have started",
+                "pressed",
+                evaluate(scenario, pressScript(surface)));
     }
 
     /**
@@ -864,6 +1255,13 @@ public class HistoryTransferTest {
      * Anything else comes back verbatim: "everything was already transferred" is
      * a DIFFERENT outcome from a completed import, and a leg that accepts both is
      * a leg that cannot tell them apart.
+     *
+     * <p><b>THE 120 s BUDGET STANDS; WHAT IT SAYS WHEN IT EXPIRES DOES NOT.</b>
+     * It used to print the polled expression, so the reader of run 31954630121
+     * had to go to the logcat to learn that the surface had never been asked to
+     * import anything. It now names the product fact — no import was reported —
+     * which is the diagnosis, and the press upstream of it now fails first and by
+     * name in the case that produced it (DIA-DL-003).
      */
     private String pollForImportStatus(ActivityScenario<MainActivity> scenario) {
         return pollFor(
@@ -873,7 +1271,9 @@ public class HistoryTransferTest {
                     + "if (!s || s.indexOf('Переношу') !== -1) { return null; }"
                     + "return s.indexOf('Перенесено') !== -1 ? 'imported' : 'other:' + s;"
                     + "})()",
-                TRANSFER_TIMEOUT_MS);
+                TRANSFER_TIMEOUT_MS,
+                "the surface to report an import — #importStatus never left «Переношу…» and"
+                        + " never said «Перенесено»");
     }
 
     /**
@@ -1127,6 +1527,19 @@ public class HistoryTransferTest {
     }
 
     private String pollFor(ActivityScenario<MainActivity> scenario, String expression, long budget) {
+        return pollFor(scenario, expression, budget, expression);
+    }
+
+    /**
+     * The same wait, saying in product terms what it was waiting for.
+     *
+     * <p>{@code what} is what the READER needs on a timeout, and the expression
+     * is what the author needs; the first is the one a 120 s expiry has to lead
+     * with. Call sites that have nothing better to say than the expression pass
+     * the expression, through the three-argument form above.
+     */
+    private String pollFor(
+            ActivityScenario<MainActivity> scenario, String expression, long budget, String what) {
         long deadline = System.currentTimeMillis() + budget;
         while (System.currentTimeMillis() < deadline) {
             String value = evaluate(scenario, expression);
@@ -1137,10 +1550,10 @@ public class HistoryTransferTest {
                 Thread.sleep(POLL_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                fail("interrupted while waiting for " + expression);
+                fail("interrupted while waiting for " + what);
             }
         }
-        fail("timed out after " + budget + " ms waiting for " + expression);
+        fail("timed out after " + budget + " ms waiting for " + what);
         return null;
     }
 
