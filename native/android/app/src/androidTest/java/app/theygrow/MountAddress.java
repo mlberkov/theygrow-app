@@ -55,7 +55,16 @@ final class MountAddress {
 
     private MountAddress() {}
 
-    /** The mount version the shell references, e.g. {@code "v2"}. */
+    /**
+     * The mount version the shell references — a {@code "v"} followed by a
+     * number.
+     *
+     * <p>Deliberately no worked example here or on the two methods below.
+     * DIA-P1 found all three carrying the generation the shell had left one
+     * bump earlier, which is the second time this file has needed that hand
+     * edit; an example that names a version is a statement that goes stale on a
+     * schedule, and this class exists precisely because such statements do.
+     */
     static synchronized String version() {
         if (cached == null) {
             cached = derive(readShell());
@@ -63,12 +72,12 @@ final class MountAddress {
         return cached;
     }
 
-    /** The mount's URL prefix, e.g. {@code "/m/v3/"}. */
+    /** The mount's URL prefix: {@code "/m/"}, the version, and a slash. */
     static String prefix() {
         return "/m/" + version() + "/";
     }
 
-    /** The mount's prefix as an ASSET path, e.g. {@code "public/m/v3/"}. */
+    /** The mount's prefix as an ASSET path: {@code "public/m/"}, then as above. */
     static String assetPrefix() {
         return "public/m/" + version() + "/";
     }

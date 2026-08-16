@@ -83,17 +83,17 @@
     </script>
 
     <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v3/app.css">
+    <link rel="stylesheet" href="/m/v4/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v3/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
+         /m/v4/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
          store. Without these the browser discovers them only after
          app.js parses, and their own imports only after that — the boot-order
          cost A1-DL-004/005/006 each recorded and declined to pay.
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v3/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v4/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -106,44 +106,44 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v3/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v3/core/state.js">
-    <link rel="modulepreload" href="/m/v3/core/storage.js">
-    <link rel="modulepreload" href="/m/v3/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v3/core/signals.js">
-    <link rel="modulepreload" href="/m/v3/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v3/core/format.js">
-    <link rel="modulepreload" href="/m/v3/core/zpd.js">
-    <link rel="modulepreload" href="/m/v3/core/urgency.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v3/store/boot.js">
-    <link rel="modulepreload" href="/m/v3/store/store.js">
-    <link rel="modulepreload" href="/m/v3/store/journal.js">
-    <link rel="modulepreload" href="/m/v3/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v3/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v3/store/bridge.js">
-    <link rel="modulepreload" href="/m/v3/store/config.js">
-    <link rel="modulepreload" href="/m/v3/store/errors.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/import.js">
-    <link rel="modulepreload" href="/m/v3/export/run.js">
-    <link rel="modulepreload" href="/m/v3/export/build.js">
-    <link rel="modulepreload" href="/m/v3/export/readout.js">
-    <link rel="modulepreload" href="/m/v3/export/sink.js">
-    <link rel="modulepreload" href="/m/v3/export/text.js">
-    <link rel="modulepreload" href="/m/v3/export/readme.js">
-    <link rel="modulepreload" href="/m/v3/export/zip.js">
-    <link rel="modulepreload" href="/m/v3/export/pdf.js">
-    <link rel="modulepreload" href="/m/v3/export/ttf.js">
-    <link rel="modulepreload" href="/m/v3/export/config.js">
-    <link rel="modulepreload" href="/m/v3/export/errors.js">
+    <link rel="modulepreload" href="/m/v4/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v4/core/state.js">
+    <link rel="modulepreload" href="/m/v4/core/storage.js">
+    <link rel="modulepreload" href="/m/v4/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v4/core/signals.js">
+    <link rel="modulepreload" href="/m/v4/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v4/core/format.js">
+    <link rel="modulepreload" href="/m/v4/core/zpd.js">
+    <link rel="modulepreload" href="/m/v4/core/urgency.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v4/store/boot.js">
+    <link rel="modulepreload" href="/m/v4/store/store.js">
+    <link rel="modulepreload" href="/m/v4/store/journal.js">
+    <link rel="modulepreload" href="/m/v4/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v4/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v4/store/bridge.js">
+    <link rel="modulepreload" href="/m/v4/store/config.js">
+    <link rel="modulepreload" href="/m/v4/store/errors.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v4/surfaces/import.js">
+    <link rel="modulepreload" href="/m/v4/export/run.js">
+    <link rel="modulepreload" href="/m/v4/export/build.js">
+    <link rel="modulepreload" href="/m/v4/export/readout.js">
+    <link rel="modulepreload" href="/m/v4/export/sink.js">
+    <link rel="modulepreload" href="/m/v4/export/text.js">
+    <link rel="modulepreload" href="/m/v4/export/readme.js">
+    <link rel="modulepreload" href="/m/v4/export/zip.js">
+    <link rel="modulepreload" href="/m/v4/export/pdf.js">
+    <link rel="modulepreload" href="/m/v4/export/ttf.js">
+    <link rel="modulepreload" href="/m/v4/export/config.js">
+    <link rel="modulepreload" href="/m/v4/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -376,12 +376,12 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v3/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v4/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v3/app.js for boot order, and the modulepreload block in the head
+         m/v4/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v3/app.js"></script>
+    <script type="module" src="/m/v4/app.js"></script>
 
     <!-- PWA Install Prompt -->
     <script>
@@ -512,6 +512,6 @@
     </script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v3/sw-register.js"></script>
+    <script type="module" src="/m/v4/sw-register.js"></script>
 </body>
 </html>

@@ -120,7 +120,11 @@ module.exports = defineConfig({
       // is cheap enough to check on every push, and because the claims that need
       // a device — saved instance state, the binder limit — are deliberately NOT
       // made there.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage)\.spec\.js/,
+      // DIA-P1 adds one more: the mount-reference guard, the app-side twin of
+      // EMV-P5-INV-001. It reads the tree and boots nothing, which is what it
+      // says about itself — a reference left at the frozen generation resolves
+      // rather than 404s, so nothing else in this suite would ever notice it.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|signal-payload|show-rule-coverage|mount-reference)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -144,7 +148,11 @@ module.exports = defineConfig({
       // banner can ever appear (LSC-DL-001). Running it under that profile would
       // assert web-channel delivery against a channel that has none.
       name: 'behavior',
-      testMatch: /(behavior|upgrade-path)\.spec\.js/,
+      // DIA-P1 adds mount-derivation: the executing half of DIA-P1-INV-003. It
+      // is here rather than in `contract` because its whole subject is what the
+      // shipped config modules COMPUTE when a browser evaluates them at a real
+      // origin — a claim no source scan can carry (AGENTS.md §11).
+      testMatch: /(behavior|upgrade-path|mount-derivation)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,
@@ -164,7 +172,11 @@ module.exports = defineConfig({
     // under this profile for the reason stated in that file.
     {
       name: 'native',
-      testMatch: /(dom-parity|behavior)\.spec\.js/,
+      // mount-derivation runs on BOTH channels on purpose (DIA-P1): the values
+      // it checks are derived from the origin the modules are loaded from, so
+      // the staged Capacitor web root and the nginx mirror are two executions of
+      // the property rather than one repeated.
+      testMatch: /(dom-parity|behavior|mount-derivation)\.spec\.js/,
       snapshotPathTemplate: '{testDir}/__baselines__/dom-mobile/{arg}{ext}',
       use: {
         viewport: MOBILE,
