@@ -916,14 +916,17 @@ not a case the parent can fix and not one this procedure has a command for.
    docs packet with its own report — it is the shape P1, P2 and P3 each used, and it happens **before** the
    PR, so the milestone does not open with the debt it is closing.
 
-   **DIA-P5 RE-OPENS THIS STEP ONCE, and it is worth saying why rather than treating it as a slip.** That
+   **DIA-P5 RE-OPENED THIS STEP ONCE, and it is worth saying why rather than treating it as a slip.** That
    packet closed a privacy leak the milestone's own invariant denied, and a claim about what a device writes
-   to its log needs a device to have written it. So `DIA-P5-INV-001` lands carrying **Not yet observed.**,
-   naming a green `android-instrumented` dispatch on this branch as what discharges it — which means steps
-   1 → 3 run a **second** time before the PR. It has been run green on the local emulator (36/36, the whole
-   run's logcat carrying zero occurrences of every needle and 42 `[signal]` lines under tag
-   `TheyGrowSignal`), and that is the edit loop, not the record: **CI mints a fresh emulator and a fresh key
-   per run, on an image nothing has been reinstalled onto.** `DIA-DL-010`.
+   to its log needs a device to have written it. So `DIA-P5-INV-001` landed carrying **Not yet observed.**,
+   naming a green `android-instrumented` dispatch on this branch as what discharges it — which meant steps
+   1 → 3 ran a **second** time before the PR. The local emulator was green first (36/36), and that was the
+   edit loop rather than the record: **CI mints a fresh emulator and a fresh key per run, on an image nothing
+   has been reinstalled onto**, and one needle could only be armed there — the store's passphrase crosses the
+   bridge on the launch that CREATES the store, which a reused local sandbox never does.
+   **Done on run 32074105863: `DeviceLogTest` 2/2, the suite 36/36, and the field now reads Observed — so no
+   `Not yet observed.` field remains anywhere in `docs/INVARIANTS.md` again.** The zero worth checking there
+   is the passphrase's, on a run whose own `store.open` line reports `freshly_created=true`. `DIA-DL-010`.
 4. **Open the milestone PR** (`feat/l2-local-diary` → `main`). The PR event runs `android-instrumented`
    again, plus the PDF/A validation leg, plus `quality` and `parity` — the full gate.
 5. **Merge.** Nothing deploys from a branch; the merge is what makes the next step possible.
