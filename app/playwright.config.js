@@ -143,7 +143,7 @@ module.exports = defineConfig({
       // this repository carries no eslint on purpose, and the class it belongs
       // to is bought by diary-save.spec.js in `behavior`, which EXECUTES the
       // path rather than reading it.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference)\.spec\.js/,
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

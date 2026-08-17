@@ -119,7 +119,20 @@ export const STORE_CONFIG = Object.freeze({
 // sqlite also ships JSON import/export, its own upgrade versioning, sync tables
 // and TypeORM plumbing, none of which may become load-bearing here. The wrapper
 // is replaceable; the schema is not. app/tests/store-supply-chain.spec.js fails
-// if a call site reaches for a method outside this list.
+// if a call site reaches for a method outside this list, AND if this list grows
+// beyond the exact set named there — the second half is what stops the list
+// drifting open one convenient method at a time.
+//
+// changed_in: DIA-DL-007 — the last three. What this list bounds is a CLASS OF
+// CAPABILITY, and that is the test the three had to pass: none of them can
+// address a path, enumerate anything, or delete anything. They begin, commit and
+// roll back a transaction on a database this app has already opened, which is
+// strictly less reach than `execute` and `run` already carry. They are here
+// because store/bridge.js now drives the transaction itself rather than asking
+// the wrapper to drive it: the wrapper rolls back inside a `finally` and throws
+// the ROLLBACK's own failure from there, which discards the failure that caused
+// it — on a full disk that turns SQLITE_FULL into "cannot rollback", and the
+// parent is told to retry rather than to free space (ADR-046 §1.1, ADR-015).
 export const ALLOWED_PLUGIN_METHODS = Object.freeze([
     'echo',
     'isSecretStored',
@@ -132,4 +145,7 @@ export const ALLOWED_PLUGIN_METHODS = Object.freeze([
     'executeSet',
     'query',
     'run',
+    'beginTransaction',
+    'commitTransaction',
+    'rollbackTransaction',
 ]);

@@ -135,8 +135,17 @@ public class DiaryEntryTest {
             assertEquals("the entry was stored with different text: " + read, "match", field(read, "body"));
             assertEquals("the day the entry is about was not kept: " + read, "2026-02-01", field(read, "eventDate"));
             // Slot 11, on the device: the instant of the EVENT is unknown and
-            // says so, while the instant of WRITING is real.
+            // says so, while the instant of WRITING is real. BOTH HALVES of the
+            // pair are asked for, because the schema's CHECK is what makes
+            // "unknown" expressible only when the two agree — an offset left
+            // behind by a NULL instant would be a half-declared moment, and
+            // RECORD_INSERT_SQL writes them together precisely so it cannot be.
             assertEquals("the event instant was invented: " + read, "null", field(read, "eventAt"));
+            assertEquals(
+                    "the event instant is NULL but its offset is not, which the paired CHECK"
+                            + " exists to prevent: " + read,
+                    "null",
+                    field(read, "eventOffset"));
             assertEquals("the entry time was not recorded: " + read, "set", field(read, "entryAt"));
             // Slot 12: nobody was asked about sensitivity, so nothing is declared.
             assertEquals("a sensitivity nobody declared was written: " + read, "null", field(read, "sensitivity"));
@@ -531,27 +540,56 @@ public class DiaryEntryTest {
 
     // --- reading the store, and arming it ------------------------------------
 
-    /** This leg's entries, read through the SHIPPED module out of the APK's mount. */
+    /**
+     * This leg's entries, read through the SHIPPED module out of the APK's mount.
+     *
+     * <p>AND A SECOND STATEMENT, FOR THE COLUMNS THE LIST QUERY DOES NOT RETURN.
+     * {@code RECORDS_SQL} selects seven columns and the event pair is not among
+     * them — the diary surface has no use for it — so until DIA-P3R2 this method
+     * read {@code row.event_at_utc} off a row that never carried it, got
+     * {@code undefined}, and reported {@code eventAt=set}. Run 31979084821 red
+     * on that as {@code expected:<null> but was:<set>}: an assertion about slot
+     * 11 that had never once observed slot 11, accusing a product that was
+     * right. The event pair is therefore asked for by name here, through the
+     * same bridge {@code journalCount} uses, rather than by widening a product
+     * query to serve a test.
+     *
+     * <p>AND A COLUMN THAT WAS NEVER SELECTED NOW SAYS SO. {@code absent} is a
+     * third answer, distinct from {@code null} and from {@code set}, so the next
+     * assertion written against a column no query returned reds naming this
+     * fixture instead of accusing the write path. That is the class the run
+     * caught, not just the instance.
+     */
     private String readBack(ActivityScenario<MainActivity> scenario, String leg) {
         return await(
                 scenario,
                 "__diaRead",
-                ("import(u('store/boot.js')).then(function (boot) {"
+                ("Promise.all([import(u('store/boot.js')), import(u('store/bridge.js'))])"
+                        + ".then(function (mods) {"
+                        + "var boot = mods[0], bridge = mods[1];"
                         + "return boot.loadRecords({ authorParticipantId: window.__diaAuthor,"
-                        + " subjectChildId: '__CHILD__' }); })"
+                        + " subjectChildId: '__CHILD__' })"
                         + ".then(function (rows) {"
                         + "if (!rows.length) { return 'count=0'; }"
                         + "var row = rows[0];"
+                        + "return bridge.query('SELECT event_at_utc, event_utc_offset_min"
+                        + " FROM record WHERE id = ?', [row.id])"
+                        + ".then(function (probe) {"
+                        + "var pair = probe[0] || {};"
+                        + "var slot = function (name) {"
+                        + " if (!(name in pair)) { return 'absent'; }"
+                        + " return pair[name] === null ? 'null' : 'set'; };"
                         + "return ['count=' + rows.length,"
                         + " 'id=' + row.id,"
                         + " 'body=' + (row.body === window.__diaWritten ? 'match' : 'differs'),"
                         + " 'eventDate=' + row.event_date_local,"
-                        + " 'eventAt=' + (row.event_at_utc === null ? 'null' : 'set'),"
+                        + " 'eventAt=' + slot('event_at_utc'),"
+                        + " 'eventOffset=' + slot('event_utc_offset_min'),"
                         + " 'entryAt=' + (row.entry_at_utc > 0 ? 'set' : 'missing'),"
                         + " 'entryAtValue=' + row.entry_at_utc,"
                         + " 'updatedAtValue=' + row.updated_at_utc,"
                         + " 'sensitivity=' + (row.sensitivity === null ? 'null' : row.sensitivity)"
-                        + "].join(';'); })")
+                        + "].join(';'); }); }); })")
                         .replace("__CHILD__", child(leg)));
     }
 

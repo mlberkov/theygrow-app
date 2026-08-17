@@ -233,8 +233,16 @@ export async function overwriteRecord({ recordId, body, eventDateLocal, now = Da
     if (!text) throw new StoreError('a diary entry with no text is not an entry');
     if (!eventDateLocal) throw new StoreError('an edit needs the day the entry is about');
 
+    // NOT `{ transaction: true }`, and the change is about the refusal rather
+    // than about speed (DIA-DL-007). One UPDATE is already atomic, so a wrapper
+    // transaction buys nothing here — and it costs: the wrapper rolls back
+    // inside a `finally` and throws the ROLLBACK's failure from there, which
+    // discards the failure that caused it. A parent whose disk fills while they
+    // are CORRECTING an entry is on the write path too, and must be told to free
+    // space rather than to press Save again. See store/bridge.js for the
+    // measured version of this on the create path.
     const result = await run(RECORD_UPDATE_SQL, [text, eventDateLocal, now, recordId], {
-        transaction: true,
+        transaction: false,
     });
     const changed = Number(result?.changes?.changes ?? 0);
     if (changed < 1) {

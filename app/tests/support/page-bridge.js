@@ -256,6 +256,20 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
 
                     if (method === 'isSecretStored') return { result: true };
                     if (method === 'createConnection' || method === 'open') return {};
+                    // The envelope store/bridge.js issues around a set since
+                    // DIA-DL-007. Answered rather than simulated: this seam holds
+                    // rows in an array and has no transaction to begin, so
+                    // pretending otherwise would be a fake proving a fake. What
+                    // it must do is not REFUSE them — the app now asks for these
+                    // on every create, and a fail-closed throw here would make
+                    // the success path look broken when it is not.
+                    if (
+                        method === 'beginTransaction'
+                        || method === 'commitTransaction'
+                        || method === 'rollbackTransaction'
+                    ) {
+                        return { changes: { changes: 0 } };
+                    }
                     if (method === 'query') {
                         return { values: await answerQuery(options.statement) };
                     }

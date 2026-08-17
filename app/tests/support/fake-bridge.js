@@ -31,8 +31,19 @@
  * `failOn` interrupts the Nth mutating call — the interruption the import has to
  * survive — and the recorder keeps every call made BEFORE the failure, because
  * what the next run must resume from is exactly that prefix.
+ *
+ * `rollbackFailsWith` makes the ROLLBACK fail too, with its OWN message. That is
+ * not a curiosity: it is the shape a full disk actually produces, because SQLite
+ * aborts the transaction itself on SQLITE_FULL and the ROLLBACK that follows
+ * finds nothing to roll back (DIA-DL-007). A seam that reported the rollback's
+ * message would tell a parent to retry when they need to free space.
  */
-function createFakeBridge({ answer = {}, failOn = null, failWith = 'SQLITE_BUSY: interrupted' } = {}) {
+function createFakeBridge({
+    answer = {},
+    failOn = null,
+    failWith = 'SQLITE_BUSY: interrupted',
+    rollbackFailsWith = null,
+} = {}) {
     const calls = [];
     let mutations = 0;
 
@@ -50,6 +61,10 @@ function createFakeBridge({ answer = {}, failOn = null, failWith = 'SQLITE_BUSY:
             if (method === 'query') {
                 return { values: rowsFor(options.statement) };
             }
+            if (method === 'rollbackTransaction' && rollbackFailsWith !== null) {
+                calls[calls.length - 1].failed = true;
+                throw new Error(rollbackFailsWith);
+            }
             if (method === 'executeSet' || method === 'run' || method === 'execute') {
                 mutations += 1;
                 if (failOn !== null && mutations === failOn) {
@@ -60,6 +75,9 @@ function createFakeBridge({ answer = {}, failOn = null, failWith = 'SQLITE_BUSY:
                 }
                 return { changes: { changes: 1 } };
             }
+            // beginTransaction / commitTransaction and anything else the seam
+            // asks for resolve quietly; only the calls above carry an outcome a
+            // spec reads.
             return {};
         },
     };
@@ -82,15 +100,37 @@ function createFakeBridge({ answer = {}, failOn = null, failWith = 'SQLITE_BUSY:
             }
             return out;
         },
-        /** One entry per transaction, so "these went together" is assertable. */
+        /**
+         * One entry per transaction, so "these went together" is assertable.
+         *
+         * `transaction` answers "was this set atomic", which since DIA-DL-007 is
+         * no longer the same question as "what flag did the app pass". The seam
+         * now drives the transaction itself — beginTransaction, the set with
+         * `transaction: false`, commitTransaction — so atomicity is read off the
+         * ENVELOPE the app issued, and reads true only if the envelope actually
+         * committed. A set the app sent with the wrapper's own flag still counts,
+         * which is what keeps the `run`-driven call sites readable here too.
+         */
         transactions() {
-            return calls
-                .filter((call) => call.method === 'executeSet' && !call.failed)
-                .map((call) => ({
-                    transaction: call.options.transaction,
-                    statements: call.options.set.map((item) => item.statement),
-                    values: call.options.set.map((item) => item.values),
-                }));
+            const out = [];
+            let open = false;
+            for (const call of calls) {
+                if (call.method === 'beginTransaction' && !call.failed) open = true;
+                if (call.method === 'executeSet' && !call.failed) {
+                    out.push({
+                        transaction: open || call.options.transaction === true,
+                        statements: call.options.set.map((item) => item.statement),
+                        values: call.options.set.map((item) => item.values),
+                        committed: false,
+                    });
+                }
+                if (call.method === 'commitTransaction' && !call.failed) {
+                    open = false;
+                    if (out.length > 0) out[out.length - 1].committed = true;
+                }
+                if (call.method === 'rollbackTransaction') open = false;
+            }
+            return out;
         },
         mutationCount() {
             return calls.filter(
