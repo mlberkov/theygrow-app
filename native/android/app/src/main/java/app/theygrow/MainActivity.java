@@ -33,6 +33,43 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
+     * Replaces the bridge's console handler with one that writes signal lines
+     * and nothing else (DIA-P5).
+     *
+     * <p>WHY HERE AND NOT IN {@code onCreate}. Capacitor builds its own
+     * {@code BridgeWebChromeClient} in {@code Bridge.loadWebView()}
+     * ({@code Bridge.java:280}), which the bridge's constructor calls on its way
+     * out, so there is nothing to replace until
+     * {@code super.load()} has returned — and the bridge exposes no hook for
+     * supplying one, so {@code setWebChromeClient} after the fact is the only
+     * door. {@code load()} is called from {@code BridgeActivity.onCreate}, which
+     * is the window this has to happen in.
+     *
+     * <p>AND THE WINDOW IS NARROW IN A WAY THAT BITES. The replacement's
+     * super-constructor calls {@code bridge.registerForActivityResult} twice,
+     * and {@code ActivityResultRegistry.register} throws
+     * {@code IllegalStateException} once the activity is at or past
+     * {@code STARTED} — "LifecycleOwners must call register before they are
+     * STARTED". Moved to {@code onStart}, {@code onResume} or
+     * {@code onPostCreate}, this line is a crash on the family's first tap
+     * rather than a subtle regression. Capacitor registers those same two
+     * launchers from inside this very call stack today, which is what says the
+     * moment is legal.
+     *
+     * <p>NOTHING IS MISSED IN BETWEEN. {@code loadWebView()} ends by asking the
+     * WebView to load the app URL, which is asynchronous; the UI thread is still
+     * inside {@code onCreate} here, so no page script has run and no console
+     * message can have been delivered to the client being replaced. The
+     * boot-time {@code store.open} signal is the first line either way, and
+     * {@code DeviceLogTest} asserts it arrives.
+     */
+    @Override
+    protected void load() {
+        super.load();
+        getBridge().getWebView().setWebChromeClient(new SignalConsoleClient(getBridge()));
+    }
+
+    /**
      * The launch case that actually happens.
      *
      * <p>The activity is {@code launchMode="singleTask"}, so a parent who leaves

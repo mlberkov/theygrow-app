@@ -565,7 +565,7 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
    - the activities modal and the activity→skill deep link behave as on the web;
    - **no `/api` request is attempted** — the app is fully local, and production `/api` is decommissioned;
    - **the service worker inside the WebView is settled as of L1-P4, and no longer needs a human observation here.** The native channel registers none and purges a registration a previously installed APK left behind together with its shell caches, so Cache Storage cannot hold a second copy of the shell. `WebViewStorageTest` measures it on the emulator and prints the probe facts into the instrumented report — whether `serviceWorker` is in `navigator` at all, what `caches.keys()` returns — so the answer is recorded rather than re-asked (`LSC-DL-004` (i), `LSC-P4-INV-004`). It has now been measured: run `31683691498` is green with `android-instrumented` at 8m39s and 16/16 instrumented tests, on head 460bd39 (`LSC-DL-005` (a)). **What that run settles and what it does not:** the emulator is fresh, so it proves no registration and no shell cache exist after a booted native app — it cannot prove a *prior* registration is purged, which is what steps 1 → 2 of the owner sequence below exist to observe. *(This bullet previously read "the one open question the repository cannot settle", and carried the disposition to L1-P4. It could be settled; it needed a device.)*
-   - **since L1-P2, check the local store came up.** With the device attached, `adb logcat | grep -i "\[store\]"` should print **nothing**: the store logs only on failure. To see it positively, use the instrumented job instead (below) — it asserts the same thing without a human reading a log.
+   - **since L1-P2, check the local store came up.** With the device attached, `adb logcat -s TheyGrowSignal | grep 'store.open'` must print `[signal] store.open outcome=opened failure_class=none …`. *(Rewritten in DIA-P5, and the rewrite is the point rather than a tidy-up. This step used to read `grep -i "\[store\]"` and expect **nothing**, because the store logged only on failure — and DIA-P5 stopped forwarding that line: `store/boot.js`'s failure path prints the engine's own message, and an engine message is exactly the string that can carry statement text, so the allowlist drops it. Left as it was, the step would have gone **silently green on a broken store as well as a healthy one**, which is worse than a step that fails. `outcome` and `failure_class` carry the same information in the closed-code form the signal was built for: `opened`, or `failed` with the reason named.)* To see it positively without reading a log, use the instrumented job instead (below).
 
 **Building locally instead (only on a machine with the full toolchain).**
 
@@ -578,6 +578,12 @@ cd native && npm ci && npm run sync && cd android && ./gradlew assembleDebug
 ### The local store and its instrumented gate — L1-P2
 
 The device holds the family's data in **one SQLCipher-encrypted SQLite file**, created by the current mount's `store/store.js` on first launch and keyed by a 256-bit passphrase minted on the device and kept in `EncryptedSharedPreferences` behind an `AndroidKeyStore` master key. Encryption is on **from creation**, so no plaintext database ever exists. The schema is the current mount's `store/schema/001-core.sql` — one artifact, shipped in both channels, applied by the app, by the desktop tests and by the instrumented test. **It is frozen** (`LSC-DL-002`): changing it after real records exist means migrating a history that exists nowhere else.
+
+**THAT PASSPHRASE WAS WRITTEN TO LOGCAT IN CLEARTEXT ON EVERY DEVICE THAT HAS EVER RUN A DEBUG BUILD, and the decision about it has been taken rather than left open.** Until DIA-P5, Capacitor traced every plugin call's whole argument object to the device log, and minting the key is a plugin call: run **32044006357** line **63944** carries `methodName: setEncryptionSecret, methodData: {"passphrase":"2c886a…791e"}`. It crosses **once per device, on the launch that creates the store**, so every installation that ever opened this app wrote its own key out on its first run. DIA-P5 closes the line; it cannot un-write the ones already written.
+
+- **The decision (owner gate, 2026-08-17, recorded as an annotation to ADR-046 in the vault): the store is NOT re-keyed now.** This is an accepted deviation with a named end, not a property of the system and not an open question.
+- **Two triggers end it.** **(a) Immediately**, if this device's logs or a bugreport ever left the owner's hands — then the key is disclosed to whoever holds them and re-keying is the response, not a scheduled task. **(b) At L4 regardless**, where the store is opened for accounts anyway: the re-key happens there as hygiene, on work that is already touching the file, rather than as an emergency.
+- **The exposure bounds, recorded so a later reader can re-judge this without re-deriving it.** Reading the line needs local access to the device's log buffer — `adb` with USB debugging authorised, or a `bugreport` that was taken and shared. The buffer is volatile and has rotated many times since. And the same debug build exposes strictly more by a different door: `webContentsDebuggingEnabled` defaults to on in a debuggable build, so `chrome://inspect` over that same authorised connection reaches the DOM, the JS heap and WebView storage directly (`DIA-DL-010` debt 12, still open).
 
 Two rules constrain how that file is written, and both are enforced by test rather than by memory:
 
@@ -636,7 +642,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 3. Choose a location and confirm. **Three things must happen together (DIA-P2):** the modal closes by itself, a banner appears at the bottom reading «Архив сохранён. Записей в журнале: N.», and it stays there until you press its ×. The banner is deliberately outside the dialog and has no timer — before this packet the confirmation was written inside the modal, which stayed open, and the owner smoke of 2026-08-16 recorded that the parent got neither a closed dialog nor a confirmation they registered.
 4. Close the picker without choosing, on a second run: the app must say **nothing at all** — no banner, no status line — and the modal must stay open. A closed picker is a decision, not a failure. A failed run is the third case: the modal stays open and says so inside itself, because a message about an archive that was not written belongs where the button was pressed.
 5. **Check the size before anything else.** The file must be non-zero and roughly the size the status line implies; a 0-byte file with the right name is the XPT-P1 defect returning, and it is the one failure mode that looks like success in a file manager. Then copy it off the device and walk steps 1–5 of "Reading the archive without the app" above on a desktop — it must open, and every entry must extract.
-6. **Read the signal, on the same run** (XPT-P1): `adb logcat -s chromium | grep 'export.run'` shows one line of the form `[signal] export.run outcome=complete archive_bytes=… chunks=… export_ms=…`. Counts and timings only — it carries no filename and no document URI, by decision. `outcome=nothing_selected` is a closed picker; `outcome=failed` names a run the app itself knows failed, which is a different and much easier state to be in than the silent one this packet ended.
+6. **Read the signal, on the same run** (XPT-P1): `adb logcat -s TheyGrowSignal | grep 'export.run'` shows one line of the form `[signal] export.run outcome=complete archive_bytes=… chunks=… export_ms=…`. Counts and timings only — it carries no filename and no document URI, by decision. `outcome=nothing_selected` is a closed picker; `outcome=failed` names a run the app itself knows failed, which is a different and much easier state to be in than the silent one this packet ended. *(Corrected in DIA-P5. This step said `-s chromium`, and that was false when written: signal lines were carried by Capacitor's console bridge under tag `Capacitor/Console`, and `-s chromium` matched two DNS warnings and no signal at all — measured on runs 32044006357 and the L1-era artefact both. Since DIA-P5 the app forwards them itself under `TheyGrowSignal`, which is what this command now names.)*
 7. Export twice without changing anything. The two archives must differ **only** in `MANIFEST.json` — that is the determinism guarantee, and it is the cheapest place to notice it breaking.
 8. **Before L1-P4** the archive was correct and nearly empty, by design: the contour existed before the records did, so the first records were recoverable before they were written. **L1-P4 lands the write path, so it is no longer empty** — see *The write path and the legacy import* below, whose step 8 says what to look for in it. *(Corrected in L1-P4: this step read as a standing expectation and would have told the owner an archive with records in it was wrong.)*
 
@@ -647,7 +653,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 3. Write two or three sentences and press **Сохранить**. **Three things must happen together:** the window stays open, the list comes back, and the new entry is at the top of it with the day you chose. The window not closing is deliberate (`DIA-DL-005` (g)) — the list is the confirmation.
 4. Press **Изменить** on that entry, change a word and the day, and save again. The list must show **one** entry, corrected. A second entry appearing means an edit has become an append and the diary has silently become a journal — stop and report it.
 5. **Force-stop the app, reopen it, and open the diary again.** The entry must still be there. That is the whole point of the packet and the only step that observes the store surviving a process death.
-6. **Read the signal on the same run:** `adb logcat -s chromium | grep 'diary.write'` shows one line per save of the form `[signal] diary.write outcome=complete failure_class=none chars=<n> write_ms=<n>`. `chars` is a length; if anything resembling the text you typed appears in that line, stop — that is a §4 breach and `LSC-P4-INV-003` should have made it impossible.
+6. **Read the signal on the same run:** `adb logcat -s TheyGrowSignal | grep 'diary.write'` shows one line per save of the form `[signal] diary.write outcome=complete failure_class=none chars=<n> write_ms=<n>`. `chars` is a length; if anything resembling the text you typed appears in that line, stop — that is a §4 breach and `LSC-P4-INV-003` should have made it impossible. *(Corrected in DIA-P5, same as the export step above: `-s chromium` named a tag these lines never carried. And read the whole log once, not only this tag — `adb logcat | grep 'подоконник'`, substituting a word you actually typed: **until DIA-P5 the bridge wrote every entry you saved to logcat verbatim**, under tag `Capacitor`, and a grep scoped to the signal would never have shown it. That is the check this step could not make, and it is now `DIA-P5-INV-001`'s.)*
 7. **What this smoke cannot reach, and nobody should pretend otherwise:** a phone that is actually out of storage. The disk-full refusal is exercised on the emulator by making the ENGINE refuse (`DiaryEntryTest`), which is a real `SQLITE_FULL` and not a real full phone — a device with no space left also fails in ways SQLite never sees. If you ever meet one for real, the sentence you should see says the entry was NOT saved, that your text is still in the field, and to free space — not to restart the app.
 8. **One thing to know before this smoke and not after it:** the archive does **not** contain diary text. It carries the marks and the journal, so an exported archive is not a backup of anything written in the diary. *(Corrected at DIA-P4: this said the owner decision had not been taken. It has — the gate of 2026-08-17 chose that the long-lived artefact **will** carry diary text and addressed the work to **L3**. Read the sentence above as a state with an address: until L3 ships, a parent's diary text exists in exactly one copy on one device. `DIA-DL-005`'s pointer and `DIA-DL-008`.)*
 
@@ -834,6 +840,17 @@ transfer is what puts one there.
    **Check the absence as deliberately as the presence:** no word you typed appears on any line, and no
    sentence you wrote does. `rebuilt=true` would mean the derived index had to be repaired before the answer
    was right — see the next section.
+   **AND THE ABSENCE CHECK HAS TO LEAVE THIS GREP, which is what DIA-P5 cost a milestone to learn.** Scoping
+   the read to `[signal]` can only ever confirm that the signal line is clean, and the signal line was never
+   the problem: the leak was on a line this grep does not select. Read the WHOLE log:
+   `adb logcat -d | grep -c 'methodData'` must be **0**. Until DIA-P5 it returned 707 on the run this
+   milestone quoted as evidence.
+   **Do NOT check this by grepping the word you typed into the search box** — that is the false negative
+   `DIA-DL-010` exists to name. The app searches by a 3-character prefix, so «села» never crosses at all;
+   what crossed was `("сел"* OR "сёл"*)`, and a grep for the typed word returned **zero against a log
+   that was leaking**. Grep a word from the ENTRY you wrote instead — `adb logcat -d | grep 'подоконник'`,
+   substituting your own — because a diary body crosses whole. `DIA-P5-INV-001` asserts both on a device,
+   but this is the one step a human can perform on the phone that actually holds the family's history.
 8. **Record the result** in the smoke note: that the entry survived a restart, which form was searched and
    found, which form was searched and honestly missed, and that no search term appeared in the log. Never a
    child's name and never a line of what was written.
@@ -891,10 +908,22 @@ not a case the parent can fix and not one this procedure has a command for.
    third field to fill in the same pass** — its DIA-P4R amendment withdraws the diary half of (b) and
    deliberately carries no run number, because the number belongs there only once the run exists
    (`DIA-DL-009`). All three are replaced together. **Done for L2 in DIA-P4-CLOSE, on run 32044006357: all
-   three fields now read Observed, and no `Not yet observed.` field remains anywhere in the file.**
+   three fields now read Observed.** *(That sentence used to end "and no `Not yet observed.` field remains
+   anywhere in the file", which DIA-P5 made false in the same breath as it corrected the invariant those
+   fields belong to — see the paragraph below.)*
+   (DIA-P4-CLOSE's decision-log address is `DIA-DL-010`, which is also the packet below.)
    Replacing them is a
    docs packet with its own report — it is the shape P1, P2 and P3 each used, and it happens **before** the
    PR, so the milestone does not open with the debt it is closing.
+
+   **DIA-P5 RE-OPENS THIS STEP ONCE, and it is worth saying why rather than treating it as a slip.** That
+   packet closed a privacy leak the milestone's own invariant denied, and a claim about what a device writes
+   to its log needs a device to have written it. So `DIA-P5-INV-001` lands carrying **Not yet observed.**,
+   naming a green `android-instrumented` dispatch on this branch as what discharges it — which means steps
+   1 → 3 run a **second** time before the PR. It has been run green on the local emulator (36/36, the whole
+   run's logcat carrying zero occurrences of every needle and 42 `[signal]` lines under tag
+   `TheyGrowSignal`), and that is the edit loop, not the record: **CI mints a fresh emulator and a fresh key
+   per run, on an image nothing has been reinstalled onto.** `DIA-DL-010`.
 4. **Open the milestone PR** (`feat/l2-local-diary` → `main`). The PR event runs `android-instrumented`
    again, plus the PDF/A validation leg, plus `quality` and `parity` — the full gate.
 5. **Merge.** Nothing deploys from a branch; the merge is what makes the next step possible.

@@ -140,6 +140,20 @@ const DECLARED_SKIPS = Object.freeze([
             + ' snippets are read at the call sites that pass them',
     },
     {
+        file: 'DeviceLogTest.java',
+        line: 518,
+        argument: '"window." + slot',
+        reason:
+            "the same shape as DiaryEntryTest's await(): the async slot name is a Java variable,"
+            + ' so the chain has a non-literal operand and no correct reconstruction reaches it',
+    },
+    {
+        file: 'DeviceLogTest.java',
+        line: 526,
+        argument: 'expression',
+        reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
+    },
+    {
         file: 'DiaryEntryTest.java',
         line: 1063,
         argument: '"window." + slot',
