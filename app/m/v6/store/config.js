@@ -111,6 +111,69 @@ export const STORE_CONFIG = Object.freeze({
     // A bound on the RENDER, never on what is stored: nothing truncates a
     // parent's text and no write consults this number.
     diaryListLimit: 200,
+
+    // changed_in: DIA-DL-008 — how many search RESULTS the surface renders.
+    // Declared apart from diaryListLimit rather than sharing it: the two bound
+    // different panes, and one number serving both would move both the day
+    // either is tuned. Same discipline as the list bound — a render limit, not
+    // a limit on what is searched or stored.
+    diarySearchLimit: 200,
+
+    // THE THREE KNOBS BELOW ARE THE WORD-FORM STRATEGY (ADR-046 §2.5), AND
+    // THEY COST NOTHING TO CHANGE. That is the whole reason the strategy is
+    // query-side. The index stores no normalisation decision (PDR-026 §4 rule
+    // 4), the tokenizer is frozen with the schema, and everything below happens
+    // when a parent presses the search control — so moving these values needs
+    // neither a migration NOR a rebuild. Read store/records.js buildDiaryMatch
+    // for the mechanism and DIA-DL-008 for the measurement they came from.
+
+    // changed_in: DIA-DL-008 — how many leading characters of a typed word are
+    // searched, before the prefix operator.
+    //
+    // MEASURED, AND THE MEASUREMENT CHOSE IT. Forty queries a parent might type
+    // against fifteen diary sentences, on the real frozen DDL:
+    //
+    //     3 -> 37/40 found their entry, 4 extra documents across 4 queries
+    //     4 -> 31/40 found their entry, 1 extra document
+    //     5 -> 26/40 found their entry, 1 extra document
+    //
+    // A prefix bridges the END of a word only, so a query LONGER than what was
+    // written cannot reach it: `села` does not find `сел` unless the ceiling
+    // cuts both down to `сел`. Going from 3 to 4 loses nine everyday queries —
+    // `села`, `сели`, `спать`, `спит`, `есть`, `зубы`, `пошёл` … — to remove
+    // ONE extra result.
+    //
+    // So this trades precision for recall on purpose, because the two failures
+    // are not equal: an extra entry is one line a parent skims past in a short
+    // list, and a miss tells them they never wrote something they did write.
+    // The extra it buys is legible rather than mysterious — `сел` also finds
+    // «Сельский дом бабушки». The whole table is in DIA-DL-008 and every row of
+    // it is executed by app/tests/schema/test_diary_search.py.
+    diarySearchStemChars: 3,
+
+    // changed_in: DIA-DL-008 — how many е/ё spellings of one typed word are
+    // searched at once. The index does NOT fold ё to е (measured on the device
+    // engine by StoreEngineTest::russian_tokenization_behaves_as_measured_off_
+    // device), so a query folded either way would miss the other spelling; both
+    // are searched instead. A word with n such letters has 2^n spellings, so
+    // the count is bounded and a word past the bound is searched exactly as the
+    // parent typed it — a miss rather than a slow query.
+    diarySearchVariantCeiling: 8,
+
+    // changed_in: DIA-DL-008 — WHO REPAIRS A DERIVED INDEX, AND WHEN.
+    //
+    // PDR-026 §4 rule 3 says the retrieval index is derived and rebuilt; it does
+    // not say who triggers that, and this is the answer. Not the parent: a
+    // parent cannot tell a stale index from a word-form miss, and a "rebuild the
+    // index" control would ask them to diagnose our internals (ADR-015). Not the
+    // open path either — store/store.js runs PRAGMA integrity_check there and,
+    // because closeStore() is never called, that already happens on effectively
+    // every launch; adding a full re-index to it would be paid at every start.
+    //
+    // So: the app, at the one moment staleness is OBSERVABLE — a search that
+    // found nothing in a diary that has entries — and at most once per app
+    // session. See store/records.js searchRecords.
+    ftsRepairPolicy: 'rebuild-on-empty-result',
 });
 
 // The complete set of plugin methods this app is allowed to call.

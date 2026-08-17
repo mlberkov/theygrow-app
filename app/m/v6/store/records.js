@@ -23,6 +23,12 @@
 // is in the private area by construction. `v_shared_journal` agrees: the set L7
 // may ever ship carries no record text at all.
 //
+// SEARCH LIVES HERE TOO, FROM DIA-P4, and deliberately not in a module of its
+// own: searching records is the record's concern, the scoping predicates are the
+// SAME three the read path uses, and a second module would be a second place for
+// "whose diary is this" to be answered. The strategy behind it — a query-side
+// answer to ADR-046 §2.5 — is documented at the search section below, not here.
+//
 // WHAT IS DELIBERATELY NOT HERE. No delete: erasing a record cascades to the
 // quotes copied out of it and leaves its marks standing with degraded
 // provenance (ADR-015), which is behaviour the schema already implements and
@@ -118,6 +124,54 @@ const RECORDS_SQL =
     + ' WHERE a.owner_participant_id = ? AND ac.child_id = ?'
     + ' AND a.visibility_class = ? AND r.kind = ?'
     + ' ORDER BY r.event_date_local DESC, r.entry_at_utc DESC, r.id DESC LIMIT ?';
+
+// SEARCH (DIA-P4). The same seven columns, the same scoping and the same order
+// as RECORDS_SQL — one list, one shape, whether it is filtered or not — with the
+// derived index joined in front of it.
+//
+// THE JOIN IS ON `rowid`, WHICH IS WHAT `content='record'` MAKES TRUE. The FTS
+// table is an EXTERNAL-CONTENT index (schema/001-core.sql), so its rowid is the
+// record's rowid and nothing else has to be kept in step.
+//
+// THE SCOPING IS NOT DECORATION. `record_fts` indexes EVERY record in the store
+// — every area, every participant, every child. A MATCH alone would return the
+// other parent's private diary. The three scope predicates are what make this a
+// search of the searcher's own entries about the child on screen, and they are
+// the same three RECORDS_SQL uses, so the two panes cannot disagree about whose
+// diary this is (DIA-P4-INV-001).
+const RECORD_SEARCH_SQL =
+    'SELECT r.id AS id, r.body AS body, r.event_date_local AS event_date_local,'
+    + ' r.entry_at_utc AS entry_at_utc, r.entry_utc_offset_min AS entry_utc_offset_min,'
+    + ' r.updated_at_utc AS updated_at_utc, r.sensitivity AS sensitivity'
+    + ' FROM record_fts f JOIN record r ON r.rowid = f.rowid'
+    + ' JOIN area a ON a.id = r.area_id'
+    + ' JOIN area_child ac ON ac.area_id = a.id'
+    + ' WHERE f.record_fts MATCH ?'
+    + ' AND a.owner_participant_id = ? AND ac.child_id = ?'
+    + ' AND a.visibility_class = ? AND r.kind = ?'
+    + ' ORDER BY r.event_date_local DESC, r.entry_at_utc DESC, r.id DESC LIMIT ?';
+
+// Has this parent written anything about this child at all? It separates the two
+// reasons a search comes back empty — nothing written, or nothing matched — and
+// it is the precondition on the index repair below: a diary with no entries has
+// no index to be wrong about.
+const RECORD_COUNT_SQL =
+    'SELECT count(*) AS n FROM record r JOIN area a ON a.id = r.area_id'
+    + ' JOIN area_child ac ON ac.area_id = a.id'
+    + ' WHERE a.owner_participant_id = ? AND ac.child_id = ?'
+    + ' AND a.visibility_class = ? AND r.kind = ?';
+
+// FTS5's own rebuild, issued through the shipped seam like any other write. The
+// COMMAND is a bound value rather than a literal inside the statement, for the
+// reason RECORD_KIND_TEXT is one: the constants in this file are read out of it
+// and executed against the real frozen DDL, and a quoted literal inside a quoted
+// string is a constant the reader cannot see whole.
+//
+// This re-reads `record` and rewrites the index from it. It touches no journal
+// row and no record: the index is DERIVED (PDR-026 §4 rule 3), which is exactly
+// why repairing it is a rebuild and never a migration.
+const FTS_REBUILD_SQL = 'INSERT INTO record_fts (record_fts) VALUES (?)';
+const FTS_REBUILD_COMMAND = 'rebuild';
 
 // Slot 5's text/media flag. A BOUND VALUE rather than a literal inside the SQL:
 // media is not a feature of this product yet, and the statements above are read
@@ -263,4 +317,195 @@ export function loadRecords({
         RECORD_KIND_TEXT,
         limit,
     ]);
+}
+
+// --- search (DIA-P4) -----------------------------------------------------
+//
+// THE WORD-FORM STRATEGY LIVES HERE, IN THE QUERY, AND NOT IN THE INDEX. That is
+// the whole answer to ADR-046 §2.5, and the reason it is cheap rather than
+// momentous:
+//
+//   * The tokenizer is FROZEN with the schema — `unicode61 remove_diacritics 2`,
+//     pinned in schema/001-core.sql. Changing it is a DDL edit.
+//   * FTS5 is compiled WITHOUT ICU (LSC-DL-002, asserted on the device by
+//     StoreEngineTest::the_bundled_engine_compiles_fts5_in), and ICU would not
+//     have helped: it neither folds ё to е nor lemmatises Russian.
+//   * So there is no stemmer to install and no tokenizer to swap. What is left
+//     is what the QUERY asks for — and a query costs nothing to change. Not a
+//     migration, and not even a rebuild.
+//
+// WHAT THE STRATEGY IS, IN ONE SENTENCE: every word the parent typed is searched
+// as a PREFIX, in every е/ё spelling of itself, and all the words must appear.
+//
+// WHAT IT GETS WRONG, SAID OUT LOUD BECAUSE THE PARENT MUST NOT DISCOVER IT
+// ALONE (ADR-015, and see surfaces/diary.js for the sentence they actually read):
+//
+//   1. IT DOES NOT KNOW WORD FORMS, so a word whose STEM changes is out of
+//      reach: `сесть` does not find `сел`, `пойти` does not find `пошла`,
+//      `спит` does not find `спал`. A prefix bridges an ending and nothing
+//      else. Measured, not assumed — three queries in forty, and the table is
+//      in DIA-DL-008.
+//   2. IT OVER-MATCHES, deliberately. `сел` also finds «Сельский дом бабушки».
+//      That is the price of (1) being as small as it is: raising the ceiling to
+//      remove this one extra result costs nine everyday queries — `села`,
+//      `спать`, `есть`, `зубы` — because a prefix cannot reach a written word
+//      SHORTER than the one typed. An extra entry is a line skimmed past; a
+//      miss tells a parent they never wrote what they wrote.
+//   3. IT RANKS NOTHING. Results keep the list's own order — newest first — so
+//      one pane has one order. bm25 was available and was not used.
+//
+// The three knobs behind it are in store/config.js with their provenance.
+
+/**
+ * The words a query contains, as FTS5's own tokenizer would cut them.
+ *
+ * MEASURED AGAINST unicode61 RATHER THAN GUESSED: letters and digits are token
+ * characters and everything else separates, including `_` — `раз_два` indexes as
+ * two tokens, `три4четыре` as one. Splitting the query the same way is what
+ * keeps the terms we ask for and the terms that were indexed the same terms.
+ */
+function tokenise(typed) {
+    if (typeof typed !== 'string') return [];
+    return typed
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((word) => word.length > 0);
+}
+
+/**
+ * Every е/ё spelling of one word, or the word alone when there are too many.
+ *
+ * THE INDEX DOES NOT FOLD ё TO е. That is measured on the real engine
+ * (StoreEngineTest::russian_tokenization_behaves_as_measured_off_device asserts
+ * `ЁЛКА` is NOT found by `елка`), so folding the query in either direction would
+ * simply move the miss to the other spelling. Both are asked for instead.
+ *
+ * The count doubles per such letter, so it is bounded. Past the bound the word is
+ * searched exactly as it was typed — a miss the parent can act on, rather than a
+ * query that grows on its own.
+ */
+function spellings(word, ceiling) {
+    const positions = [];
+    for (let i = 0; i < word.length; i += 1) {
+        if (word[i] === 'е' || word[i] === 'ё') positions.push(i);
+    }
+    if (positions.length === 0 || 2 ** positions.length > ceiling) return [word];
+
+    let forms = [word];
+    for (const at of positions) {
+        const next = [];
+        for (const form of forms) {
+            const chars = Array.from(form);
+            chars[at] = 'е';
+            next.push(chars.join(''));
+            chars[at] = 'ё';
+            next.push(chars.join(''));
+        }
+        forms = next;
+    }
+    return Array.from(new Set(forms));
+}
+
+/**
+ * The FTS5 MATCH expression for what a parent typed. PURE — no store, no clock.
+ *
+ * EVERY TERM IS QUOTED, AND THAT IS A SAFETY PROPERTY RATHER THAN A STYLE. A
+ * parent writing about their child types apostrophes, dashes, quotation marks and
+ * the occasional `*`, and every one of those is an OPERATOR in FTS5's query
+ * grammar. Unquoted, `сел "OR` is a syntax error and the search dies in front of
+ * someone who did nothing wrong. Quoted, it is two ordinary words. Nothing has to
+ * be escaped inside the quotes either: tokenise() has already dropped everything
+ * that is not a letter or a digit, so a `"` cannot survive to reach one.
+ *
+ * The prefix operator sits OUTSIDE the quotes — `"сел"*` — which is where FTS5's
+ * grammar puts it.
+ *
+ * Returns '' when the query holds no words at all. The caller does not search on
+ * that: an empty MATCH is a syntax error, and there is nothing to look for.
+ */
+export function buildDiaryMatch(
+    typed,
+    {
+        stemChars = STORE_CONFIG.diarySearchStemChars,
+        variantCeiling = STORE_CONFIG.diarySearchVariantCeiling,
+    } = {}
+) {
+    const groups = [];
+    for (const word of tokenise(typed)) {
+        const terms = Array.from(
+            new Set(
+                spellings(word, variantCeiling).map((form) => `"${form.slice(0, stemChars)}"*`)
+            )
+        ).sort();
+        // OR within a word (its spellings), AND across words: two words typed
+        // mean both are wanted, which is what a person expects of a search box.
+        groups.push(`(${terms.join(' OR ')})`);
+    }
+    return groups.join(' AND ');
+}
+
+// THE INDEX REPAIR HAPPENS AT MOST ONCE PER APP SESSION, and the flag is set
+// BEFORE the rebuild runs rather than after it. A rebuild that fails will fail
+// again, and retrying it on every empty result would make every ordinary
+// word-form miss slow for the rest of the session.
+let indexRepaired = false;
+
+/**
+ * One child's diary, filtered to what the parent typed.
+ *
+ * Returns `{ rows, tokens, rebuilt, searched }` rather than bare rows: the
+ * surface needs to tell "nothing matched" from "nothing was asked", and the
+ * signal needs counts. `tokens` is a COUNT of words, never the words.
+ *
+ * WHY THE REPAIR IS HERE AND NOT ANYWHERE ELSE. The index is derived and
+ * rebuildable (PDR-026 §4 rule 3), which says it CAN be repaired and not who
+ * asks. A parent cannot tell a stale index from a word-form miss, so a
+ * "rebuild the index" control would hand them our internals to diagnose
+ * (ADR-015); and the store's open path already runs PRAGMA integrity_check on
+ * effectively every launch, so a re-index bolted there would be paid at every
+ * start. An empty result over a diary that HAS entries is the one moment
+ * staleness is observable at all — so that is where the repair is, once, and
+ * the parent is told nothing about it because nothing was asked of them.
+ */
+export async function searchRecords({
+    authorParticipantId,
+    subjectChildId,
+    typed,
+    limit = STORE_CONFIG.diarySearchLimit,
+}) {
+    if (!authorParticipantId || !subjectChildId) {
+        throw new StoreError('a search needs both a searcher and a subject (LSC-P2-INV-005)');
+    }
+
+    const words = tokenise(typed);
+    if (words.length === 0) {
+        return { rows: [], tokens: 0, rebuilt: false, searched: false };
+    }
+
+    const expression = buildDiaryMatch(typed);
+    const scope = [
+        authorParticipantId,
+        subjectChildId,
+        STORE_CONFIG.diaryAreaVisibility,
+        RECORD_KIND_TEXT,
+    ];
+
+    let rows = await query(RECORD_SEARCH_SQL, [expression, ...scope, limit]);
+    let rebuilt = false;
+
+    if (rows.length === 0 && !indexRepaired) {
+        const counted = await query(RECORD_COUNT_SQL, scope);
+        if (Number(counted[0]?.n ?? 0) > 0) {
+            indexRepaired = true;
+            // { transaction: false } for the reason overwriteRecord passes it
+            // (DIA-DL-007): one statement is already atomic, and asking the
+            // wrapper for a transaction re-opens the window where its own
+            // rollback failure speaks for the write.
+            await run(FTS_REBUILD_SQL, [FTS_REBUILD_COMMAND], { transaction: false });
+            rebuilt = true;
+            rows = await query(RECORD_SEARCH_SQL, [expression, ...scope, limit]);
+        }
+    }
+
+    return { rows, tokens: words.length, rebuilt, searched: true };
 }
