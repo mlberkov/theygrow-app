@@ -79,7 +79,11 @@ const DECLARED_SHELL_ACCESSES = [
 const KEYED_ACCESS =
   /\b(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem)\s*\(\s*'([^']+)'/g;
 
-const SHIPPED_HTML = ['index.html', 'offline.html'];
+// DIA-P1 adds transfer.html. It is the shell with the most at stake for this
+// invariant: it runs on the production origin, where localStorage holds the only
+// copy of the family's history, so its whole module graph belongs inside the
+// scanned surface rather than beside it.
+const SHIPPED_HTML = ['index.html', 'offline.html', 'transfer.html'];
 
 const HTML_SOURCES = SHIPPED_HTML.map((file) => ({
   where: file,

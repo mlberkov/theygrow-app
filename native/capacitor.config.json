@@ -3,7 +3,8 @@
   "appName": "TheyGrow",
   "webDir": "www",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": false,
+    "loggingBehavior": "none"
   },
   "server": {
     "androidScheme": "https",

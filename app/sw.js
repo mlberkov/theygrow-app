@@ -19,7 +19,29 @@
 // channel, where the mount is read out of the APK rather than fetched over
 // HTTP; the bump is here because bytes at a published mount URL are never
 // rewritten, whichever channel happens to execute them.
-const CACHE_VERSION = 'v13';
+//
+// changed_in: DIA-DL-001 — v13 -> v14 with the /m/v4/ mount bump, which carries
+// the browser-to-native history transfer. Two of the new generation's files
+// differ from the frozen one in bytes the web channel DOES execute — the mount
+// now derives its own asset URLs instead of carrying them as literals — so
+// unlike the previous bump this one is functional on both channels, not only
+// on the one the rule protects.
+//
+// changed_in: DIA-DL-004 — v14 -> v15 with the /m/v5/ mount bump, which carries
+// the web channel composition and the export confirmation. Both are bytes the
+// WEB channel executes — the stylesheet, the export surface and two new modules
+// — so this bump is the delivery mechanism rather than a formality: the archive
+// control stops being offered where no archive can be produced, and the parent
+// who is already on a previous generation gets that through the network-first
+// shell plus a mount URL their immutable window cannot answer with a stale copy.
+//
+// changed_in: DIA-DL-005 — v15 -> v16 with the /m/v6/ mount bump, which carries
+// the diary write path. FORCED, not chosen: this packet changes app.js, app.css,
+// three surfaces and four store modules, and bytes at a published mount URL are
+// never rewritten. The cost is a SIXTH generation shipped and served immutable,
+// stated here rather than absorbed — see DIA-DL-005 for what retiring the early
+// generations would take, which is still deferred.
+const CACHE_VERSION = 'v16';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -27,12 +49,25 @@ const OFFLINE_URLS = [
   '/offline.html',
   '/manifest.json',
   '/kb-v1.json',
+  // DIA-P1 — the browser-to-native handoff page and its module graph. It is
+  // precached because the handoff needs no network at all: it reads the
+  // localStorage of this same origin and hands the result to the app on the
+  // same device, so a parent on a bad connection can still move their history.
+  // Its entry is named here because the shell references it; the three modules
+  // it imports are named for the same reason index.html names its graph.
+  //
+  // (No apostrophe in this block, deliberately — see the trap named below.)
+  '/transfer.html',
+  '/m/v6/transfer/handoff-page.js',
+  '/m/v6/transfer/config.js',
+  '/m/v6/transfer/errors.js',
+  '/m/v6/transfer/format.js',
   // Versioned module mount (A1-DL-004): the shell references these by URL, so
   // they are precached by name. Content changes ship as a NEW mount version
-  // (/m/v3/...), never as new bytes at these URLs — inside the 30-day immutable
+  // (/m/v6/...), never as new bytes at these URLs — inside the 30-day immutable
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
-  '/m/v3/app.css',
-  '/m/v3/sw-register.js',
+  '/m/v6/app.css',
+  '/m/v6/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
   // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
@@ -42,50 +77,62 @@ const OFFLINE_URLS = [
   // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
   // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
-  '/m/v3/app.js',
-  '/m/v3/core/kb-boot.js',
-  '/m/v3/core/state.js',
-  '/m/v3/core/storage.js',
-  '/m/v3/core/repo-local.js',
-  '/m/v3/core/signals.js',
-  '/m/v3/core/dom-utils.js',
-  '/m/v3/core/format.js',
-  '/m/v3/core/zpd.js',
-  '/m/v3/core/urgency.js',
-  '/m/v3/surfaces/table.js',
-  '/m/v3/surfaces/skill-completion.js',
-  '/m/v3/surfaces/zpd-filter.js',
-  '/m/v3/surfaces/skill-modal.js',
-  '/m/v3/surfaces/profile.js',
-  '/m/v3/surfaces/activities.js',
-  '/m/v3/surfaces/onboarding.js',
-  '/m/v3/surfaces/accordion.js',
+  '/m/v6/app.js',
+  '/m/v6/core/kb-boot.js',
+  '/m/v6/core/state.js',
+  '/m/v6/core/storage.js',
+  '/m/v6/core/repo-local.js',
+  '/m/v6/core/signals.js',
+  '/m/v6/core/dom-utils.js',
+  '/m/v6/core/format.js',
+  '/m/v6/core/zpd.js',
+  '/m/v6/core/urgency.js',
+  '/m/v6/surfaces/table.js',
+  '/m/v6/surfaces/skill-completion.js',
+  '/m/v6/surfaces/zpd-filter.js',
+  '/m/v6/surfaces/skill-modal.js',
+  '/m/v6/surfaces/profile.js',
+  '/m/v6/surfaces/activities.js',
+  '/m/v6/surfaces/onboarding.js',
+  '/m/v6/surfaces/accordion.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the
   // import graph reaches them, and an installed client must not boot offline
   // with a broken graph. The DDL artifact they read
-  // (/m/v3/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // (/m/v6/store/schema/001-core.sql) is deliberately NOT here: only the native
   // channel ever fetches it, and that channel does not use this worker.
   //
   // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
   // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
   // quotes — an apostrophe swallows every entry after it and the guard then
   // reports the icons as unprecached.
-  '/m/v3/store/boot.js',
-  '/m/v3/store/store.js',
-  '/m/v3/store/journal.js',
-  '/m/v3/store/repo-journal.js',
-  '/m/v3/store/import-legacy.js',
-  '/m/v3/store/bridge.js',
-  '/m/v3/store/config.js',
-  '/m/v3/store/errors.js',
+  '/m/v6/store/boot.js',
+  '/m/v6/store/store.js',
+  '/m/v6/store/journal.js',
+  '/m/v6/store/repo-journal.js',
+  '/m/v6/store/import-legacy.js',
+  // DIA-P3 — the diary record path. Precached with the rest of the store
+  // because the diary is the app shell now, not an extra: a parent who opens
+  // the app offline must still be able to write down what happened today.
+  '/m/v6/store/records.js',
+  '/m/v6/store/bridge.js',
+  // DIA-P1 — the transfer seam. The three transfer/ modules it imports are
+  // already precached above, for the handoff page; this is the app-side door
+  // to them, and it is inert on the web exactly as store/bridge.js is.
+  '/m/v6/store/transfer.js',
+  '/m/v6/store/config.js',
+  '/m/v6/store/errors.js',
+  // DIA-P2 — the channel composition: which of the two header actions this
+  // channel offers, and the knobs that decide it.
+  '/m/v6/surfaces/channel.js',
+  '/m/v6/channel/config.js',
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
   // FETCH at runtime are deliberately NOT here: the declaration
-  // (/m/v3/export/declaration.json) plus the two print-layer binaries, the
-  // embedded font and the ICC profile under /m/v3/export/assets/. Only the
+  // (/m/v6/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v6/export/assets/. Only the
   // native channel ever reads them, that channel does not use this worker, and
   // the web channel cannot export at all — so precaching them would spend
   // roughly 443 KB of an installed web client cache budget on bytes it can
@@ -93,19 +140,20 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
-  '/m/v3/surfaces/export.js',
-  '/m/v3/surfaces/import.js',
-  '/m/v3/export/run.js',
-  '/m/v3/export/build.js',
-  '/m/v3/export/readout.js',
-  '/m/v3/export/sink.js',
-  '/m/v3/export/text.js',
-  '/m/v3/export/readme.js',
-  '/m/v3/export/zip.js',
-  '/m/v3/export/pdf.js',
-  '/m/v3/export/ttf.js',
-  '/m/v3/export/config.js',
-  '/m/v3/export/errors.js',
+  '/m/v6/surfaces/diary.js',
+  '/m/v6/surfaces/export.js',
+  '/m/v6/surfaces/import.js',
+  '/m/v6/export/run.js',
+  '/m/v6/export/build.js',
+  '/m/v6/export/readout.js',
+  '/m/v6/export/sink.js',
+  '/m/v6/export/text.js',
+  '/m/v6/export/readme.js',
+  '/m/v6/export/zip.js',
+  '/m/v6/export/pdf.js',
+  '/m/v6/export/ttf.js',
+  '/m/v6/export/config.js',
+  '/m/v6/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',
@@ -114,6 +162,16 @@ const OFFLINE_URLS = [
   '/icons/favicon-16.png',
   '/icons/favicon-32.png'
 ];
+
+// Navigable pages this image ships that are NOT the app shell (DIA-P1).
+//
+// A navigation to one of these must not be mirrored into the cache entry keyed
+// '/', which is the app shell's offline copy — see the fetch handler for what
+// that costs. Kept as an explicit list rather than a pattern because the set is
+// closed and small: it is exactly the HTML files in app/Dockerfile's COPY list
+// other than index.html, and app/tests/delivery-contract.spec.js asserts that
+// correspondence rather than leaving the two to drift.
+const NON_SHELL_PAGES = ['/offline.html', '/transfer.html'];
 
 // Install: precache offline essentials.
 // NOTE: no skipWaiting() here — the new worker parks in `waiting` until driven
@@ -170,12 +228,28 @@ self.addEventListener('fetch', (event) => {
   // freshly deployed index.html on the next navigation, no hard-refresh needed.
   // The successful response is mirrored into the cache keyed to '/' so the
   // offline fallback copy stays current.
+  //
+  // DIA-P1 — THE MIRROR IS NOW CONDITIONAL, AND THE CONDITION IS LOAD-BEARING.
+  // Until this packet every navigation was mirrored to '/', on the premise that
+  // every navigable path IS the app shell: nginx's `try_files $uri $uri/
+  // /index.html` makes any unknown path serve index.html, and /offline.html was
+  // reached from the cache rather than navigated to. /transfer.html breaks that
+  // premise — it is a real, separately-shipped page a parent navigates to on
+  // purpose — and mirroring it would overwrite the app shell's offline copy
+  // with the handoff page. The next offline boot of '/' would then show the
+  // handoff page instead of the app, permanently, for every client that had
+  // ever opened the transfer link. Named rather than pattern-matched: the set of
+  // HTML pages this image ships is small, closed, and asserted against
+  // app/Dockerfile's COPY list by app/tests/delivery-contract.spec.js.
   if (request.mode === 'navigate') {
+    const mirrorsTheShell = !NON_SHELL_PAGES.includes(url.pathname);
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          if (mirrorsTheShell) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          }
           return response;
         })
         .catch(() =>

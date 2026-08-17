@@ -134,6 +134,42 @@ test.describe('the wrapper stays replaceable', () => {
         }
     });
 
+    test('the allowlist is an exact set, so it cannot grow quietly', () => {
+        // The leg above is one-directional: it stops a CALL SITE reaching past
+        // the list, and says nothing about the list itself growing. DIA-DL-007
+        // added three methods to it on a bounded-capability argument — none of
+        // beginTransaction / commitTransaction / rollbackTransaction can address
+        // a path, enumerate anything or delete anything; they control a
+        // transaction on a database the app has already opened. That argument
+        // was made once, in front of the owner. This leg is what stops it
+        // becoming a standing precedent for adding a fourth without one: the set
+        // is pinned here, and widening it means editing this list on purpose.
+        const config = fs.readFileSync(path.join(STORE_DIR, 'config.js'), 'utf8');
+        const block = /ALLOWED_PLUGIN_METHODS = Object\.freeze\(\[([\s\S]*?)\]\)/.exec(config);
+        expect(block, 'config.js declares no ALLOWED_PLUGIN_METHODS').not.toBeNull();
+        const allowed = Array.from(block[1].matchAll(/'([^']+)'/g)).map((m) => m[1]);
+
+        expect(allowed.slice().sort()).toEqual(
+            [
+                'beginTransaction',
+                'close',
+                'closeConnection',
+                'commitTransaction',
+                'createConnection',
+                'echo',
+                'execute',
+                'executeSet',
+                'isSecretStored',
+                'open',
+                'query',
+                'rollbackTransaction',
+                'run',
+                'setEncryptionSecret',
+            ].sort()
+        );
+        expect(new Set(allowed).size, 'the allowlist names a method twice').toBe(allowed.length);
+    });
+
     test('no call site reaches the plugin machinery this app must not depend on', () => {
         // Its JSON import/export is not our export contour (P3); its upgrade
         // versioning is not our migration ledger (slot 14); its sync tables

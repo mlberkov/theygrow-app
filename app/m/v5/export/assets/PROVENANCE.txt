@@ -1,0 +1,52 @@
+Vendored binary assets for the export print layer (L1-P3, LSC-DL-003).
+
+Both files are pinned by SHA-256 in app/tests/export-contour.spec.js. A changed
+byte reds that gate; these are the only binaries this app ships that are not
+icons, and they end up inside every artifact a family exports, so they are
+treated as a supply-chain surface rather than as content.
+
+WHY THEY EXIST AT ALL. PDF/A requires every font used to be EMBEDDED, and there
+is no Cyrillic font among the PDF base-14. So any PDF this product emits — /A
+conformant or not — has to carry a font with it. The ICC profile is required by
+PDF/A-2b's OutputIntent, which is what makes the file's colour reproducible
+without reference to the device that wrote it.
+
+
+PTSans-Regular.ttf
+    sha256  9cc831490532009bae2b3ce0d39c62adfc889060beb421593bfd9d2396d0f10a
+    bytes   442960
+    source  https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/PT_Sans-Web-Regular.ttf
+    fetched 2026-08-12
+    licence SIL Open Font License 1.1 — see PTSans-OFL.txt beside this file.
+            Copyright (c) 2010 ParaType Ltd, with Reserved Font Names
+            "PT Sans" and "ParaType". Embedding in a document is an explicitly
+            permitted use; redistribution of the font file requires the licence
+            to travel with it, which is why PTSans-OFL.txt is committed here and
+            shipped alongside.
+    why     Designed for Cyrillic, which is the family's language. Vendored
+            UNMODIFIED: the upstream bytes are what the hash pins, so provenance
+            is checkable against the source rather than against a local edit.
+            It is larger than this packet estimated when planning (~443 KB
+            against an assumed ~120 KB) because the upstream web build carries
+            `kern` (144 KB) and `hdmx` (34 KB) tables the PDF writer never uses.
+            Stripping them would save roughly 200 KB but would mean the shipped
+            file is no longer the file the hash can be checked against upstream,
+            and a hand-rolled table-directory rewrite is a new class of defect
+            for a saving that costs the web channel nothing (see the precache
+            note in app/sw.js).
+
+sRGB-v2-micro.icc
+    sha256  0a8a33aea66a6f154a5642ebe168ef287e73265d9f7b51c42a45e6eedbacda7a
+    bytes   456
+    source  https://raw.githubusercontent.com/saucecontrol/Compact-ICC-Profiles
+            /master/profiles/sRGB-v2-micro.icc
+    fetched 2026-08-12
+    licence CC0-1.0 (public domain dedication), declared by the repository.
+    what    ICC v2.1, device class 'mntr', colour space RGB, PCS XYZ, nine tags
+            (desc cprt wtpt rXYZ gXYZ bXYZ rTRC gTRC bTRC) — a complete
+            matrix/TRC sRGB profile in 456 bytes. Verified by reading the header
+            and tag table directly, not assumed from the filename.
+    why     PDF/A-2b needs an OutputIntent with an embedded destination profile.
+            A full sRGB profile is ~3-15 KB; this one is functionally equivalent
+            for a text document and two orders of magnitude smaller, and it goes
+            into every exported artifact, so its size is paid per export.

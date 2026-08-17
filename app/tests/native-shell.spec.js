@@ -3,9 +3,11 @@
 // LSC-P1-INV-002 — the native channel ships the web channel's bytes unchanged,
 // and exports nothing off the device (L1-P1).
 //
-// THREE CLAIMS, ONE FILE. The first two are the two halves of "the Android
+// FOUR CLAIMS, ONE FILE. The first two are the two halves of "the Android
 // shell is a shell"; the third (EMV-P5-INV-001) is what keeps the native side
-// pointed at the generation the shell actually runs:
+// pointed at the generation the shell actually runs; the fourth (DIA-P5-INV-001)
+// pins the knob that stops the framework beneath the shell writing the family's
+// data to the device log:
 //
 //  (a) BYTE-IDENTITY. The APK's web root is assembled by
 //      native/tools/stage-webdir.js from app/Dockerfile's COPY list — the same
@@ -26,6 +28,14 @@
 //      quietly reaches bytes nobody runs. See the describe block for what that
 //      cost, and AGENTS.md §11 for why a source scan is the right instrument
 //      for it and carries no runtime claim.
+//
+//  (d) NO PLUGIN-ARGUMENT TRACE. Capacitor logs every plugin call's whole
+//      argument object to logcat whenever the build is debuggable, which is the
+//      build the owner installs. Every family value this app holds crosses that
+//      bridge as a bound parameter, so the knob that switches it off is pinned
+//      here for the same reason (b) is — one JSON key, in a file a toolchain
+//      upgrade or a careless `cap sync` could quietly reshape. The device half
+//      of the claim is DeviceLogTest, on the emulator; this half is static.
 //
 // This spec reads native/www/ AS IT STANDS and deliberately does NOT stage it
 // first: staging inside the test would wipe a hand-added file moments before
@@ -184,6 +194,33 @@ test.describe('native shell — family data does not leave the device (LSC-P1-IN
         expect(source, `${file} does not exclude domain="${domain}"`).toContain(`domain="${domain}"`);
       }
     }
+  });
+
+  test('the bridge does not trace plugin arguments to the device log (DIA-P5-INV-001)', () => {
+    // Capacitor's default is `debug`, which resolves to "log whenever the build
+    // is debuggable" — and the debug build is the one docs/RUNBOOK.md tells the
+    // owner to install on the phone that holds the family's real history. Under
+    // it, Bridge.callPluginMethod writes every plugin call's whole argument
+    // object to logcat: measured on android-instrumented run 32044006357, 707
+    // such lines, carrying the expression built from what the parent typed into
+    // the search box on 5 of 5 searches, and the store's SQLCipher passphrase in
+    // cleartext. A second emitter beside it — the injected JavaScript echoing
+    // every plugin RESULT to the console — brought that run's totals to the
+    // child's name on 31 lines and a diary body on 13.
+    //
+    // This is a STATIC check of a knob, and it carries no runtime claim (§11).
+    // What it defends is the gap between dispatches: android-instrumented is
+    // pull_request + workflow_dispatch only, so DIA-P5-INV-001's device leg can
+    // be many commits behind a regression, and this key is the regression's
+    // whole surface. The generated copy under native/android/.../assets/ is
+    // gitignored and rewritten by `cap sync` from THIS file, so this is the one
+    // place the value is owned.
+    const config = JSON.parse(fs.readFileSync(path.join(NATIVE_ROOT, 'capacitor.config.json'), 'utf8'));
+    expect(
+      config.android && config.android.loggingBehavior,
+      'native/capacitor.config.json must set android.loggingBehavior to "none" — Capacitor\'s'
+        + ' default traces every plugin call\'s arguments to logcat in any debuggable build'
+    ).toBe('none');
   });
 });
 

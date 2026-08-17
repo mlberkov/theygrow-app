@@ -16,8 +16,15 @@
                      приложения» и вдобавок мертвый предмет для артефакта, весь
                      смысл которого — читаться через двадцать лет.
                      На десктопе иконка + подпись, на мобильном только иконка;
-                     aria-label и title дословно повторяют видимую подпись. -->
-                <button type="button" class="header-action" id="exportBtn" title="Сохранить архив" aria-label="Сохранить архив">
+                     aria-label и title дословно повторяют видимую подпись.
+
+                     DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
+                     канале (m/v6/surfaces/channel.js). В браузере архив не
+                     собирается вообще — веб-ветки в export/sink.js нет и не было
+                     (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
+                     происходит. Разметка одна на оба канала: это ветка времени
+                     выполнения, а не вторая сборка (LSC-P1-INV-002). -->
+                <button type="button" class="header-action" id="exportBtn" hidden="" title="Сохранить архив" aria-label="Сохранить архив">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <path d="M12 3v11">
 </path>
@@ -28,17 +35,57 @@
                     </svg>
                     <span class="header-action-label">Сохранить архив</span>
                 </button>
-                <!-- Чат сообщества. Иконка — обычный бумажный самолётик, общее
-                     соглашение «отправить/сообщение». Это НЕ фирменный знак
-                     Telegram: их логотип — их товарный знак, и мы его не
-                     воспроизводим. -->
-                <a href="https://t.me/+c-5y_69kmu8wNDky" target="_blank" rel="noopener noreferrer" class="telegram-button" title="Чат сообщества" aria-label="Чат сообщества" onclick="trackEvent('telegram_click')">
-                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                        <path d="M21 3L3 10.5l7 2.5 2.5 7L21 3z">
+                <!-- Дневник (DIA-P3). Иконка — раскрытая тетрадь с пером:
+                     «записать своими словами», в отличие от галочки в таблице,
+                     которая утверждает про ребёнка. Это разные объекты: отметка
+                     — приписанное утверждение и живёт в неизменяемом журнале,
+                     запись дневника — собственный текст родителя и правится
+                     перезаписью (PDR-026 §4, правило 1).
+
+                     Приходит СКРЫТОЙ и раскрывается только на нативном канале
+                     (m/v6/surfaces/channel.js): дневник пишется в устройственное
+                     хранилище, а в браузере его нет вообще — store/bridge.js там
+                     инертен по построению (LSC-P1-INV-001). Предлагать действие,
+                     которого на этом канале не происходит, — ровно тот дефект,
+                     который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
+
+                     Ни GA4-события, ни onclick здесь нет (решение владельца
+                     2026-08-16, гейт D). -->
+                <button type="button" class="header-action" id="diaryBtn" hidden="" title="Дневник" aria-label="Дневник">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z">
 </path>
-                        <path d="M10 13l11-10">
+                        <path d="M20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z">
+</path>
+                        <path d="M16 3l2 2-4 4h-2V7z">
 </path>
                     </svg>
+                    <span class="header-action-label">Дневник</span>
+                </button>
+                <!-- Приложение для Android (DIA-P2, ADR-047). Единственный канал
+                     распространения — прямой APK со страницы релизов, не
+                     магазин. Иконка — телефон со стрелкой внутрь: «положить
+                     файл на устройство», в отличие от стрелки архива, которая
+                     означает «достать файл наружу».
+
+                     Приходит СКРЫТОЙ и раскрывается только в браузере И только
+                     когда <meta name="theygrow-apk-release"> объявляет, что
+                     релиз опубликован. href проставляется из объявленного
+                     CHANNEL_CONFIG.apkReleaseUrl, а не из разметки: адрес
+                     продукта объявлен в одном месте.
+
+                     Здесь НЕТ onclick и никакой телеметрии — ни события GA4, ни
+                     сигнала (решение владельца 2026-08-16, гейт D). -->
+                <a class="header-action" id="apkBtn" hidden="" target="_blank" rel="noopener noreferrer" title="Скачать APK" aria-label="Скачать APK" href="https://github.com/mlberkov/theygrow-app/releases/latest">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <rect x="6" y="2" width="12" height="20" rx="2">
+</rect>
+                        <path d="M12 7v7">
+</path>
+                        <path d="M9 11l3 3 3-3">
+</path>
+                    </svg>
+                    <span class="header-action-label">Скачать APK</span>
                 </a>
             </div>
         </div>

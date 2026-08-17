@@ -160,8 +160,19 @@ async function installPreviousGeneration(page, context, baseURL) {
     });
     // The defect, executed rather than described: the handler runs to
     // completion and the parent sees nothing.
-    await page.locator('#exportBtn').click();
-    await expect(page.locator('#exportModal')).toHaveCSS('display', 'none');
+    //
+    // WITNESS REPOINTED AT DIA-P2. This used to press #exportBtn. That control
+    // is offered on the native channel only now, and the staged shell is the
+    // CURRENT markup with its mount rewritten, so on this web page it is not
+    // revealed and could not be pressed. #profileButton is the same defect
+    // class through a different door — a surface the app opens by adding a
+    // class the stylesheet has to resolve (.profile-dropdown.show) — it is a
+    // control this channel offers, and it sits in the HEADER, which matters:
+    // the footer controls are covered by the update banner in leg 2, and a
+    // click the banner intercepts would fail for a reason that has nothing to
+    // do with what this spec is about.
+    await page.locator('#profileButton').click();
+    await expect(page.locator('#profileDropdown')).toHaveCSS('display', 'none');
   } else {
     test.info().annotations.push({
       type: 'staged generation',
@@ -222,12 +233,17 @@ test.describe('an installed client on the previous generation reaches the curren
 
     // And the surface the fix was for is visible to a person pressing the
     // control — the computed style, after a click, on the upgraded client.
-    await expect(page.locator('#exportModal')).toBeHidden();
-    await page.locator('#exportBtn').click();
-    await expect(page.locator('#exportModal')).toBeVisible();
-    await expect(page.locator('#exportModal')).toHaveCSS('display', 'block');
-    await page.locator('#exportModalClose').click();
-    await expect(page.locator('#exportModal')).toHaveCSS('display', 'none');
+    // The control is #profileButton since DIA-P2 (see the note in
+    // installPreviousGeneration): the archive control is native-only now, and
+    // this page is the web channel. The claim is unchanged in kind — a class
+    // the handler adds must resolve to a displayed box in the stylesheet the
+    // upgraded client is evaluating.
+    await expect(page.locator('#profileDropdown')).toBeHidden();
+    await page.locator('#profileButton').click();
+    await expect(page.locator('#profileDropdown')).toBeVisible();
+    await expect(page.locator('#profileDropdown')).toHaveCSS('display', 'block');
+    await page.locator('#profileButton').click();
+    await expect(page.locator('#profileDropdown')).toHaveCSS('display', 'none');
 
     // No request under the previous mount decided any of that. The mount bump is
     // what makes this true: the new stylesheet lives at a URL the client has no
@@ -270,7 +286,7 @@ test.describe('an installed client on the previous generation reaches the curren
 
     // THE MEASURED OUTCOME (EMV-DL-003 (e)). The document evaluates the CURRENT
     // mount's stylesheet even though the client never accepted the update, and
-    // the export modal is visible on click. The mechanism, and the reason this
+    // the profile dropdown is visible on click. The mechanism, and the reason this
     // is a property of the arrangement rather than a coincidence: the worker
     // serves navigations network-first, so the fresh shell arrives on the next
     // open; that shell names /m/v{N+1}/app.css, which is not in the old cache
@@ -282,10 +298,10 @@ test.describe('an installed client on the previous generation reaches the curren
     expect(sheets.some((href) => href.includes(`${STAGED.currentMount.prefix}app.css`))).toBe(true);
     expect(sheets.some((href) => href.includes(STAGED.mount.prefix))).toBe(false);
 
-    await expect(page.locator('#exportModal')).toBeHidden();
-    await page.locator('#exportBtn').click();
-    await expect(page.locator('#exportModal')).toBeVisible();
-    await expect(page.locator('#exportModal')).toHaveCSS('display', 'block');
+    await expect(page.locator('#profileDropdown')).toBeHidden();
+    await page.locator('#profileButton').click();
+    await expect(page.locator('#profileDropdown')).toBeVisible();
+    await expect(page.locator('#profileDropdown')).toHaveCSS('display', 'block');
 
     expect(
       requested.filter((pathname) => pathname.startsWith(STAGED.mount.prefix)),

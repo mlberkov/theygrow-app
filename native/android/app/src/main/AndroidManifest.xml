@@ -46,6 +46,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+                DIA-P1 / ADR-048 §4 — the browser-to-native history handoff.
+
+                CUSTOM SCHEME, NOT https App Links, AND THAT IS THE DECISION
+                RATHER THAN A SHORTCUT. App Links verify against a release
+                signing certificate published at the origin; the Release
+                workflow has never run (ADR-047), and the family's history
+                exists now. A custom scheme works on the debug signature the
+                device is holding today. App Links are an allowed later
+                addition, not a precondition, and adding one later does not
+                invalidate this filter.
+
+                android:autoVerify is deliberately ABSENT: it is meaningful
+                only for http/https and would claim a verification that
+                nothing performs.
+
+                WHAT KEEPS THE FAMILY HISTORY FROM REACHING ANOTHER APP. Not
+                this filter — any app may declare the same scheme. The handoff
+                page addresses the link with `package=app.theygrow` in an
+                intent:// URI, so Chrome resolves it to this package or to
+                nothing, with no disambiguation dialog to mis-tap. See
+                TRANSFER_CONFIG.linkPackage in the mount.
+
+                No new permission: ACTION_VIEW is delivered, not requested.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="theygrow" android:host="transfer" />
+            </intent-filter>
+
         </activity>
 
         <provider

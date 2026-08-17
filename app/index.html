@@ -9,6 +9,29 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-v2.png">
 
+    <!-- ОПУБЛИКОВАН ЛИ РЕЛИЗ APK (DIA-P2, changed_in: DIA-DL-004).
+         Одно значение, и оно меняется рукой владельца: `none` — релиза нет,
+         `published` — релиз опубликован и на странице релизов лежат APK и его
+         .sha256. Любое другое содержимое, как и отсутствие этого тега, значит
+         «нет»: кнопка загрузки не показывается, и посетитель не получает ни
+         404, ни пустой страницы под видом загрузки.
+
+         ПОЧЕМУ ЗДЕСЬ, А НЕ В МОДУЛЕ. Модули лежат под /m/v{N}/ и отдаются
+         `immutable, max-age=2592000`: байты по опубликованному адресу не
+         переписываются (A1-DL-004), поэтому флаг там стоил бы новой генерации
+         маунта, бампа CACHE_VERSION и промоушена — за один булев, при пяти уже
+         опубликованных генерациях. Шелл отдаётся `max-age=3600,
+         must-revalidate` и network-first воркером, так что здесь та же правка
+         стоит деплоя и доезжает до установленных клиентов на следующем
+         открытии. Словарь (имя тега и единственное «да»-значение) и адрес
+         остались объявленными в m/v{N}/channel/config.js.
+
+         ПОРЯДОК ДЛЯ ВЛАДЕЛЬЦА: сначала опубликовать релиз, потом переключить
+         это значение. Обратный порядок — это и есть мёртвое обещание, которое
+         этот тег существует, чтобы не допустить. См. docs/RUNBOOK.md, раздел
+         "Release build + APK distribution". -->
+    <meta name="theygrow-apk-release" content="none">
+
     <!-- Google tag (gtag.js) -->
     <script>
       // L1-P4: THE NATIVE CHANNEL CARRIES NO ANALYTICS. Owner decision, taken
@@ -83,17 +106,27 @@
     </script>
 
     <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v3/app.css">
+    <link rel="stylesheet" href="/m/v6/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v3/ graph — fifteen at A1-P6, twenty-one since L1-P2 added the native
-         store. Without these the browser discovers them only after
-         app.js parses, and their own imports only after that — the boot-order
-         cost A1-DL-004/005/006 each recorded and declined to pay.
+         /m/v6/ graph — FORTY-SIX today. The count is written here as a series
+         because the series is the point: fifteen at A1-P6, twenty-one once
+         L1-P2 added the native store, and forty-six since DIA-P3 added the
+         diary. It had been left at twenty-one through four packets, which read
+         as a claim about the list below rather than as the history it is; the
+         number is only worth carrying if it is the current one, so it is
+         corrected here rather than left to drift further.
+
+         Nobody needs to count by hand to check it: app/tests/delivery-contract.
+         spec.js asserts this set EQUALS the walked import graph in both
+         directions (A1-P6-INV-001), which is the guard that actually holds the
+         list right. Without these hints the browser discovers the modules only
+         after app.js parses, and their own imports only after that — the
+         boot-order cost A1-DL-004/005/006 each recorded and declined to pay.
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v3/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v6/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -106,44 +139,52 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v3/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v3/core/state.js">
-    <link rel="modulepreload" href="/m/v3/core/storage.js">
-    <link rel="modulepreload" href="/m/v3/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v3/core/signals.js">
-    <link rel="modulepreload" href="/m/v3/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v3/core/format.js">
-    <link rel="modulepreload" href="/m/v3/core/zpd.js">
-    <link rel="modulepreload" href="/m/v3/core/urgency.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v3/store/boot.js">
-    <link rel="modulepreload" href="/m/v3/store/store.js">
-    <link rel="modulepreload" href="/m/v3/store/journal.js">
-    <link rel="modulepreload" href="/m/v3/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v3/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v3/store/bridge.js">
-    <link rel="modulepreload" href="/m/v3/store/config.js">
-    <link rel="modulepreload" href="/m/v3/store/errors.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v3/surfaces/import.js">
-    <link rel="modulepreload" href="/m/v3/export/run.js">
-    <link rel="modulepreload" href="/m/v3/export/build.js">
-    <link rel="modulepreload" href="/m/v3/export/readout.js">
-    <link rel="modulepreload" href="/m/v3/export/sink.js">
-    <link rel="modulepreload" href="/m/v3/export/text.js">
-    <link rel="modulepreload" href="/m/v3/export/readme.js">
-    <link rel="modulepreload" href="/m/v3/export/zip.js">
-    <link rel="modulepreload" href="/m/v3/export/pdf.js">
-    <link rel="modulepreload" href="/m/v3/export/ttf.js">
-    <link rel="modulepreload" href="/m/v3/export/config.js">
-    <link rel="modulepreload" href="/m/v3/export/errors.js">
+    <link rel="modulepreload" href="/m/v6/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v6/core/state.js">
+    <link rel="modulepreload" href="/m/v6/core/storage.js">
+    <link rel="modulepreload" href="/m/v6/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v6/core/signals.js">
+    <link rel="modulepreload" href="/m/v6/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v6/core/format.js">
+    <link rel="modulepreload" href="/m/v6/core/zpd.js">
+    <link rel="modulepreload" href="/m/v6/core/urgency.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v6/store/boot.js">
+    <link rel="modulepreload" href="/m/v6/store/store.js">
+    <link rel="modulepreload" href="/m/v6/store/journal.js">
+    <link rel="modulepreload" href="/m/v6/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v6/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v6/store/records.js">
+    <link rel="modulepreload" href="/m/v6/store/bridge.js">
+    <link rel="modulepreload" href="/m/v6/store/transfer.js">
+    <link rel="modulepreload" href="/m/v6/transfer/config.js">
+    <link rel="modulepreload" href="/m/v6/transfer/errors.js">
+    <link rel="modulepreload" href="/m/v6/transfer/format.js">
+    <link rel="modulepreload" href="/m/v6/store/config.js">
+    <link rel="modulepreload" href="/m/v6/store/errors.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v6/channel/config.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/diary.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v6/surfaces/import.js">
+    <link rel="modulepreload" href="/m/v6/export/run.js">
+    <link rel="modulepreload" href="/m/v6/export/build.js">
+    <link rel="modulepreload" href="/m/v6/export/readout.js">
+    <link rel="modulepreload" href="/m/v6/export/sink.js">
+    <link rel="modulepreload" href="/m/v6/export/text.js">
+    <link rel="modulepreload" href="/m/v6/export/readme.js">
+    <link rel="modulepreload" href="/m/v6/export/zip.js">
+    <link rel="modulepreload" href="/m/v6/export/pdf.js">
+    <link rel="modulepreload" href="/m/v6/export/ttf.js">
+    <link rel="modulepreload" href="/m/v6/export/config.js">
+    <link rel="modulepreload" href="/m/v6/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -165,6 +206,23 @@
         <button id="updateDismiss" aria-label="Закрыть">&times;</button>
     </div>
 
+    <!-- АРХИВ СОХРАНЁН (DIA-P2). Подтверждение живёт СНАРУЖИ модалки архива и
+         переживает её закрытие: после удачного сохранения окно закрывается, а
+         эта строка остаётся, пока родитель её не уберёт. Две находки владельца
+         2026-08-16 — «подтверждения нет» и «окно не закрывается» — это один
+         дефект: подтверждение стояло внутри окна, которое родитель ожидал
+         увидеть закрытым, и приходило сразу после возврата из системного
+         выбора файла.
+
+         role="status", а не alert: сохранение прошло, тревожить нечем.
+         Класс .app-banner нужен правилу .app-banner.show — без класса ни одно
+         .show-правило не может совпасть, и это ровно тот дефект, который
+         app/tests/show-rule-coverage.spec.js ловит (EMV-P1-INV-001). -->
+    <div id="exportDoneBanner" class="app-banner" role="status">
+        <span id="exportDoneText"></span>
+        <button type="button" id="exportDoneDismiss" aria-label="Закрыть">&times;</button>
+    </div>
+
     <!-- Новый заголовок с профилем -->
     <header>
         <div class="header-top">
@@ -183,10 +241,18 @@
                      приложения» и вдобавок мертвый предмет для артефакта, весь
                      смысл которого — читаться через двадцать лет.
                      На десктопе иконка + подпись, на мобильном только иконка;
-                     aria-label и title дословно повторяют видимую подпись. -->
+                     aria-label и title дословно повторяют видимую подпись.
+
+                     DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
+                     канале (m/v6/surfaces/channel.js). В браузере архив не
+                     собирается вообще — веб-ветки в export/sink.js нет и не было
+                     (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
+                     происходит. Разметка одна на оба канала: это ветка времени
+                     выполнения, а не вторая сборка (LSC-P1-INV-002). -->
                 <button type="button"
                         class="header-action"
                         id="exportBtn"
+                        hidden
                         title="Сохранить архив"
                         aria-label="Сохранить архив">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
@@ -199,24 +265,68 @@
                     </svg>
                     <span class="header-action-label">Сохранить архив</span>
                 </button>
-                <!-- Чат сообщества. Иконка — обычный бумажный самолётик, общее
-                     соглашение «отправить/сообщение». Это НЕ фирменный знак
-                     Telegram: их логотип — их товарный знак, и мы его не
-                     воспроизводим. -->
-                <a href="https://t.me/+c-5y_69kmu8wNDky"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="telegram-button"
-                   title="Чат сообщества"
-                   aria-label="Чат сообщества"
-                   onclick="trackEvent('telegram_click')">
-                    <svg class="telegram-icon" width="24" height="24" viewBox="0 0 24 24"
+                <!-- Дневник (DIA-P3). Иконка — раскрытая тетрадь с пером:
+                     «записать своими словами», в отличие от галочки в таблице,
+                     которая утверждает про ребёнка. Это разные объекты: отметка
+                     — приписанное утверждение и живёт в неизменяемом журнале,
+                     запись дневника — собственный текст родителя и правится
+                     перезаписью (PDR-026 §4, правило 1).
+
+                     Приходит СКРЫТОЙ и раскрывается только на нативном канале
+                     (m/v6/surfaces/channel.js): дневник пишется в устройственное
+                     хранилище, а в браузере его нет вообще — store/bridge.js там
+                     инертен по построению (LSC-P1-INV-001). Предлагать действие,
+                     которого на этом канале не происходит, — ровно тот дефект,
+                     который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
+
+                     Ни GA4-события, ни onclick здесь нет (решение владельца
+                     2026-08-16, гейт D). -->
+                <button type="button"
+                        class="header-action"
+                        id="diaryBtn"
+                        hidden
+                        title="Дневник"
+                        aria-label="Дневник">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
                          stroke-linecap="round" stroke-linejoin="round"
                          aria-hidden="true" focusable="false">
-                        <path d="M21 3L3 10.5l7 2.5 2.5 7L21 3z"/>
-                        <path d="M10 13l11-10"/>
+                        <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/>
+                        <path d="M20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/>
+                        <path d="M16 3l2 2-4 4h-2V7z"/>
                     </svg>
+                    <span class="header-action-label">Дневник</span>
+                </button>
+                <!-- Приложение для Android (DIA-P2, ADR-047). Единственный канал
+                     распространения — прямой APK со страницы релизов, не
+                     магазин. Иконка — телефон со стрелкой внутрь: «положить
+                     файл на устройство», в отличие от стрелки архива, которая
+                     означает «достать файл наружу».
+
+                     Приходит СКРЫТОЙ и раскрывается только в браузере И только
+                     когда <meta name="theygrow-apk-release"> объявляет, что
+                     релиз опубликован. href проставляется из объявленного
+                     CHANNEL_CONFIG.apkReleaseUrl, а не из разметки: адрес
+                     продукта объявлен в одном месте.
+
+                     Здесь НЕТ onclick и никакой телеметрии — ни события GA4, ни
+                     сигнала (решение владельца 2026-08-16, гейт D). -->
+                <a class="header-action"
+                   id="apkBtn"
+                   hidden
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   title="Скачать APK"
+                   aria-label="Скачать APK">
+                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <rect x="6" y="2" width="12" height="20" rx="2"/>
+                        <path d="M12 7v7"/>
+                        <path d="M9 11l3 3 3-3"/>
+                    </svg>
+                    <span class="header-action-label">Скачать APK</span>
                 </a>
             </div>
         </div>
@@ -224,6 +334,17 @@
             Отслеживание развития навыков ребёнка по месяцам согласно возрастным нормам
         </div>
     </header>
+
+    <!-- ЕДИНСТВЕННАЯ КОПИЯ — ЗДЕСЬ (DIA-P2). Строка веб-канала, скрытая на
+         нативном. До этого пакета этот факт был сказан один раз — внутри модалки
+         архива, которая на вебе больше не открывается. Утверждение истинно
+         ровно сейчас и ровно на этом канале: пока перенос не подтверждён
+         (ADR-048 §5), localStorage этого браузера держит единственную копию
+         истории семьи, и резервной копии у неё нет нигде. Стоит над таблицей, а
+         не в окне: родитель должен встретить это, не открывая ничего. -->
+    <p id="webChannelNote" class="channel-note" hidden>
+        Всё, что вы отмечаете здесь, хранится только в этом браузере: резервной копии у этих данных нет. Архив умеет собирать только приложение на телефоне.
+    </p>
 
     <!-- Таблица -->
     <div class="table-wrapper">
@@ -283,10 +404,22 @@
             <p class="export-plain">Браузерная версия продолжает работать со своим хранилищем. Отметка, поставленная в браузере ПОСЛЕ этого переноса, здесь не появится, пока перенос не будет запущен ещё раз. Отметки, сделанные здесь, в браузере не появятся никогда.</p>
             <p>У перенесённых отметок нет даты наблюдения: в браузере она не записывалась. Они получат дату переноса, и в архиве будет прямо сказано, что настоящая дата неизвестна.</p>
             <p>Отметьте, кого перенести. Снятый профиль можно перенести позже — а вот отменить перенос нельзя: журнал только пополняется.</p>
+
+            <!-- DIA-P1 — предложение начать перенос. Показывается, когда со
+                 стороны браузера ещё ничего не пришло; после возврата на его
+                 месте появляется список профилей и кнопка «Перенести».
+                 Родителю не показывают выбор между «ссылкой» и «файлом»:
+                 запасной путь включается сам, а объяснение — одна строка
+                 (#importFallback) и та же кнопка. См. ADR-048 §3. -->
+            <p id="importHandoffOffer" hidden>История лежит в браузере, и приложение её оттуда не видит. Нажмите — откроется браузер, там будет одна кнопка, и вы вернётесь сюда.</p>
+
             <div id="importChoices" class="import-choices"></div>
+            <p id="importFallback" class="export-status" hidden></p>
             <p id="importStatus" class="export-status" hidden></p>
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="importCloseBtn">Не сейчас</button>
+                <button type="button" class="modal-button modal-button-secondary" id="importPickBtn" hidden>Выбрать файл</button>
+                <button type="button" class="modal-button modal-button-primary" id="importHandoffBtn" hidden>Открыть браузер</button>
                 <button type="button" class="modal-button modal-button-primary" id="importRunBtn">Перенести</button>
             </div>
         </div>
@@ -296,12 +429,109 @@
         <div class="modal-content">
             <span class="modal-close" id="storeUnavailableClose">&times;</span>
             <h2>Отметка не сохранена</h2>
-            <p>Хранилище на этом устройстве не открылось, поэтому записать отметку некуда. Галочка снята: показывать её означало бы утверждать, что отметка сохранена.</p>
+            <!-- Место закончилось — DIA-P3, и это ДРУГАЯ причина с другим
+                 лечением. Раньше полный диск попадал сюда же и читался как
+                 «хранилище не открылось»: родителю предлагали перезапустить
+                 приложение, чего свободного места не прибавит. Строка приходит
+                 скрытой и раскрывается только когда причина классифицирована
+                 как disk_full (store/errors.js), а соседний абзац при этом
+                 прячется — две причины никогда не показываются вместе. -->
+            <p id="storeDiskFullNote" hidden>На устройстве закончилось место, поэтому записать отметку не удалось. Галочка снята: показывать её означало бы утверждать, что отметка сохранена. Освободите место — и отметьте навык снова.</p>
+            <p id="storeUnavailableNote">Хранилище на этом устройстве не открылось, поэтому записать отметку некуда. Галочка снята: показывать её означало бы утверждать, что отметка сохранена.</p>
             <p class="export-plain">Уже записанные данные не потеряны и не изменены — приложение просто не может их сейчас прочитать.</p>
             <p>Попробуйте закрыть и открыть приложение. Если это повторяется, сохраните архив при первой возможности, когда хранилище откроется.</p>
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="storeUnavailableCloseBtn">Закрыть</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Дневник (DIA-P3). Одно окно, две панели: список записей и форма.
+         Второе модальное окно поверх первого было бы стопкой, которой у этой
+         оболочки никогда не было; переключение панелей — это `hidden`, тот же
+         приём, что у скрытых кнопок в #importModal.
+
+         СПИСОК — ЭТО И ЕСТЬ ПОДТВЕРЖДЕНИЕ. После сохранения окно НЕ
+         закрывается: запись появляется первой в списке, там, куда родитель уже
+         смотрит. Отдельного баннера здесь нет намеренно — находка владельца
+         2026-08-16 (DIA-DL-004) была про подтверждение внутри окна, которое
+         вот-вот исчезнет; это окно не исчезает.
+
+         Текст записи ставится только через textContent (m/v6/surfaces/diary.js).
+         Это семейный текст: он не проходит через innerHTML нигде. -->
+    <div id="diaryModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="diaryModalClose">&times;</span>
+            <h2>Дневник</h2>
+
+            <div id="diaryListPane">
+                <!-- ПОИСК (DIA-P4). Форма, а не одно поле: Enter должен искать,
+                     и на телефоне у формы с одним полем клавиатура сама
+                     показывает «Искать».
+
+                     ФОРМА ПОКАЗЫВАЕТСЯ, ТОЛЬКО ЕСЛИ ЕСТЬ ЧТО ИСКАТЬ. Пустому
+                     дневнику предлагать поиск незачем: родитель искал бы в том,
+                     чего нет, и «ничего не нашлось» прочиталось бы как поломка.
+                     Решает это m/v6/surfaces/diary.js по числу записей. -->
+                <form id="diarySearchForm" class="diary-search" hidden>
+                    <label for="diarySearchInput">Найти:</label>
+                    <input type="search" id="diarySearchInput" name="diarySearchInput" autocomplete="off">
+                    <button type="submit" class="modal-button modal-button-secondary" id="diarySearchBtn">Искать</button>
+                    <button type="button" class="modal-button modal-button-secondary" id="diarySearchClearBtn" hidden>Показать все</button>
+                </form>
+                <!-- Пустой случай называет условие ИСТОЧНИКА: записей нет.
+                     Не «ничего не произошло» и не «начните вести дневник». -->
+                <p id="diaryEmpty" class="export-plain" hidden>Записей пока нет.</p>
+                <!-- ДРУГОЙ пустой случай, и потому отдельный элемент: записи
+                     есть, но по этим словам ничего не нашлось. Честная
+                     деградация (ADR-015): строка называет условие источника, а
+                     потом говорит, ЧЕГО поиск не умеет, и что сделать вместо
+                     этого. Про индекс, словоформы и токенизатор родителю знать
+                     не нужно — ему нужно знать, что попробовать. -->
+                <p id="diarySearchEmpty" class="export-status" hidden>В дневнике нет записей с этими словами. Поиск ищет по началу слова и не разбирает русские словоформы, поэтому запись, где слово стоит в другой форме, может не найтись. Попробуйте слово покороче — например, только его начало.</p>
+                <!-- И ТРЕТИЙ, СОВСЕМ ДРУГОЙ СЛУЧАЙ: поиск не выполнился. Это
+                     НЕ «ничего не нашлось», и подменять одно другим нельзя —
+                     это значило бы сказать родителю, что он чего-то не писал,
+                     когда на самом деле мы не смогли посмотреть. Каждая строка
+                     здесь говорит, что поиск не выполнен и что записи на месте
+                     (m/v6/surfaces/diary.js, SEARCH_REFUSAL). -->
+                <p id="diarySearchStatus" class="export-status" hidden></p>
+                <!-- Две причины, по которым писать некуда, и они лечатся
+                     разным. Показывается ровно одна (m/v6/surfaces/diary.js). -->
+                <p id="diaryNoStore" class="export-status" hidden>Дневник хранится в приложении на этом устройстве, а хранилище сейчас не открылось. Записать пока некуда — закройте и откройте приложение. Уже записанное не потеряно.</p>
+                <p id="diaryNoChild" class="export-status" hidden>Сначала создайте профиль ребёнка — запись дневника ведётся о ком-то, и без профиля её некуда отнести. Профиль создаётся в меню вверху.</p>
+                <ul id="diaryList" class="diary-list"></ul>
+                <div class="modal-buttons">
+                    <button type="button" class="modal-button modal-button-secondary" id="diaryCloseBtn">Закрыть</button>
+                    <button type="button" class="modal-button modal-button-primary" id="diaryNewBtn">Новая запись</button>
+                </div>
+            </div>
+
+            <!-- ПОЛЯ ПОМЕЧЕНЫ aria-required, А НЕ required, И ЭТО РЕШЕНИЕ.
+                 С `required` браузер перехватывает отправку сам и показывает
+                 собственный пузырь — на своём языке, своими словами и мимо
+                 #diaryStatus. На этой поверхности отказ читает родитель, который
+                 только что написал про своего ребёнка, и он должен быть сказан
+                 одним голосом с остальными отказами: что записи НЕТ, что текст
+                 на месте, что делать дальше. Семантика поля при этом не
+                 теряется — aria-required сообщает её вспомогательным
+                 технологиям, — а проверку выполняет m/v6/surfaces/diary.js,
+                 который её и объясняет. -->
+            <form id="diaryForm" hidden>
+                <div class="modal-form-group">
+                    <label for="diaryEventDate">Когда это было:</label>
+                    <input type="date" id="diaryEventDate" name="diaryEventDate" aria-required="true">
+                </div>
+                <div class="modal-form-group">
+                    <label for="diaryBody">Что произошло:</label>
+                    <textarea id="diaryBody" name="diaryBody" rows="6" aria-required="true"></textarea>
+                </div>
+                <p id="diaryStatus" class="export-status" hidden></p>
+                <div class="modal-buttons">
+                    <button type="button" class="modal-button modal-button-secondary" id="diaryCancelBtn">Отмена</button>
+                    <button type="submit" class="modal-button modal-button-primary" id="diarySaveBtn">Сохранить</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -313,7 +543,6 @@
             <p class="export-plain">Фотографии, видео и звукозаписи в архив не входят.</p>
             <p class="export-plain">Резервной копии этих данных в облаке нет.</p>
             <p>Архив не зашифрован: ключ теряется быстрее, чем данные. Любой, кто получит этот файл, сможет его прочитать — храните его так же, как хранили бы бумажный семейный альбом.</p>
-            <p id="exportUnavailable" class="export-unavailable" hidden>В браузере архив не создаётся: он собирается из данных приложения на телефоне. Это относится и к данным, которые вы видите сейчас, — резервной копии у них нет.</p>
             <p id="exportStatus" class="export-status" hidden></p>
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="exportCloseBtn">Закрыть</button>
@@ -376,12 +605,12 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v3/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v6/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v3/app.js for boot order, and the modulepreload block in the head
+         m/v6/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v3/app.js"></script>
+    <script type="module" src="/m/v6/app.js"></script>
 
     <!-- PWA Install Prompt -->
     <script>
@@ -512,6 +741,6 @@
     </script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v3/sw-register.js"></script>
+    <script type="module" src="/m/v6/sw-register.js"></script>
 </body>
 </html>
