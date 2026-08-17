@@ -22,9 +22,14 @@
 // shipped surface asks the shipped store for the right thing and renders what
 // comes back. It proves the CONTRACT between `surfaces/diary.js` and
 // `store/boot.js`. It proves NOTHING about SQLite: it executes no SQL, applies
-// no DDL, has no schema, no constraints, no triggers, no transactions and no
-// encryption. What the statements MEAN is `pytest app/tests/schema`; that an
-// entry LANDS is `DiaryEntryTest` on a device.
+// no DDL, has no schema, no constraints, no triggers, no transactions, no index
+// and no encryption. What the statements MEAN is `pytest app/tests/schema`; that
+// an entry LANDS is `DiaryEntryTest` on a device.
+//
+// DIA-P4 ADDS SEARCH ON EXACTLY THOSE TERMS. There is no FTS5 here, so the seam
+// does not decide which rows a query finds: a leg STAGES the answer and the seam
+// records the expression it was asked with. Which rows an expression really
+// matches is `test_diary_search.py` against the real frozen DDL.
 //
 // IT FAILS CLOSED, AND IT DOES NOT MATCH ON SUBSTRINGS. This milestone has been
 // bitten four times by substring matching over code and SQL — a comment about
@@ -82,6 +87,9 @@ const READ_FROM_SOURCE = Object.freeze({
         'RECORD_INSERT_SQL',
         'RECORD_UPDATE_SQL',
         'RECORDS_SQL',
+        'RECORD_SEARCH_SQL',
+        'RECORD_COUNT_SQL',
+        'FTS_REBUILD_SQL',
     ],
     'store/journal.js': ['CHILDREN_SQL', 'MARKS_SQL'],
 });
@@ -133,6 +141,23 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
             // INSERT's bound values are remembered and handed back under the
             // column names the shipped read query itself asks for.
             const records = [];
+
+            // What the next search is to be answered with, and what it becomes
+            // once the index has been rebuilt. Set by the leg, never by the
+            // seam: see the RECORD_SEARCH_SQL branch below for why.
+            window.__pageBridgeSearch = { answer: [], answerAfterRebuild: null, failWith: null };
+
+            // The order RECORDS_SQL declares, applied once for both reads so
+            // the list and the search cannot disagree about it.
+            const newestFirst = (rows) =>
+                rows
+                    .slice()
+                    .sort((a, b) =>
+                        a.event_date_local === b.event_date_local
+                            ? b.entry_at_utc - a.entry_at_utc
+                            : a.event_date_local < b.event_date_local ? 1 : -1
+                    )
+                    .map((row) => ({ ...row }));
 
             const unknown = (method, statement) => {
                 throw new Error(
@@ -190,16 +215,32 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     // the first-write case the surface has to handle.
                     return records.length > 0 ? [{ id: 'area-page-bridge' }] : [];
                 }
-                if (statement === sql.RECORDS_SQL) {
-                    return records
-                        .slice()
-                        .sort((a, b) =>
-                            a.event_date_local === b.event_date_local
-                                ? b.entry_at_utc - a.entry_at_utc
-                                : a.event_date_local < b.event_date_local ? 1 : -1
-                        )
-                        .map((row) => ({ ...row }));
+                if (statement === sql.RECORDS_SQL) return newestFirst(records);
+
+                // THIS SEAM MATCHES NOTHING, AND THAT IS THE POINT (DIA-P4).
+                // There is no FTS5 here, no tokenizer, no index and no MATCH —
+                // so it does not decide which rows a query finds. The leg
+                // STAGES an answer (`window.__pageBridgeSearch.answer`, a list
+                // of record ids), and the seam hands back exactly those rows
+                // while RECORDING the expression it was given. That keeps the
+                // two claims apart: what an expression matches is
+                // `pytest app/tests/schema/test_diary_search.py` against the
+                // real frozen DDL, and what the SURFACE asked for is readable
+                // here. A seam that faked matching would be a fake proving a
+                // fake — the rule this file's header already states about
+                // transactions.
+                if (statement === sql.RECORD_SEARCH_SQL) {
+                    // A search the STORE refuses. Staged rather than simulated:
+                    // the message is thrown across the same boundary the plugin
+                    // rejects on, so store/errors.js classifies it exactly as it
+                    // would classify the engine's own words.
+                    const staged = window.__pageBridgeSearch;
+                    if (staged.failWith) throw new Error(staged.failWith);
+                    return newestFirst(
+                        records.filter((row) => staged.answer.includes(row.id))
+                    );
                 }
+                if (statement === sql.RECORD_COUNT_SQL) return [{ n: records.length }];
                 return unknown('query', statement);
             };
 
@@ -221,6 +262,17 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                         updated_at_utc: values[8],
                         sensitivity: null,
                     });
+                    return;
+                }
+                if (statement === sql.FTS_REBUILD_SQL) {
+                    // The only OBSERVABLE of a rebuild, modelled and nothing
+                    // more: what the index answers afterwards. The seam holds
+                    // no index to rebuild, so it changes the staged answer and
+                    // says so out loud rather than pretending to re-index.
+                    const staged = window.__pageBridgeSearch;
+                    if (staged.answerAfterRebuild !== null) {
+                        staged.answer = staged.answerAfterRebuild;
+                    }
                     return;
                 }
                 if (statement === sql.RECORD_UPDATE_SQL) {

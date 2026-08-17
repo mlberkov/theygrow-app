@@ -324,6 +324,59 @@ header h1 {
     min-height: 120px;
 }
 
+/* Поиск по дневнику (DIA-P4). Один ряд: подпись, поле, две кнопки.
+
+   flex-wrap, а не медиа-запрос: на узком экране ряд переносится сам, и это
+   единственное, что от него требуется. Поле забирает остаток ширины через
+   flex: 1, поэтому длинный запрос виден целиком, а кнопки не уезжают.
+
+   Кнопки — те же .modal-button, что и везде в окнах, но с уменьшенным
+   вертикальным padding: строка поиска стоит над списком, а не в ряду действий
+   диалога, и кнопка полной высоты сделала бы её вторым рядом действий. */
+.diary-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+/* ТОТ ЖЕ ДЕФЕКТ, ЧТО У .header-action[hidden] ВЫШЕ, И ПОЙМАН ОН ТАК ЖЕ — новым
+   тестом на первом прогоне. `display: flex` в правиле класса перебивает
+   `display: none`, которое браузер даёт атрибуту hidden, поэтому без этой строки
+   форма поиска приходит видимой в пустом дневнике: искать предлагается там, где
+   искать нечего, и единственный возможный ответ — «ничего не нашлось». Это
+   второй случай в одной вехе (EMV-P1-INV-001), и правило одно и то же: если
+   класс задаёт display, скрытому состоянию нужна своя строка. */
+.diary-search[hidden] {
+    display: none;
+}
+
+.diary-search label {
+    font-size: 14px;
+    color: var(--text-secondary, #666);
+}
+
+.diary-search input {
+    flex: 1;
+    min-width: 140px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: inherit;
+}
+
+.diary-search input:focus {
+    outline: none;
+    border-color: var(--primary-purple);
+}
+
+.diary-search .modal-button {
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
 /* Список записей дневника (DIA-P3). Прокручивается сам, а не тянет окно:
    diaryListLimit ограничивает отрисовку двумя сотнями, и двести записей
    вытолкнули бы кнопки за нижний край экрана. */

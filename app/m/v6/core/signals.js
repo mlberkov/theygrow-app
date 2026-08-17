@@ -216,6 +216,38 @@ export const SIGNAL_TAXONOMY = Object.freeze({
         emittedNow: true,
     }),
 
+    // changed_in: DIA-DL-008 — what one search over the diary did (DIA-P4).
+    //
+    // THE TERM A PARENT TYPES IS THE MOST FAMILY-IDENTIFYING STRING THIS APP HAS
+    // EVER HELD. It is what they call their own child's things, in their own
+    // words, and it exists in a local variable at the exact moment this signal
+    // fires. That is why the fields below are what they are, and why the list is
+    // worth reading as a set of ABSENCES: no term, no prefix of one, no length of
+    // one, no hash of one, no expression built from one, and no id of anything
+    // found. Nothing here narrows down what was asked or what was written.
+    //
+    // What is here instead: `tokens` is how many WORDS the query held — the
+    // number that separates a real search from a stray keypress, and it is a
+    // count in the same sense `diary.write`'s `chars` is a length. `results` is
+    // how many entries came back. `rebuilt` says whether the derived index had
+    // to be repaired before the answer was right, which is the ONE fact about
+    // this path that is invisible from everywhere else: the parent is not told,
+    // because they were not asked and there is nothing for them to do, so this
+    // line is where the owner reads it during the RUNBOOK smoke.
+    //
+    // The structural guard refuses a free string outright (see this module's
+    // header), so none of the above is a promise — it cannot be done. The
+    // discipline that IS mine to keep is at the call site, and it is the same
+    // one `surfaces/diary.js` already follows for `chars`: every count is
+    // computed into a local before the payload literal, never inside it.
+    'diary.search': Object.freeze({
+        fields: Object.freeze(['outcome', 'failure_class', 'tokens', 'results', 'search_ms', 'rebuilt']),
+        boolean: Object.freeze(['rebuilt']),
+        numeric: Object.freeze(['tokens', 'results', 'search_ms']),
+        producingStage: 'DIA-P4',
+        emittedNow: true,
+    }),
+
     // changed_in: XPT-DL-001 — what one export did. It exists because the defect
     // XPT-P1 repairs was INVISIBLE from the device: the process died while the
     // file picker was in front, so the app printed nothing, the surface showed

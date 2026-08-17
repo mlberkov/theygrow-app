@@ -28,7 +28,7 @@ import {
     loadMarks,
 } from './repo-journal.js';
 import { storeFailureCode } from './errors.js';
-import { createRecord, loadRecords, overwriteRecord } from './records.js';
+import { createRecord, loadRecords, overwriteRecord, searchRecords } from './records.js';
 import { pendingImport, runImport } from './import-legacy.js';
 import {
     discardTransfer,
@@ -94,7 +94,10 @@ export async function initNativeStore({ now = () => Date.now() } = {}) {
 // is a module that guard never reads, and that is the property being kept.
 // DIA-P3 adds the diary record path on the same terms: surfaces/diary.js reaches
 // createRecord / overwriteRecord / loadRecords through this door and never
-// imports store/records.js itself.
+// imports store/records.js itself. DIA-P4 adds searchRecords beside them — the
+// same door, and deliberately not a second one, because the storage-seam scan
+// walks THIS graph and a module reached any other way is a module it never
+// reads.
 export {
     acknowledgeCursor,
     appendChild,
@@ -119,5 +122,6 @@ export {
     projectSkillState,
     readSince,
     runImport,
+    searchRecords,
     storeFailureCode,
 };

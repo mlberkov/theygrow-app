@@ -18,6 +18,13 @@
 // нет, и записать «не чувствительно» значило бы объявить за родителя то, о чём
 // его не спросили.
 //
+// ПОИСК (DIA-P4) ЖИВЁТ В ТОМ ЖЕ ОКНЕ И В ТОМ ЖЕ СПИСКЕ. Не вторая поверхность:
+// это тот же дневник, только показанный не весь. Отсюда и три РАЗНЫЕ пустые
+// строки, которые нельзя схлопывать в одну, потому что родитель делает после
+// каждой разное: записей нет вовсе (#diaryEmpty), записи есть, но по этим словам
+// ничего не нашлось (#diarySearchEmpty), и поиск не выполнился (#diarySearchStatus).
+// Последнее — утверждение о нас, а не о дневнике; см. SEARCH_REFUSAL ниже.
+//
 // ВРЕМЯ СОБЫТИЯ И ВРЕМЯ ЗАПИСИ — РАЗНЫЕ. Форма спрашивает ДЕНЬ, о котором
 // запись, и по умолчанию это сегодня; момент написания store/records.js берёт
 // сам. Родитель пишет вечером про утро, и обе даты остаются в строке (PDR-026
@@ -28,7 +35,13 @@
 
 import { emitSignal } from '../core/signals.js';
 import { BACKEND, getCurrentProfile, historyBackend, selfParticipant } from '../core/state.js';
-import { createRecord, loadRecords, overwriteRecord, storeFailureCode } from '../store/boot.js';
+import {
+    createRecord,
+    loadRecords,
+    overwriteRecord,
+    searchRecords,
+    storeFailureCode,
+} from '../store/boot.js';
 
 // Каждая локальная переменная связана РОВНО с одним id — то же правило, что в
 // surfaces/import.js: угадывать, какой элемент имеет в виду имя, тесты
@@ -112,7 +125,15 @@ async function renderList() {
     const noChild = el('diaryNoChild');
     const noStore = el('diaryNoStore');
     const newButton = el('diaryNewBtn');
+    const searchForm = el('diarySearchForm');
     list.replaceChildren();
+
+    // Обе поисковые строки гасятся здесь, и это единственное место, где они
+    // гаснут: список без поиска не может показывать ни «не нашлось», ни «поиск
+    // не выполнен» — оба относятся к запросу, которого сейчас нет.
+    el('diarySearchEmpty').hidden = true;
+    el('diarySearchStatus').hidden = true;
+    el('diarySearchClearBtn').hidden = true;
 
     // ЧЕСТНАЯ ДЕГРАДАЦИЯ (ADR-015): кнопка «Новая запись» НЕ предлагается, когда
     // писать некуда. Предложить форму, которая заведомо откажет на сохранении,
@@ -124,6 +145,7 @@ async function renderList() {
     newButton.hidden = blocked !== null;
     if (blocked) {
         empty.hidden = true;
+        searchForm.hidden = true;
         emitSignal('write.refused', {
             reason: blocked === NO_STORE ? 'store_unavailable' : 'no_subject',
         });
@@ -135,6 +157,130 @@ async function renderList() {
         list.append(entryItem(row));
     }
     empty.hidden = rows.length > 0;
+    // Искать предлагается, только когда есть что искать. В пустом дневнике поиск
+    // мог бы вернуть только «ничего не нашлось» — строку, которая прочиталась бы
+    // как поломка, хотя всё в порядке и записей просто нет.
+    searchForm.hidden = rows.length === 0;
+}
+
+// ЧТО РОДИТЕЛЬ ЧИТАЕТ, КОГДА ПОИСК НЕ ВЫПОЛНИЛСЯ — и почему это отдельный
+// набор строк, а не «ничего не нашлось».
+//
+// «Ничего не нашлось» — утверждение о ДНЕВНИКЕ: такой записи нет. Отказ
+// хранилища — утверждение о НАС: мы не смогли посмотреть. Сказать первое вместо
+// второго значит сообщить родителю, что он чего-то не писал, хотя он писал, — и
+// это ровно тот класс тихой лжи, ради которого существует ADR-046 §1. Поэтому
+// каждая строка ниже говорит две вещи: поиск НЕ выполнен, и записи на месте.
+const SEARCH_REFUSAL = Object.freeze({
+    disk_full:
+        'Поиск не выполнен: на устройстве закончилось место. Записи на месте —'
+        + ' освободите место и попробуйте ещё раз.',
+    unavailable:
+        'Поиск не выполнен: хранилище сейчас недоступно. Записи на месте — закройте'
+        + ' и откройте приложение, потом попробуйте ещё раз.',
+    corrupt:
+        'Поиск не выполнен: хранилище не отвечает как обычно. Записи, которые вы уже'
+        + ' написали, никуда не делись — закройте и откройте приложение.',
+    other: 'Поиск не выполнен. Записи на месте — попробуйте ещё раз.',
+});
+
+/** Снимает фильтр и показывает весь дневник заново. */
+async function clearSearch() {
+    el('diarySearchInput').value = '';
+    await renderList();
+}
+
+/**
+ * Ищет по дневнику и показывает результат в том же списке.
+ *
+ * ЧТО ЗДЕСЬ НЕ ПРОИСХОДИТ, И ЭТО ГЛАВНОЕ (DIA-P4-INV-002). То, что родитель
+ * набрал, — самая опознаваемая строка, какую это приложение когда-либо держало:
+ * это его собственные слова про своего ребёнка. Она уходит РОВНО в два места —
+ * в связанный параметр запроса (store/records.js строит из неё выражение MATCH)
+ * и в поле ввода, где родитель её и оставил. В сигнал не уходит ни она, ни её
+ * длина, ни её кусок; в консоль — только имя класса ошибки, без сообщения
+ * движка. Считанные величины кладутся в локальные переменные ДО полезной
+ * нагрузки: вызов внутри неё — место, где семейный текст проходит незамеченным,
+ * и app/tests/signal-payload.spec.js такой вызов отказывается пропускать.
+ */
+async function runSearch(event) {
+    event.preventDefault();
+    const searchButton = el('diarySearchBtn');
+    const list = el('diaryList');
+    const searchStatus = el('diarySearchStatus');
+    const searchEmpty = el('diarySearchEmpty');
+    const typed = el('diarySearchInput').value;
+
+    searchStatus.hidden = true;
+    searchEmpty.hidden = true;
+
+    // Форма предлагается только там, где список уже отрисовался, так что сюда с
+    // закрытым хранилищем почти не попасть. «Почти» — не «никогда»: хранилище
+    // может закрыться между отрисовкой и нажатием, и тогда это надо сказать.
+    const blocked = whyNotWritable();
+    if (blocked) {
+        emitSignal('write.refused', {
+            reason: blocked === NO_STORE ? 'store_unavailable' : 'no_subject',
+        });
+        searchStatus.textContent = SEARCH_REFUSAL.unavailable;
+        searchStatus.hidden = false;
+        return;
+    }
+
+    const who = author();
+    searchButton.disabled = true;
+    const startedAt = Date.now();
+    try {
+        const found = await searchRecords({ ...who, typed });
+        const searchMs = Date.now() - startedAt;
+        const resultCount = found.rows.length;
+        const tokenCount = found.tokens;
+        const wasRebuilt = found.rebuilt;
+        const searchOutcome = found.searched ? 'complete' : 'refused';
+        emitSignal('diary.search', {
+            outcome: searchOutcome,
+            failure_class: 'none',
+            tokens: tokenCount,
+            results: resultCount,
+            search_ms: searchMs,
+            rebuilt: wasRebuilt,
+        });
+
+        // Пустой запрос — это не поиск, а просьба показать всё. Ровно так он и
+        // читается: отдельного отказа тут не нужно, нужен весь дневник.
+        if (!found.searched) {
+            await clearSearch();
+            return;
+        }
+
+        list.replaceChildren();
+        for (const row of found.rows) {
+            list.append(entryItem(row));
+        }
+        el('diaryEmpty').hidden = true;
+        el('diarySearchClearBtn').hidden = false;
+        searchEmpty.hidden = resultCount > 0;
+    } catch (error) {
+        const searchMs = Date.now() - startedAt;
+        const failureClass = storeFailureCode(error);
+        emitSignal('diary.search', {
+            outcome: 'failed',
+            failure_class: failureClass,
+            search_ms: searchMs,
+        });
+        // ТОЛЬКО ИМЯ КЛАССА, И ЭТО ОТЛИЧАЕТСЯ ОТ ПУТИ ЗАПИСИ НАМЕРЕННО. Там в
+        // консоль идёт и сообщение движка: текст записи там — связанное
+        // значение, и движок его не повторяет. Здесь повторить было бы что: из
+        // набранного строится выражение MATCH, и сообщение об ошибке разбора
+        // такого выражения содержало бы его целиком. Класса достаточно, чтобы
+        // понять, что случилось, во время прогона по RUNBOOK.
+        // eslint-disable-next-line no-console
+        console.error('[diary] the search did not run:', error?.name, failureClass);
+        searchStatus.textContent = SEARCH_REFUSAL[failureClass] ?? SEARCH_REFUSAL.other;
+        searchStatus.hidden = false;
+    } finally {
+        searchButton.disabled = false;
+    }
 }
 
 function showList() {
@@ -155,7 +301,9 @@ function showForm({ recordId = null, body = '', eventDate = null, now = Date.now
 export async function openDiaryModal() {
     showList();
     el('diaryModal').classList.add('show');
-    await renderList();
+    // clearSearch, а не renderList: окно открывается на всём дневнике, а не на
+    // фильтре, который родитель набрал в прошлый раз и уже не видит.
+    await clearSearch();
 }
 
 function closeDiaryModal() {
@@ -274,7 +422,12 @@ async function saveEntry(event) {
         // Окно НЕ закрывается: подтверждение — это список, в котором запись
         // теперь стоит первой. Сначала список, потом переключение панели, чтобы
         // не было кадра с пустым списком.
-        await renderList();
+        //
+        // clearSearch, а не renderList, и это про то же подтверждение: если в
+        // списке стоял фильтр, только что сохранённая запись могла бы в него не
+        // попасть — и родитель увидел бы список без своей записи ровно в тот
+        // момент, когда список ЕСТЬ подтверждение (DIA-DL-005 (g)).
+        await clearSearch();
         showList();
     } catch (error) {
         const writeMs = Date.now() - startedAt;
@@ -329,6 +482,8 @@ export function wireDiary() {
         showList();
     });
     el('diaryForm').addEventListener('submit', saveEntry);
+    el('diarySearchForm').addEventListener('submit', runSearch);
+    el('diarySearchClearBtn').addEventListener('click', clearSearch);
     el('diaryList').addEventListener('click', startEdit);
     el('diaryModal').addEventListener('click', (e) => {
         if (e.target.id === 'diaryModal') {

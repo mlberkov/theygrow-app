@@ -205,7 +205,7 @@ module.exports = defineConfig({
       // serves a different web root, and a leg that also simulates the shell
       // would vary two things at once. What it does NOT claim is anything about
       // SQLite, and its own header says so.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save)\.spec\.js/,
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save|diary-search)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,
