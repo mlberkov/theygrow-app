@@ -78,6 +78,13 @@ import org.junit.runner.RunWith;
  * already refused — an arming that "succeeded" without arming anything. Both
  * disk-full legs now release in a {@code finally}.
  *
+ * <p>DIA-P4 ADDS ONE LEG, and it is here rather than in a file of its own because
+ * it is the same subject: what the store does with a parent's own text, observed
+ * through the surface they touch. It searches, it destroys the derived index
+ * underneath them and searches again, and it TIMES both — a repair that happens
+ * inside a search is time a parent waits, and "the index is rebuildable" is not
+ * a claim worth making without the number attached.
+ *
  * <p>WHAT THIS TEST DOES NOT REACH, so no green here is read as more than it is.
  * The emulator is not the family's phone: it is a fresh API-34 image, and a
  * device whose storage is actually exhausted also fails in ways SQLite never
@@ -201,6 +208,102 @@ public class DiaryEntryTest {
                     "editing a diary entry wrote to the mark journal",
                     journalBefore,
                     journalCount(scenario));
+        }
+    }
+
+    // --- search, and the index repairing itself under the parent (DIA-P4) ----
+
+    /**
+     * A parent searches their own diary, and a destroyed index costs them nothing.
+     *
+     * <p>THREE CLAIMS, IN THE ORDER THEY HAVE TO BE MADE.
+     *
+     * <p>1. A FORM THEY DID NOT WRITE STILL FINDS THE ENTRY. `села` reaches «сел
+     * сам» — the whole point of a query-side word-form strategy, and the thing
+     * that decides whether search is usable in Russian at all.
+     *
+     * <p>2. THE SELF-HEAL IS OBSERVED AS REACHING THE PARENT. The index is
+     * emptied through the shipped seam, and then the parent presses the same
+     * search control and IS SHOWN THEIR ENTRY. What is asserted is what appears
+     * on their screen — not that a rebuild statement was issued, which would be
+     * asserting our own mechanism back to ourselves. And it is timed, because
+     * whatever the repair costs is time they spend looking at a screen that has
+     * not answered yet.
+     *
+     * <p>3. A FORM NO PREFIX CAN REACH IS SAID HONESTLY, and said as the RIGHT
+     * ONE of two sentences. `сесть` cannot reach `сел` — the stem moved — so the
+     * parent gets the word-forms explanation. If they got the store-refusal line
+     * instead, the app would be blaming itself for a working search; if they got
+     * the word-forms line on a real refusal, it would be telling them they never
+     * wrote something they did write. Both elements are asserted, each way round.
+     *
+     * <p>ORDER IS LOAD-BEARING HERE. The repair fires at most once per app
+     * session, so the miss is searched LAST: an empty result earlier would spend
+     * the one repair this document gets, and claim 2 would then be observing a
+     * rebuild that had already happened.
+     */
+    @Test
+    public void a_parent_searches_the_diary_and_a_lost_index_is_repaired_under_them() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            pollFor(scenario, BOOTED, EVALUATE_TIMEOUT_MS);
+            String leg = "search";
+            seedChild(scenario, leg);
+
+            assertEquals("the diary was not offered", "pressed", openCompose(scenario));
+            assertEquals("listed", fillAndSave(scenario, "2026-02-01", "Сегодня сел сам и держался"));
+            assertEquals(
+                    "a second entry could not be composed", "pressed", openCompose(scenario));
+            assertEquals("listed", fillAndSave(scenario, "2026-02-02", "Ёлка растёт быстро"));
+
+            // 1. The form the parent did not write, and it narrows rather than
+            //    returning the diary: one entry of the two.
+            String hit = searchFromTheSurface(scenario, "села");
+            Log.i(TAG, "search hit: " + hit);
+            assertEquals("`села` did not reach «сел сам»: " + hit, "1", field(hit, "found"));
+            assertEquals("the search reported nothing found: " + hit, "false", field(hit, "empty"));
+            assertEquals("the search did not run: " + hit, "false", field(hit, "failed"));
+
+            // 2. The index is destroyed underneath them — FTS5's own delete-all,
+            //    through the shipped seam, so the loss is real rather than
+            //    simulated — and the next search must still answer.
+            destroyIndex(scenario);
+            String healed = searchFromTheSurface(scenario, "села");
+            Log.i(TAG, "search after the index was destroyed: " + healed);
+            assertEquals(
+                    "a destroyed index cost the parent their entry — the repair did not reach"
+                            + " them: " + healed,
+                    "1",
+                    field(healed, "found"));
+            assertEquals("the parent was told nothing matched: " + healed, "false", field(healed, "empty"));
+            assertEquals("false", field(healed, "failed"));
+
+            // The control, and the reason it is here: without a second search on
+            // a whole index, the number above is a repair time with no baseline
+            // to read it against.
+            String again = searchFromTheSurface(scenario, "села");
+            Log.i(TAG, "search on a whole index: " + again);
+            assertEquals("1", field(again, "found"));
+            Log.i(
+                    TAG,
+                    "search wait as the parent experiences it: repairing=" + field(healed, "ms")
+                            + " ms, ordinary=" + field(again, "ms")
+                            + " ms (two short entries on an emulator — a real diary is a"
+                            + " different measurement and this does not predict it)");
+
+            // 3. The form no prefix can reach, and the RIGHT sentence for it.
+            String miss = searchFromTheSurface(scenario, "сесть");
+            Log.i(TAG, "search miss: " + miss);
+            assertEquals("`сесть` reached `сел`, which no prefix can do: " + miss, "0", field(miss, "found"));
+            assertEquals("nothing matched, and the surface did not say so: " + miss, "true", field(miss, "empty"));
+            assertEquals(
+                    "a working search was reported to the parent as a broken store: " + miss,
+                    "false",
+                    field(miss, "failed"));
+            assertEquals(
+                    "the parent was told nothing matched without being told why, or what to try"
+                            + " instead (ADR-015): " + miss,
+                    "wordforms",
+                    field(miss, "said"));
         }
     }
 
@@ -459,6 +562,86 @@ public class DiaryEntryTest {
                     + "return 'refused-other';"
                     + "})()",
                 ACT_TIMEOUT_MS);
+    }
+
+    /**
+     * Types a query, presses the search control, and reports what the parent got.
+     *
+     * <p>THE WAIT IS MEASURED IN THE PAGE, not by the Java poller. {@code pollFor}
+     * ticks every 400 ms, which would quantise a repair that takes twenty into
+     * "four hundred" — and the number this returns is meant to be read as what a
+     * parent sat through, so it has to be finer than the instrument.
+     *
+     * <p>It settles on whichever of the three outcomes the surface produces —
+     * entries listed, «ничего не нашлось», or a refusal — so a leg can assert
+     * that the RIGHT one happened rather than waiting for the one it expects and
+     * timing out on the others. {@code said} reduces the empty sentence to a
+     * token in JavaScript rather than comparing Cyrillic across the
+     * {@code evaluateJavascript} boundary, which is the rule ExportTransferTest
+     * records.
+     */
+    private String searchFromTheSurface(ActivityScenario<MainActivity> scenario, String typed) {
+        return await(
+                scenario,
+                "__diaSearch",
+                ("(new Promise(function (resolve) {"
+                                + "var box = document.getElementById('diarySearchInput');"
+                                + "var go = document.getElementById('diarySearchBtn');"
+                                + "if (!box || !go || document.getElementById('diarySearchForm').hidden) {"
+                                + " resolve('found=-1;empty=false;failed=false;said=no-form;ms=0');"
+                                + " return; }"
+                                + "var started = Date.now();"
+                                + "box.value = '__TERM__';"
+                                + "go.click();"
+                                // THE WAIT KEYS ON SOMETHING THE APP SETS WHEN IT
+                                // HAS DECIDED, which is the rule the mark leg's
+                                // wait was repaired to obey (DIA-DL-006). A
+                                // predicate over the LIST would settle before
+                                // the search ran at all: the list already holds
+                                // the entries the parent wrote, so `an entry is
+                                // present` is true of the document before the
+                                // press. The search control disables itself
+                                // synchronously on submit and re-enables in a
+                                // `finally`, so its being enabled again is the
+                                // surface saying it is finished.
+                                + "var tick = function () {"
+                                + " if (go.disabled) { setTimeout(tick, 20); return; }"
+                                + " var found = document.querySelectorAll('#diaryList .diary-entry').length;"
+                                + " var none = document.getElementById('diarySearchEmpty');"
+                                + " var failed = document.getElementById('diarySearchStatus');"
+                                + " var said = 'listed';"
+                                + " if (!none.hidden) {"
+                                + "  said = none.textContent.indexOf('словоформ') !== -1"
+                                + "   ? 'wordforms' : 'other'; }"
+                                + " if (!failed.hidden) { said = 'refused'; }"
+                                + " resolve(['found=' + found, 'empty=' + !none.hidden,"
+                                + "  'failed=' + !failed.hidden, 'said=' + said,"
+                                + "  'ms=' + (Date.now() - started)].join(';'));"
+                                + "};"
+                                + "setTimeout(tick, 20);"
+                                + "}))")
+                        .replace("__TERM__", typed));
+    }
+
+    /**
+     * Empties the derived index, through the seam the app itself writes with.
+     *
+     * <p>{@code delete-all} is FTS5's own command for an external-content index,
+     * so what follows is a genuinely lost index rather than a simulated one — the
+     * same distinction {@code fillToCeiling} draws about a full disk. Nothing the
+     * family wrote is touched: {@code record} is the source, and the index is
+     * derived from it (PDR-026 §4 rule 3).
+     */
+    private void destroyIndex(ActivityScenario<MainActivity> scenario) {
+        String done =
+                await(
+                        scenario,
+                        "__diaWipe",
+                        "import(u('store/bridge.js')).then(function (bridge) {"
+                            + "return bridge.run('INSERT INTO record_fts (record_fts) VALUES (?)',"
+                            + " ['delete-all'], { transaction: false })"
+                            + ".then(function () { return 'wiped'; }); })");
+        assertEquals("the derived index was not emptied", "wiped", done);
     }
 
     /** What the parent is left holding after a refusal. */

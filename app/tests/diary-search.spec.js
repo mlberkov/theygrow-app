@@ -177,6 +177,33 @@ test.describe('the search narrows the same list, in the same window', () => {
         await expect(page.locator('#diarySearchClearBtn')).toBeHidden();
     });
 
+    test('the search control is disabled while the search runs, and enabled after', async ({
+        page,
+    }) => {
+        // NOT COSMETIC, AND NOT ONLY ABOUT DOUBLE-PRESSES. `DiaryEntryTest`'s
+        // device leg keys its wait on exactly this: the list already holds the
+        // parent's entries before a search, so a predicate over the LIST settles
+        // before the search has run — the failure mode DIA-DL-006 repaired in
+        // the mark leg. The control being enabled again is the surface saying it
+        // has decided, so that assumption gets an executor here rather than
+        // living unstated inside a Java string.
+        const ids = await withTwoEntries(page);
+        await page.evaluate((next) => Object.assign(window.__pageBridgeSearch, next), {
+            answer: [ids[0]],
+        });
+
+        // Read in the SAME synchronous turn as the press: the handler disables
+        // the control before its first await, so this is deterministic.
+        const during = await page.evaluate(() => {
+            document.getElementById('diarySearchInput').value = 'сел';
+            document.getElementById('diarySearchBtn').click();
+            return document.getElementById('diarySearchBtn').disabled;
+        });
+        expect(during, 'the control stayed enabled while the search ran').toBe(true);
+        await expect(page.locator('#diarySearchBtn')).toBeEnabled();
+        await expect(page.locator('#diaryList .diary-entry')).toHaveCount(1);
+    });
+
     test('an empty box is a request for the whole diary, not a search', async ({ page }) => {
         await withTwoEntries(page);
         await search(page, '   ', { answer: [] });

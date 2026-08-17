@@ -228,6 +228,141 @@ public class StoreEngineTest {
         assertTrue("a full rebuild lost the index", matches("сел"));
     }
 
+    // --- search over the diary, on the device engine (DIA-P4) --------------
+    //
+    // WHERE THE BOUNDARY IS, AND WHY THE NEXT READER MUST NOT "UNIFY" THESE WITH
+    // THE BUILDER. The two legs below make claims about the ENGINE: that
+    // SQLCipher's FTS5 build, with the tokenizer the frozen schema pins, resolves
+    // a quoted prefix, an OR of two spellings, and the `rebuild` command the way
+    // the desktop engine does. That is why their match terms are LITERAL. They
+    // are expressions of the SHAPE `buildDiaryMatch` produces, chosen to exercise
+    // prefix, alternation and quoting — they are NOT read from
+    // `diarySearchStemChars`, and they must not be.
+    //
+    // The moment they were derived from the knob, a green here would mean "the
+    // app agrees with itself" instead of "the engine does what we measured", and
+    // the one claim no laptop can make would be gone. What the SHIPPED builder
+    // produces from what a parent types is asserted where the builder runs:
+    // app/tests/schema/test_diary_search.py executes it under node against the
+    // real frozen DDL, and DiaryEntryTest drives it through the surface.
+    //
+    // So if these two ever disagree with that suite, the answer is not to make
+    // one read the other. It is that this engine differs from the desktop one,
+    // which is exactly the fact these legs exist to surface.
+
+    /** Five ordinary diary sentences, the same corpus the desktop suite uses. */
+    private void seedSearchCorpus() {
+        applySchema();
+        database.execSQL(
+                "INSERT INTO participant (id, is_self, created_at_utc) VALUES ('p-1', 1, 1)");
+        database.execSQL(
+                "INSERT INTO area (id, title, visibility_class, owner_participant_id,"
+                        + " created_at_utc) VALUES ('a-1', 'diary', 'child_shared', NULL, 1)");
+        String[][] corpus = {
+            {"r-sel", "Сегодня сел сам и держался"},
+            {"r-elka", "Ёлка растёт быстро"},
+            {"r-posla", "Пошла первый раз без рук"},
+            {"r-reb", "Ребёнок сказал новое слово"},
+            {"r-spal", "Спал днём два часа"},
+        };
+        for (String[] row : corpus) {
+            database.execSQL(
+                    "INSERT INTO record (id, area_id, author_participant_id, kind, body,"
+                            + " event_date_local, entry_at_utc, entry_utc_offset_min,"
+                            + " updated_at_utc) VALUES (?, 'a-1', 'p-1', 'text', ?,"
+                            + " '2026-01-01', 1, 0, 1)",
+                    new String[] {row[0], row[1]});
+        }
+    }
+
+    /**
+     * What a query of the shipped SHAPE finds on the engine that will run it.
+     *
+     * <p>The negative assertions carry as much as the positive ones. A search
+     * without lemmatisation has systematic misses, the product tells the parent
+     * so in its own words, and this is where "systematic" stops being an
+     * assumption about the device: `сесть` does not reach `сел` and `спит` does
+     * not reach `спал`, because the stem itself moved and a prefix bridges only
+     * an ending.
+     */
+    @Test
+    public void a_query_of_the_shipped_shape_behaves_as_measured_on_the_device() {
+        seedSearchCorpus();
+
+        // A prefix reaches a longer written form.
+        assertTrue("a quoted prefix found nothing", matches("(\"сел\"* OR \"сёл\"*)"));
+        assertTrue("`растут` does not reach `растёт`", matches("(\"раст\"*)"));
+        assertTrue("`пошёл` does not reach `Пошла`", matches("(\"пош\"*)"));
+        assertTrue("`спать` does not reach `Спал`", matches("(\"спа\"*)"));
+
+        // BOTH ё/е spellings are searched, because the index folds NEITHER into
+        // the other — the measured gap of LSC-DL-002, which the query closes and
+        // the index still does not.
+        assertTrue("the е spelling did not reach an indexed ё", matches("(\"елк\"* OR \"ёлк\"*)"));
+        assertFalse(
+                "yo folded to ye on this engine — re-read LSC-DL-002 and DIA-DL-008,"
+                        + " the query-side alternation may no longer be needed",
+                matches("\"елк\"*"));
+
+        // The documented misses. If either of these ever passes, this engine
+        // acquired stemming and the whole word-form decision can be revisited.
+        assertFalse("`сесть` reached `сел`, which no prefix scheme can do", matches("(\"сес\"*)"));
+        assertFalse("`спит` reached `Спал`", matches("(\"спи\"*)"));
+
+        // THE OVER-MATCH IS DELIBERATELY NOT ASSERTED HERE. `сельский` finding
+        // `сел сам` is a fact about TRUNCATION — the builder cutting both words
+        // to the same prefix — not about this engine, which sees only the
+        // expression it is handed. It is executed where the builder runs
+        // (app/tests/schema/test_diary_search.py, `сельский` -> ["r-sel"]).
+        // Asserting it here would make this file quietly about the knob.
+    }
+
+    /**
+     * A destroyed index is rebuilt from the records, and the rebuild is TIMED.
+     *
+     * <p>WHY THE NUMBER IS THE POINT. The product repairs the index inside a
+     * search that came back empty over a diary that has entries, so whatever a
+     * rebuild costs is time a PARENT waits, holding a screen that has not
+     * answered yet. Recording "it can be rebuilt" without recording what that
+     * takes would leave the one fact the design rests on unmeasured.
+     *
+     * <p>WHAT THE NUMBER DOES NOT SAY, and it must be read with this attached: it
+     * is five short sentences on an emulator. A parent with three years of
+     * entries is a different measurement, and nothing in this repository reaches
+     * it. The cost of a rebuild grows with the corpus, because a rebuild
+     * re-tokenises every record.
+     *
+     * <p>{@code delete-all} is FTS5's own way of emptying an external-content
+     * index, so the loss is real rather than simulated.
+     */
+    @Test
+    public void the_index_repairs_itself_after_delete_all() {
+        seedSearchCorpus();
+        assertTrue("the corpus was not indexed to begin with", matches("(\"сел\"* OR \"сёл\"*)"));
+
+        database.execSQL("INSERT INTO record_fts (record_fts) VALUES ('delete-all')");
+        assertFalse(
+                "delete-all left the index standing, so nothing below is about a repair",
+                matches("(\"сел\"* OR \"сёл\"*)"));
+
+        long startedAt = System.nanoTime();
+        database.execSQL("INSERT INTO record_fts (record_fts) VALUES ('rebuild')");
+        long rebuildMs = (System.nanoTime() - startedAt) / 1_000_000L;
+
+        assertTrue("the rebuild did not restore the index", matches("(\"сел\"* OR \"сёл\"*)"));
+        assertTrue("the rebuild restored only the term it was asked about", matches("(\"пош\"*)"));
+
+        // The records are the SOURCE of the index, so a rebuild reads them and
+        // writes nothing back. Losing the index must never cost a family a row.
+        assertEquals("5", queryScalar("SELECT count(*) FROM record"));
+
+        Log.i(
+                TAG,
+                "fts rebuild: records=5 ms=" + rebuildMs
+                        + " (emulator, five short sentences — a real diary is a different"
+                        + " measurement and this number does not predict it)");
+    }
+
     // --- what the engine SAYS when it is full (DIA-P3) ---------------------
 
     /**
