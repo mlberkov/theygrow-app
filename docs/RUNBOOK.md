@@ -859,15 +859,32 @@ not a case the parent can fix and not one this procedure has a command for.
    `workflow_dispatch` only, by the standing owner decision on CI spend. On the dispatch path the `android`
    job is **skipped by design** and `android-instrumented` uploads `theygrow-debug-apk` itself, so one
    dispatch yields both the verdict and the installable build.
-2. **Read the verdict before anything else.** Expected at the close of L2: `DiaryEntryTest` **5/5** and
-   `StoreEngineTest` **11/11**. Three numbers arrive with it and exist nowhere else — the rebuild duration
-   (`fts rebuild: records=5 ms=…`) and the two search waits
-   (`search wait as the parent experiences it: repairing=… ms, ordinary=… ms`). Read them **with the corpus
-   attached**: five short sentences and two short entries on an emulator, which does not predict a diary
-   with three years in it. Also present, recorded rather than required:
-   `fts integrity-check over an emptied index: bare=… | rank=1=…`.
+2. **Read the verdict before anything else — and read it out of THIS run's artefact.** Expected at the
+   close of L2: `DiaryEntryTest` **5/5** and `StoreEngineTest` **11/11**. Three numbers arrive with it and
+   exist nowhere else. **Each is logged under the tag of the suite that measures it**, so no single tag
+   carries all three and a reader who greps one of them concludes the others never arrived — the defect
+   that cost this milestone a full diagnostic round (`DIA-DL-009` (f)):
+   - **`LSC` — the engine numbers**, both `StoreEngineTest`'s: the rebuild duration
+     `fts rebuild: records=5 ms=…`, and — recorded rather than required —
+     `fts integrity-check over an emptied index: bare=… | rank=1=…`.
+   - **`DIA` — the search waits**, `DiaryEntryTest`'s:
+     `search wait as the parent experiences it: repairing=… ms, ordinary=… ms`. **`DIA` is not unique to
+     that suite** (`HistoryTransferTest` logs under it too), so scope the read to the leg rather than to
+     the tag alone.
+
+   Read the numbers **with the corpus attached**: five short sentences and two short entries on an
+   emulator, which does not predict a diary with three years in it.
+
+   **And the rule those tags exist to serve: a claim about a run is read from THAT run's artefact.** The
+   `ci-artifacts/` directory in the working tree is **uncommitted** (`.gitignore`) and holds whatever the
+   last run that wrote there left behind — it carries no run number and does not refresh itself. Fetch the
+   run under discussion, or name the run the file came from. A number quoted out of a stale directory is a
+   claim about a different run wearing this one's name.
 3. **Discharge the unobserved invariants, in `docs/INVARIANTS.md`.** `DIA-P4-INV-001` and `DIA-P4-INV-003`
-   carry a **Not yet observed.** field naming this dispatch as what discharges it. Replacing that field is a
+   carry a **Not yet observed.** field naming this dispatch as what discharges it. **`DIA-P3-INV-002` has a
+   third field to fill in the same pass** — its DIA-P4R amendment withdraws the diary half of (b) and
+   deliberately carries no run number, because the number belongs there only once the run exists
+   (`DIA-DL-009`). All three are replaced together. Replacing them is a
    docs packet with its own report — it is the shape P1, P2 and P3 each used, and it happens **before** the
    PR, so the milestone does not open with the debt it is closing.
 4. **Open the milestone PR** (`feat/l2-local-diary` → `main`). The PR event runs `android-instrumented`

@@ -106,6 +106,17 @@ public class DiaryEntryTest {
             "document.querySelectorAll('#tableBody tr[data-skill-id]').length > 0";
 
     /**
+     * The entry the acts write, and therefore the SIZE the arming has to reach.
+     *
+     * <p>One constant because it was typed in two legs and a third has to arm
+     * for it. The text is incidental; the LENGTH is load-bearing (DIA-DL-009).
+     * Twenty-six characters fit in slack that a two-hundred-character filler
+     * could not use, so a fixture that stopped at the longer row called the
+     * store full and then watched this one land on it.
+     */
+    private static final String AN_ENTRY = "Впервые сам встал у дивана";
+
+    /**
      * A fixture belongs to ONE leg (DIA-DL-002). The store outlives every
      * ActivityScenario in this process, so a child id shared between legs would
      * let one leg read another leg's entries and call them its own.
@@ -130,7 +141,7 @@ public class DiaryEntryTest {
 
             // A parent writing in the evening about the morning: the day is
             // chosen, the moment of writing is the app's business.
-            String verdict = fillAndSave(scenario, "2026-02-01", "Впервые сам встал у дивана");
+            String verdict = fillAndSave(scenario, "2026-02-01", AN_ENTRY);
             assertEquals("the surface did not report a saved entry: " + verdict, "listed", verdict);
 
             // THE ENTRY LANDED, asked of the STORE rather than of the surface —
@@ -316,7 +327,7 @@ public class DiaryEntryTest {
             String leg = "diskdiary";
             seedChild(scenario, leg);
 
-            String armed = fillToCeiling(scenario);
+            String armed = fillToCeiling(scenario, AN_ENTRY);
             Log.i(TAG, "arming: " + armed);
             try {
                 assertEquals(
@@ -324,17 +335,27 @@ public class DiaryEntryTest {
                                 + " disk: " + armed,
                         "full",
                         field(armed, "state"));
-                // THIS leg's act is a record write, so the record-shaped refusal
-                // is the one that arms it. The journal-shaped one is asserted by
-                // the mark leg, which is the leg whose act writes journal rows.
+                // THIS leg's act is a record write OF A PARTICULAR SIZE, so the
+                // refusal that arms it is the refusal of a record that size.
+                //
+                // `refusal` — the 200-character filler's — is still in the
+                // arming line and is deliberately NOT asserted here. It licensed
+                // this leg until DIA-DL-009, and it licensed nothing: on run
+                // 32012897363 it was reported at 09:03:45.287, and at
+                // 09:03:45.345 the app logged `diary.write outcome=complete
+                // ... chars=26` on that same store. Keeping it in the line is
+                // what let that run be compared with 31982061125, whose arming
+                // string was byte-identical and whose leg went green.
+                // The journal-shaped refusal is asserted by the mark leg, whose
+                // act writes journal rows.
                 assertEquals(
-                        "the store refused the filler for some reason other than a full disk,"
-                                + " so nothing below is about a full disk: " + armed,
+                        "the store still accepts a record the size of the entry below, so that"
+                                + " entry is not being written to a full disk: " + armed,
                         "full:StoreDiskFullError",
-                        field(armed, "refusal"));
+                        field(armed, "actRefusal"));
 
                 assertEquals("the diary was not offered", "pressed", openCompose(scenario));
-                String verdict = fillAndSave(scenario, "2026-02-01", "Впервые сам встал у дивана");
+                String verdict = fillAndSave(scenario, "2026-02-01", AN_ENTRY);
 
                 Log.i(TAG, "refusal verdict: " + verdict);
                 assertEquals(
@@ -377,7 +398,14 @@ public class DiaryEntryTest {
             pollFor(scenario, BOOTED, EVALUATE_TIMEOUT_MS);
             seedChild(scenario, "diskmark");
 
-            String armed = fillToCeiling(scenario);
+            // This leg's act is journal-shaped, so what arms it is
+            // `journalRefusal` and the act-sized record stage is not its
+            // precondition. It is passed the same entry anyway, so that ONE
+            // arming serves both legs and the record stages mean the same thing
+            // in each — a fixture that filled to a different depth depending on
+            // its caller would make the two legs' arming lines incomparable,
+            // and comparing arming lines is what found DIA-DL-009.
+            String armed = fillToCeiling(scenario, AN_ENTRY);
             Log.i(TAG, "arming: " + armed);
             try {
                 assertEquals(
@@ -788,15 +816,47 @@ public class DiaryEntryTest {
 
     /**
      * Lowers the page ceiling to the current size and then REACHES it, in both
-     * of the shapes the acts under test write.
+     * of the shapes the acts under test write AND at the size they write.
      *
      * <p>The clamp alone is not a full disk: SQLite refuses to set a maximum
      * below the current page count, and a small row may still fit in a
      * partially-filled page. So filler rows are written until one is refused —
-     * first in large pieces, then in small ones, so that what remains free is
-     * smaller than any row the acts under test write. The refusal of the last
+     * first in large pieces, then in small ones, and last in rows the size of
+     * the act itself, because what a refusal establishes is bounded by the row
+     * that was refused and reaches nothing narrower. The refusal of the last
      * filler is the evidence that the store is full, and it is returned rather
      * than assumed.
+     *
+     * <p>AND THE LAST FILLER MUST BE THE SIZE OF THE ACT, which run 32012897363
+     * is why this now says so. A REFUSAL PROVES THE STORE FULL FOR THE WRITE
+     * THAT WAS PERFORMED AND FOR NOTHING ELSE. {@code max_page_count} bounds the
+     * pages of the FILE, not its occupancy, and a statement that is refused
+     * leaves the file no larger than it found it — so the slack in
+     * partially-filled leaves is still there afterwards for a shorter row. The
+     * small stage's filler is 199 characters against the act's 26 — the stages
+     * are named by the argument to {@code new Array(n)}, which joins to n-1
+     * characters, and the one-off does not move the argument — so its refusal
+     * said nothing whatever about the act: the
+     * arming reported itself full at 09:03:45.287, and fifty-eight milliseconds
+     * later the app's own signal recorded the entry landing on that same store
+     * — {@code [signal] diary.write outcome=complete failure_class=none
+     * chars=26 write_ms=44}, at 09:03:45.345. (This fixture's own {@code
+     * refusal verdict: listed} follows at .716; that line is the harness
+     * speaking, not the store.)
+     *
+     * <p>{@code app/tests/schema/test_store_corruption.py} measures the same
+     * thing off the device and in seconds: the 8000-character stage is refused
+     * immediately, the 200-character stage writes eight rows and is refused,
+     * and then FOUR MORE ROWS OF THE ACT'S SIZE LAND before that size is refused
+     * in turn — after which it stays refused for ten more attempts, which is the
+     * only reason arming down to it terminates.
+     *
+     * <p>SO THE THREE STAGES ARE NOT THREE WAYS OF SAYING ONE THING and the loop
+     * cannot be simplified back into one. They are three sizes, the last of them
+     * is the act's, and its refusal — returned as {@code actRefusal} — is what
+     * licenses the diary leg. {@code refusal}, the small stage's, stays in the
+     * answer because it is what makes one run's arming comparable with another's,
+     * and it is no longer asserted by anybody.
      *
      * <p>THEN THE SAME THING AGAIN FOR THE JOURNAL, because "full" is a property
      * of the next write and not of the file. The filler above exhausts what
@@ -814,11 +874,11 @@ public class DiaryEntryTest {
      * and say it had, which is the whole failure mode this method exists to
      * prevent.
      */
-    private String fillToCeiling(ActivityScenario<MainActivity> scenario) {
+    private String fillToCeiling(ActivityScenario<MainActivity> scenario, String act) {
         return await(
                 scenario,
                 "__diaArm",
-                "import(u('store/bridge.js')).then(function (bridge) {"
+                ("import(u('store/bridge.js')).then(function (bridge) {"
                     // The filler needs a container, and it gets its OWN — created
                     // before the clamp, and deliberately NOT linked to any child.
                     // loadRecords() reaches records through area_child, so an
@@ -835,8 +895,7 @@ public class DiaryEntryTest {
                     + "return bridge.pragma('PRAGMA max_page_count = ' + pages)"
                     + ".then(function (ceiling) {"
                     + "var made = 0;"
-                    + "var write = function (size) {"
-                    + " var body = new Array(size).join('я');"
+                    + "var write = function (body) {"
                     + " return bridge.run('INSERT INTO record (id, area_id,"
                     + " author_participant_id, kind, body, event_date_local, entry_at_utc,"
                     + " entry_utc_offset_min, updated_at_utc)"
@@ -850,10 +909,10 @@ public class DiaryEntryTest {
                     + "var refused = function (error) {"
                     + " if (!error || error.name !== 'StoreDiskFullError') { throw error; }"
                     + " return 'full:' + error.name; };"
-                    + "var loop = function (size, left) {"
+                    + "var loop = function (body, left) {"
                     + " if (left <= 0) { return Promise.resolve('budget'); }"
-                    + " return write(size).then(function () { made += 1;"
-                    + "  return loop(size, left - 1); }, refused); };"
+                    + " return write(body).then(function () { made += 1;"
+                    + "  return loop(body, left - 1); }, refused); };"
                     // The mark path's own shape: one transaction carrying a
                     // journal entry and its detail. kind='note' with a NULL
                     // skill is what the schema's paired CHECK makes expressible,
@@ -879,18 +938,30 @@ public class DiaryEntryTest {
                     + " if (left <= 0) { return Promise.resolve('budget'); }"
                     + " return probe().then(function () { journalled += 1;"
                     + "  return journalLoop(left - 1); }, refused); };"
-                    + "return loop(8000, 400).then(function (big) {"
+                    + "return loop(new Array(8000).join('я'), 400).then(function (big) {"
                     + " if (big === 'budget') { return 'state=budget;rows=' + made; }"
-                    + " return loop(200, 400).then(function (small) {"
+                    + " return loop(new Array(200).join('я'), 400).then(function (small) {"
                     + "  if (small === 'budget') { return 'state=budget;rows=' + made; }"
-                    + "  return journalLoop(200).then(function (journal) {"
-                    + "   if (journal === 'budget') {"
-                    + "    return 'state=journal-budget;rows=' + made"
-                    + "     + ';journalRows=' + journalled; }"
-                    + "   return ['state=full', 'rows=' + made, 'ceiling=' + ceiling,"
-                    + "    'refusal=' + small, 'journalRows=' + journalled,"
-                    + "    'journalRefusal=' + journal].join(';'); });"
-                    + "  }); }); }); }); })");
+                    // Everything written from here on is the act's own size, so
+                    // the two counts are kept apart: `rows` stays what it always
+                    // meant, and `actRows` is the cost of the stage that was
+                    // missing.
+                    + "  var sized = made;"
+                    + "  return loop('__ACT__', 400).then(function (act) {"
+                    + "   if (act === 'budget') {"
+                    + "    return 'state=act-budget;rows=' + sized"
+                    + "     + ';actRows=' + (made - sized); }"
+                    + "   return journalLoop(200).then(function (journal) {"
+                    + "    if (journal === 'budget') {"
+                    + "     return 'state=journal-budget;rows=' + sized"
+                    + "      + ';actRows=' + (made - sized)"
+                    + "      + ';journalRows=' + journalled; }"
+                    + "    return ['state=full', 'rows=' + sized, 'ceiling=' + ceiling,"
+                    + "     'refusal=' + small, 'actRows=' + (made - sized),"
+                    + "     'actRefusal=' + act, 'journalRows=' + journalled,"
+                    + "     'journalRefusal=' + journal].join(';'); });"
+                    + "   }); }); }); }); }); })")
+                        .replace("__ACT__", act));
     }
 
     /**

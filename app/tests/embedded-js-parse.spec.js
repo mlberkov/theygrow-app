@@ -141,7 +141,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DiaryEntryTest.java',
-        line: 992,
+        line: 1063,
         argument: '"window." + slot',
         reason:
             'a chain with a non-literal operand: the async slot name is a Java variable. C3'
@@ -150,7 +150,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DiaryEntryTest.java',
-        line: 1000,
+        line: 1071,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
