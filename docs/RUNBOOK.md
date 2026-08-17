@@ -875,6 +875,12 @@ not a case the parent can fix and not one this procedure has a command for.
    Read the numbers **with the corpus attached**: five short sentences and two short entries on an
    emulator, which does not predict a diary with three years in it.
 
+   **Done for L2: run 32044006357** — `DiaryEntryTest` 5/5, `StoreEngineTest` 11/11, and all three numbers
+   on the record in `DIA-P4-INV-003`. One thing that dispatch settled about the numbers themselves, worth
+   knowing before quoting one: **the repairing search wait is a SAMPLE, not a measurement.** It was 22 ms
+   on run 32012897363 and 41 ms on 32044006357 — same corpus, same image — while the ordinary wait beside
+   it was 21 ms in both. Quote it as a range, or name the run it came from.
+
    **And the rule those tags exist to serve: a claim about a run is read from THAT run's artefact.** The
    `ci-artifacts/` directory in the working tree is **uncommitted** (`.gitignore`) and holds whatever the
    last run that wrote there left behind — it carries no run number and does not refresh itself. Fetch the
@@ -884,7 +890,9 @@ not a case the parent can fix and not one this procedure has a command for.
    carry a **Not yet observed.** field naming this dispatch as what discharges it. **`DIA-P3-INV-002` has a
    third field to fill in the same pass** — its DIA-P4R amendment withdraws the diary half of (b) and
    deliberately carries no run number, because the number belongs there only once the run exists
-   (`DIA-DL-009`). All three are replaced together. Replacing them is a
+   (`DIA-DL-009`). All three are replaced together. **Done for L2 in DIA-P4-CLOSE, on run 32044006357: all
+   three fields now read Observed, and no `Not yet observed.` field remains anywhere in the file.**
+   Replacing them is a
    docs packet with its own report — it is the shape P1, P2 and P3 each used, and it happens **before** the
    PR, so the milestone does not open with the debt it is closing.
 4. **Open the milestone PR** (`feat/l2-local-diary` → `main`). The PR event runs `android-instrumented`
