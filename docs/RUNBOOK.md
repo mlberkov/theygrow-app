@@ -62,7 +62,7 @@ Three places in this file, and the header comment of all three build-configs, us
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
-   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v5/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v5/app.js"` and `curl -fsSI "$TAG_URL/m/v5/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v5/sw-register.js` carries the same headers. Repeat for the current mount version after a bump.
+   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v6/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v6/app.js"` and `curl -fsSI "$TAG_URL/m/v6/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v6/sw-register.js` carries the same headers. Repeat for the current mount version after a bump.
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
 4. **Promote.** Shift 100% traffic to the just-smoked revision:
    `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
@@ -649,7 +649,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 5. **Force-stop the app, reopen it, and open the diary again.** The entry must still be there. That is the whole point of the packet and the only step that observes the store surviving a process death.
 6. **Read the signal on the same run:** `adb logcat -s chromium | grep 'diary.write'` shows one line per save of the form `[signal] diary.write outcome=complete failure_class=none chars=<n> write_ms=<n>`. `chars` is a length; if anything resembling the text you typed appears in that line, stop — that is a §4 breach and `LSC-P4-INV-003` should have made it impossible.
 7. **What this smoke cannot reach, and nobody should pretend otherwise:** a phone that is actually out of storage. The disk-full refusal is exercised on the emulator by making the ENGINE refuse (`DiaryEntryTest`), which is a real `SQLITE_FULL` and not a real full phone — a device with no space left also fails in ways SQLite never sees. If you ever meet one for real, the sentence you should see says the entry was NOT saved, that your text is still in the field, and to free space — not to restart the app.
-8. **One thing to know before this smoke and not after it:** the archive does **not** contain diary text. It carries the marks and the journal. Until the owner decision recorded in `DIA-DL-005` is taken, an exported archive is not a backup of anything written in the diary.
+8. **One thing to know before this smoke and not after it:** the archive does **not** contain diary text. It carries the marks and the journal, so an exported archive is not a backup of anything written in the diary. *(Corrected at DIA-P4: this said the owner decision had not been taken. It has — the gate of 2026-08-17 chose that the long-lived artefact **will** carry diary text and addressed the work to **L3**. Read the sentence above as a state with an address: until L3 ships, a parent's diary text exists in exactly one copy on one device. `DIA-DL-005`'s pointer and `DIA-DL-008`.)*
 
 **Note for the web channel (rewritten in DIA-P2).** In a browser there is **no archive control at all**. Until that packet the control opened a modal that explained why it could not act; the browser cannot produce an archive under any circumstances — there is no web branch in the export sink and there never was — so the action is no longer offered where it does not happen (PDR-034 §1). What the browser says instead is a line above the table: everything marked there lives only in that browser, it has no backup, and the archive is something the phone app makes. That statement is true until a transfer is confirmed (ADR-048 §5), and it is on screen without anything being opened.
 
@@ -796,6 +796,103 @@ the ceiling. It is bounded rather than open — a shortened URI fails the declar
 digest, the receiver refuses it before staging, and the app falls to the file path — and
 `HistoryTransferTest.the_receiver_refuses_a_truncated_link` executes exactly that refusal on an input
 it builds itself.
+
+### The diary and its search — DIA-P3 / DIA-P4 (owner-run)
+
+> **Owner device action.** Performed by the owner on a real handset. Claude Code runs none of it, and no
+> job in CI can: the emulator has never held this family's history, and the parity suite drives a
+> synthetic origin with no store behind it.
+
+**Run this after the transfer smoke above, on the same install.** The diary needs a child profile, and the
+transfer is what puts one there.
+
+1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. Press **Новая запись**,
+   pick a day that is NOT today — deliberately, because the event day and the moment of writing are
+   different columns and this is the only place a person checks that the form asks for the first — type a
+   couple of sentences, press **Сохранить**. The window stays open and the entry appears first in the list.
+   That is the confirmation; there is no banner here by design.
+2. **Confirm it survived the process, not just the render.** Force-stop the app, relaunch it, open the
+   diary. The entry is still listed, with the day you chose. A list that renders and a journal that was
+   written are different facts, and only the relaunch tells them apart.
+3. **Correct it.** Press **Изменить** on the entry, change a word, save. There is still exactly **one**
+   entry — an edit is an overwrite, not a second entry on top (PDR-026 §4 rule 1).
+4. **Search for a word you wrote, in a DIFFERENT form.** Write `сел` and search `села`; write `растёт` and
+   search `растут`. The entry is found. This is the whole word-form decision (`DIA-DL-008`) meeting a real
+   parent: the search matches the beginning of a word, so a different ending is bridged.
+5. **Search for a form it CANNOT reach, and read the sentence.** Search `сесть` against an entry containing
+   `сел`. Expected: nothing found, and the line «В дневнике нет записей с этими словами. Поиск ищет по началу
+   слова и не разбирает русские словоформы…». **This is a designed miss, not a fault** — the stem itself
+   changes, and no prefix scheme reaches it with or without ICU. What is being checked is that the product
+   says so, and offers the shorter word, instead of implying the entry does not exist.
+6. **Confirm the two empty states are not the same sentence.** Press **Показать все**, then search a word
+   nobody wrote. The «нет записей с этими словами» line appears — and «Записей пока нет.» does **not**, on a
+   diary that has entries. If a search failure ever produced the second, the app would be telling a parent
+   they never wrote something they did write.
+7. **Read the log, and confirm what is NOT in it.** `adb logcat | grep '\[signal\]'` during the searches
+   above. Expect lines of the shape
+   `[signal] diary.search outcome=complete failure_class=none tokens=1 results=1 search_ms=… rebuilt=false`.
+   **Check the absence as deliberately as the presence:** no word you typed appears on any line, and no
+   sentence you wrote does. `rebuilt=true` would mean the derived index had to be repaired before the answer
+   was right — see the next section.
+8. **Record the result** in the smoke note: that the entry survived a restart, which form was searched and
+   found, which form was searched and honestly missed, and that no search term appeared in the log. Never a
+   child's name and never a line of what was written.
+
+**There is no manual way to rebuild the search index, and that is deliberate.** There is no console into an
+encrypted SQLCipher store on a device — no `sqlite3`, no shell, no exported file to run SQL against — so a
+"run this command" step would be a step nobody can perform. The app repairs the index itself: a search that
+comes back empty over a diary that HAS entries runs FTS5's `rebuild` once per app session and re-runs the
+query, so the parent sees their entry rather than an explanation (`DIA-DL-008` (e)). Nothing is shown to
+them about it; `rebuilt=true` in the signal line above is where an operator reads that it happened. If a
+search that should hit keeps missing across a full restart of the app, that is the case to report — it is
+not a case the parent can fix and not one this procedure has a command for.
+
+### Closing a milestone: the owner sequence, end to end (L2 / DIA-P4)
+
+> **The order is the procedure.** Each step's output is the next step's premise, and two of them are
+> irreversible-ish in practice: a merge is what makes the branch history public on `main`, and a promotion
+> is what puts new bytes in front of the family. Written out because the milestone that needs it most is the
+> one where every earlier packet's evidence is already in, and the temptation is to skip to the merge.
+
+1. **Dispatch `android-instrumented` on the branch.** GitHub → **Actions** → **CI** → **Run workflow** →
+   `feat/l2-local-diary`. This is the only job that runs the device legs; it is `pull_request` +
+   `workflow_dispatch` only, by the standing owner decision on CI spend. On the dispatch path the `android`
+   job is **skipped by design** and `android-instrumented` uploads `theygrow-debug-apk` itself, so one
+   dispatch yields both the verdict and the installable build.
+2. **Read the verdict before anything else.** Expected at the close of L2: `DiaryEntryTest` **5/5** and
+   `StoreEngineTest` **11/11**. Three numbers arrive with it and exist nowhere else — the rebuild duration
+   (`fts rebuild: records=5 ms=…`) and the two search waits
+   (`search wait as the parent experiences it: repairing=… ms, ordinary=… ms`). Read them **with the corpus
+   attached**: five short sentences and two short entries on an emulator, which does not predict a diary
+   with three years in it. Also present, recorded rather than required:
+   `fts integrity-check over an emptied index: bare=… | rank=1=…`.
+3. **Discharge the unobserved invariants, in `docs/INVARIANTS.md`.** `DIA-P4-INV-001` and `DIA-P4-INV-003`
+   carry a **Not yet observed.** field naming this dispatch as what discharges it. Replacing that field is a
+   docs packet with its own report — it is the shape P1, P2 and P3 each used, and it happens **before** the
+   PR, so the milestone does not open with the debt it is closing.
+4. **Open the milestone PR** (`feat/l2-local-diary` → `main`). The PR event runs `android-instrumented`
+   again, plus the PDF/A validation leg, plus `quality` and `parity` — the full gate.
+5. **Merge.** Nothing deploys from a branch; the merge is what makes the next step possible.
+6. **The push to `main` builds and deploys at 0% traffic.** `app/cloudbuild.yaml` Step 3 lands a fresh
+   revision with `--no-traffic --tag sha-$SHORT_SHA`. The live revision keeps serving. **Nothing has reached
+   the family yet at this point.**
+7. **Curl-smoke the tagged revision** — the full list in **Promotion + rollback (L1 deploy-safety gate)**,
+   step 3. Note that this milestone did **not** bump the mount: `/m/v6/` was created on the branch and edited
+   in place, so `CACHE_VERSION` stays **v16** and the mount checks in that step address `/m/v6/`.
+8. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
+   That step asks about a client that had the app *before* this deploy; a fresh browser does not qualify and
+   the honest answer, if no such client exists, is to write that in the note.
+9. **The on-device smoke, in this order and no other:** the **transfer** (*The browser-to-native history
+   transfer*), then the **diary and its search** (the section above). The order is load-bearing — the diary
+   needs a child profile and the transfer is what puts one there — and the transfer's own step 1 says to read
+   the instrumented result before installing anything, which step 2 above has already done.
+10. **The still-gated owner items, none of which this milestone performs.** Clearing the browser's
+    `localStorage` after a confirmed transfer (nothing in the code removes, rewrites or marks the source
+    consumed — the decision and the moment are the owner's). Removing the install prompt (PDR-034 §3, gated
+    on this smoke). The GA4 surface, which stays until authentication appears at L4. Retiring `m/v1`–`m/v5`.
+    The privacy-policy and consent surface, whose address is a separate owner decision. And the artefact work
+    the 2026-08-17 gate addressed to **L3** — until it ships, the archive carries marks and journal history
+    only, which the diary's own corrupt-store message already tells a parent in their own words.
 
 ### `/api` (FastAPI)
 
