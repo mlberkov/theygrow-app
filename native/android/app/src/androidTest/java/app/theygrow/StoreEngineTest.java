@@ -345,6 +345,30 @@ public class StoreEngineTest {
                 "delete-all left the index standing, so nothing below is about a repair",
                 matches("(\"сел\"* OR \"сёл\"*)"));
 
+        // RECORDED, NOT REQUIRED — the same posture as the ICU line above, and
+        // the product depends on none of it. On desktop SQLite 3.45.1 the
+        // argument-less integrity-check PASSES over an emptied index and only
+        // the `rank`-argument form detects the divergence; whether that form
+        // exists on this engine has never been measured. The product rebuilds
+        // unconditionally rather than probing, so this reports instead of
+        // asserting: it turns an unknown in DIA-DL-008 into a fact for whoever
+        // later wants a staleness probe.
+        String argumentless = "did not raise";
+        try {
+            database.execSQL("INSERT INTO record_fts (record_fts) VALUES ('integrity-check')");
+        } catch (RuntimeException raised) {
+            argumentless = "raised: " + raised.getMessage();
+        }
+        String withRank = "did not raise";
+        try {
+            database.execSQL(
+                    "INSERT INTO record_fts (record_fts, rank) VALUES ('integrity-check', 1)");
+        } catch (RuntimeException raised) {
+            withRank = "raised: " + raised.getMessage();
+        }
+        Log.i(TAG, "fts integrity-check over an emptied index: bare=" + argumentless
+                + " | rank=1=" + withRank);
+
         long startedAt = System.nanoTime();
         database.execSQL("INSERT INTO record_fts (record_fts) VALUES ('rebuild')");
         long rebuildMs = (System.nanoTime() - startedAt) / 1_000_000L;
