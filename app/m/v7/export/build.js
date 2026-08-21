@@ -15,7 +15,7 @@ import { EXPORT_CONFIG } from './config.js';
 import { ExportError } from './errors.js';
 import { renderPdf } from './pdf.js';
 import { renderAttachmentsNote, renderReadme } from './readme.js';
-import { renderDataset, renderJournal } from './text.js';
+import { renderDataset, renderDiary, renderJournal } from './text.js';
 import { writeZip } from './zip.js';
 
 const ENCODER = new TextEncoder();
@@ -30,9 +30,19 @@ const EMPTY_STATEMENT = Object.freeze({
         'Ни один атрибут ребёнка ещё не был записан, поэтому показывать нечего.',
     'text/skills.txt':
         'Ни один навык ещё не был отмечен, поэтому текущего состояния навыков нет.',
+    // Rewritten in FIU-P4, and the old wording is worth naming because it was
+    // FALSE by the time it mattered: it said the diary "appears in a later
+    // version of the app". The diary shipped at DIA-P3 and its records have
+    // travelled in this archive ever since — this dataset was declared at L1-P3,
+    // ahead of the table having rows. An empty file here means one thing only,
+    // and it is a fact about the SOURCE: the participant who made this archive
+    // wrote nothing. Another participant's entries are not counted here and
+    // never were part of what this file could have shown (scope.diary).
     'text/diary.txt':
-        'Записей дневника в этом архиве нет. Дневник появляется в более поздней версии'
-        + ' приложения, поэтому его отсутствие здесь ожидаемо и не означает потери.',
+        'Записей дневника в этом архиве нет: участник, создавший архив, не написал'
+        + ' ни одной. Это не потеря и не сбой при создании архива. Записи других'
+        + ' участников семьи сюда не входят по правилу архива, поэтому их'
+        + ' отсутствие здесь ничего не говорит о том, есть они у них или нет.',
 });
 
 function json(value) {
@@ -108,6 +118,20 @@ function renderFile(entry, declaration, readout, manifest, rendered) {
             return json({ declaration, datasets: readout });
         case 'text/journal.txt':
             return text(renderJournal(declaration, readout));
+        // The diary has a renderer of its own for the reason text.js gives at
+        // renderDiary: a field block answers "what does this dataset hold", and
+        // this file has to answer "what did I write about my child". Named here
+        // by path, exactly as the journal is, rather than by a new key in the
+        // declaration — the file list is the declaration's business, how one
+        // declared file is rendered is the builder's.
+        case 'text/diary.txt':
+            return text(
+                renderDiary(datasetByName(declaration, entry.dataset), readout[entry.dataset], {
+                    title: entry.title_ru.toUpperCase(),
+                    emptyStatement: EMPTY_STATEMENT[entry.path],
+                    scopeStatement: declaration.scope.diary?.statement_ru,
+                })
+            );
         case 'attachments/README.txt':
             return text(renderAttachmentsNote(declaration));
         default: {

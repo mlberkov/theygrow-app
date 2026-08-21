@@ -1,16 +1,23 @@
 {
   "format": "theygrow-archive",
-  "format_version": 1,
+  "format_version": 2,
   "schema_contract": "lsc-journal-v1",
-  "declared_in": "LSC-DL-003",
+  "declared_in": "FIU-DL-004",
+  "previous_version_declared_in": "LSC-DL-003",
   "title_ru": "Архив семейной истории TheyGrow",
   "about_ru": "Это самоописывающийся архив. Всё, что нужно для чтения текстовых файлов и файла index.json, описано здесь же: список наборов данных, список полей и объяснение каждого поля. Приложение для чтения не требуется.",
   "authoritative_ru": "Первоисточник — журнал записей (набор journal_entry и его три таблицы деталей). Производные наборы вычислены из журнала и приведены для удобства чтения; при расхождении верен журнал.",
   "scope": {
     "kind": "requesting_participant",
-    "statement_ru": "В архив входят все общие записи о ребёнке и личные записи того участника, который создал архив. Личные записи других участников семьи в этот архив не входят и никогда не войдут: у каждого участника свой архив.",
-    "statement_en": "The archive carries every child-shared entry plus the private entries of the participant who requested it. Another participant's private entries are never included; each participant exports their own.",
-    "parameter": "self_participant_id"
+    "statement_ru": "В архив входят все общие записи журнала о ребёнке и личные записи журнала того участника, который создал архив. Личные записи журнала других участников семьи в этот архив не входят и никогда не войдут: у каждого участника свой архив. Для текста дневника правило строже — см. раздел scope.diary.",
+    "statement_en": "The archive carries every child-shared journal entry plus the private journal entries of the participant who requested it. Another participant's private journal entries are never included; each participant exports their own. Diary text follows a stricter rule — see scope.diary.",
+    "parameter": "self_participant_id",
+    "diary": {
+      "statement_ru": "Текст дневника принадлежит тому, кто его написал. В этот архив входят ТОЛЬКО записи дневника участника, создавшего архив, — и никакие записи других участников, ни в одном файле, ни в печатном слое, ни в счётчиках. Правило действует не на уровне области, к которой относится запись, а на уровне автора самой записи: набор record отбирается по полю author_participant_id, поэтому запись другого участника не попадает сюда даже из общей области ребёнка.",
+      "statement_en": "Diary text belongs to whoever wrote it. This archive carries ONLY the diary entries of the participant who created it — no other participant's entries, in any file, in the print layer, or in any count. The rule binds the entry's AUTHOR rather than the area it sits in: the record dataset is selected on author_participant_id, so another participant's entry cannot travel here even out of a child-shared area.",
+      "predicate": "record.author_participant_id = self_participant_id",
+      "changed_in": "FIU-DL-004"
+    }
   },
   "media": {
     "included": false,
@@ -69,7 +76,7 @@
     },
     {
       "path": "text/diary.txt",
-      "title_ru": "Записи дневника",
+      "title_ru": "Записи дневника: то, что было написано своими словами, по дням",
       "dataset": "record"
     },
     {
@@ -144,9 +151,9 @@
       "name": "record",
       "kind": "source",
       "title_ru": "Записи дневника",
-      "description_ru": "Текстовые записи дневника. Дневник появляется на более поздней ступени продукта, поэтому в архиве этого времени набор может быть пустым — это ожидаемо, а не потеря.",
+      "description_ru": "Записи дневника — то, что участник, создавший этот архив, написал своими словами. Здесь только его собственные записи: отбор идёт по полю author_participant_id, а не по области, поэтому запись другого участника семьи не попадает сюда ни из общей области ребёнка, ни откуда-либо ещё (раздел scope.diary). Читать эти записи глазами удобнее в файле text/diary.txt и в печатном слое: там они собраны по дням и набраны как текст, а не как поля. Пустой набор означает ровно одно — этот участник не написал ни одной записи.",
       "params": ["self_participant_id"],
-      "query": "SELECT r.id AS id, r.area_id AS area_id, r.author_participant_id AS author_participant_id, r.kind AS kind, r.body AS body, r.media_ref AS media_ref, r.sensitivity AS sensitivity, r.event_date_local AS event_date_local, r.event_at_utc AS event_at_utc, r.event_utc_offset_min AS event_utc_offset_min, r.entry_at_utc AS entry_at_utc, r.entry_utc_offset_min AS entry_utc_offset_min, r.updated_at_utc AS updated_at_utc FROM record r JOIN area a ON a.id = r.area_id WHERE a.visibility_class = 'child_shared' OR a.owner_participant_id = ? ORDER BY r.entry_at_utc, r.id",
+      "query": "SELECT r.id AS id, r.area_id AS area_id, r.author_participant_id AS author_participant_id, r.kind AS kind, r.body AS body, r.media_ref AS media_ref, r.sensitivity AS sensitivity, r.event_date_local AS event_date_local, r.event_at_utc AS event_at_utc, r.event_utc_offset_min AS event_utc_offset_min, r.entry_at_utc AS entry_at_utc, r.entry_utc_offset_min AS entry_utc_offset_min, r.updated_at_utc AS updated_at_utc FROM record r WHERE r.author_participant_id = ? ORDER BY r.entry_at_utc, r.id",
       "columns": [
         { "name": "id", "type": "text", "description_ru": "Идентификатор записи (UUID)." },
         { "name": "area_id", "type": "text", "description_ru": "Область, к которой относится запись." },

@@ -43,10 +43,28 @@ export const EXPORT_CONFIG = Object.freeze({
     // the string has to keep meaning what it meant.
     formatId: 'theygrow-archive',
 
-    // changed_in: LSC-DL-003 — the format version. Bumps only when the DIRECTORY
+    // changed_in: LSC-DL-003 — the format version. Bumps when the DIRECTORY
     // SHAPE or the FIELD SET changes, never when a value changes. A reader that
     // understands version N must keep understanding artifacts written by it.
-    formatVersion: 1,
+    //
+    // changed_in: FIU-DL-004 — VALUE 1 → 2, and the RULE above gains its third
+    // cause, because this bump is an instance of one the original wording did
+    // not name: **what a dataset's rows are SCOPED to.** The shape is untouched
+    // and so is every field set; what changed is which rows are in `record` at
+    // all. v1 scoped diary records through their AREA, so another participant's
+    // entry in a child-shared area was inside the promise; v2 scopes them by
+    // `author_participant_id`, so it never is (declaration.json scope.diary).
+    // Narrowing a published promise is exactly what a reader needs a version
+    // number to tell them about — an archive is read decades later by someone
+    // who cannot ask which rule was in force — so the rule reads: shape, field
+    // set, OR the scope of a dataset's rows. A value inside a row still bumps
+    // nothing.
+    //
+    // The second half of this packet — text/diary.txt rendered as a diary
+    // instead of as a field dump — does NOT on its own require the bump: it is
+    // a rendering of the same rows into the same file. It ships under v2
+    // because the scope change carries it, not the other way round.
+    formatVersion: 2,
 
     // changed_in: LSC-DL-003 — the artifact's self-description, fetched from the
     // app's own origin exactly like the DDL is (store/config.js schemaUrl). It is

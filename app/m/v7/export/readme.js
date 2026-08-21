@@ -107,6 +107,14 @@ export function renderReadme(declaration) {
 
     sections.push(RULE, 'ЧТО ВХОДИТ В АРХИВ, А ЧТО НЕТ', RULE, '');
     sections.push(wrap(declaration.scope.statement_ru), '');
+    // FIU-P4. The diary rule is stated separately from the journal rule because
+    // it is STRICTER, and a reader who takes the sentence above as covering
+    // everything would draw the wrong conclusion about the one dataset that
+    // carries a person's own words. Read out of the declaration rather than
+    // written here, so the archive's own copy and its README cannot drift.
+    if (declaration.scope.diary) {
+        sections.push(wrap(declaration.scope.diary.statement_ru), '');
+    }
 
     sections.push(RULE, 'КАК СВЯЗАНЫ ЗАПИСИ', RULE, '');
     sections.push(wrap(declaration.join.comment_ru), '');
