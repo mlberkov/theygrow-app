@@ -296,6 +296,40 @@ Canonical names to create: Cloud Run service **`theygrow-api-staging`**, databas
    7. Decide the old `app/kb-v{M}.json`'s fate in the same packet (owner call at bump time — the app references exactly one version, and the old bytes stay reproducible via the domain-kb tag `kb-v{M}`, so retiring it is the natural default; no policy is pre-fixed here).
 3. **Promotion.** The no-traffic revision smoke (step 3 of **Promotion + rollback (L1 deploy-safety gate)** above) includes the two kb checks — immutable `Cache-Control` and served-sha256 == vendored.
 
+## Privacy policy (owner-run, L3-P3)
+
+The app links a privacy policy from inside itself, and the link is **withheld until you say the document
+exists**. Same mechanism as the APK download offer above, same fail-closed rule, and one difference that
+decides the order you do things in.
+
+1. **Publish the document first.** The address is fixed and declared once, in
+   `app/m/v{N}/channel/config.js` as `CHANNEL_CONFIG.policyUrl` — today `https://theygrow.app/privacy`.
+   It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
+   geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
+   download and a pinch-zoom rather than a document.
+2. **Then declare it.** In `app/index.html`, set `<meta name="theygrow-privacy-policy" content="published">`
+   (it ships as `content="none"`). Anything that is not exactly `published` — a missing tag, an empty value,
+   a typo, a stale `none` — means "no document", and no link is offered anywhere.
+3. **The two channels pick that flip up differently, and this is the step people forget.** The shell is
+   served `max-age=3600, must-revalidate` and network-first, so on the **web** the flip costs a deploy and
+   reaches installed clients on their next navigation — merge, deploy and promote per **Promotion +
+   rollback**. The shell is ALSO what the APK carries, so on a **phone** it reaches nobody until the next
+   release build is produced and installed (**Release build + APK distribution** above). Until then the app
+   on a parent's phone correctly shows no link.
+4. **Check it, in the place it lives.** Open the app, press the round **«?»** in the header, scroll to the
+   bottom of the greeting: «Политика конфиденциальности» must be there and must open the real page. It is
+   the only home the link has, on both channels, and «?» is the only way back into that window once the
+   greeting has been closed.
+5. **Ordering is the whole point, exactly as it is for the release.** Flipping the token before the
+   document exists puts a parent on a 404 under the word "privacy" — a promise about their family's data
+   with nothing behind it. Nothing in CI can catch that: the token is a statement by you, and
+   `FIU-P3-INV-002` checks only that the code obeys it. **If the document is ever withdrawn or moved, set
+   this back to `none`** before anything else.
+6. **What this does NOT do.** It does not build the web channel's analytics-consent surface, and it asks
+   the parent to accept nothing — no checkbox, no blocked close. Making the document reachable is the
+   obligation; collecting acceptance is separate work with its own storage question, and it is still owed
+   (`A3-DL-003` debt 2, PDR-035 §5).
+
 ## Module mount (owner-run version bump)
 
 > **Why this section exists.** `/m/v{N}/` is served `public, immutable, max-age=2592000` at a URL that carries no content hash. **A `CACHE_VERSION` bump alone does NOT deliver changed bytes at an existing mount URL** — `cache.addAll` goes through the HTTP cache, so inside the 30-day immutable window the browser hands the new worker its stored copy without revalidating, and the new cache generation is filled with the **stale** file. It then survives every subsequent bump. Changing the bytes at a published mount URL is therefore not a thing this project does. See `A1-DL-004`.
@@ -361,7 +395,7 @@ Individual steps below carry a **(first execution)** marker where they fall in t
 3. **Verify the pair locally first:** `sha256sum -c theygrow-v{…}.apk.sha256` in the directory holding both. That is the transfer check, and it costs one command.
 4. **Wherever the file is handed over — a GitHub release page, a direct handout — these three travel with it, together:** the **versioned filename** (never a static `latest`: a page must not carry two different binaries under one name), the **SHA-256 beside the download**, and an explicit **"allow installs from unknown sources"** instruction. This is accepted distribution practice for a direct-APK channel under ADR-047 §8 — not a vendor directive, and not something Android enforces on our behalf.
 5. **Reveal the download button on the web channel — AFTER the release page exists, never before (DIA-P2).** The public «Скачать APK» control in the header ships withheld and is revealed only when the shell declares a published release. Two edits and a deploy:
-   1. In `app/index.html`, set `<meta name="theygrow-apk-release" content="published">` (it ships as `content="none"`). The address it opens is declared once, in `app/m/v{N}/channel/config.js` as `CHANNEL_CONFIG.apkReleaseUrl` — today `https://github.com/mlberkov/theygrow-app/releases/latest`.
+   1. In `app/index.html`, set `<meta name="theygrow-apk-release" content="published">`. *(It is set to `published` today — commit `a8b2ec2`, 2026-08-18. This line used to read "it ships as `content=\"none\"`", which that commit falsified; corrected at L3-P3. Set it back to `none` if a release is ever withdrawn — see the last bullet of this step.)* The address it opens is declared once, in `app/m/v{N}/channel/config.js` as `CHANNEL_CONFIG.apkReleaseUrl` — today `https://github.com/mlberkov/theygrow-app/releases/latest`.
    2. Merge and deploy as usual, then promote per **Promotion + rollback (L1 deploy-safety gate)**. **The state lives in the shell and not under `/m/v{N}/` deliberately:** the mount is served `immutable, max-age=2592000` and its bytes are never rewritten, so a flag there would have cost a whole mount generation, a `CACHE_VERSION` bump and a promotion for one token. The shell is `max-age=3600, must-revalidate` and served network-first, so this reaches installed clients on their next navigation.
    - **Ordering is the whole point.** Flipping the token before the release page carries the two files puts a visitor on a page with nothing on it — the dead promise the withholding exists to prevent. Nothing in CI can catch that: the token is a statement by you, and `DIA-P2-INV-002` checks only that the code obeys it.
    - **If a release is ever withdrawn or the repository is made private, set it back to `none`.** The link would 404 for every visitor and no test would go red.
@@ -569,6 +603,17 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
    - **since L3-P1, check what BACKGROUNDING does — this is the step that tells a parent's device from a test's.** With the device attached and `adb logcat -s TheyGrowSignal` running: press **Home**, or lock the screen. Within a second a `[signal] store.close outcome=complete failure_class=none close_ms=…` must appear. Then reopen the app **and touch something that reads the store** — open the diary — and a second `[signal] store.open …` must appear carrying **`previous_run_clean=true`**. Those two lines together are the whole of `FIU-P1-INV-001` as a parent's phone performs it, and `previous_run_clean=true` is the one that says the `PRAGMA integrity_check` at every launch is over. **If the close line never appears**, this handset's WebView does not deliver the visibility change at `onStop` and the park needs the native belt `FIU-DL-001` alternative 3 describes — record the handset and its Android version, because that is the finding.
    - **and check the return, which is a UX step and not a log step.** Open the diary or the activities window, press **Home**, come back. The app must be where you left it, with **nothing** over it. *(Rewritten at L3-P2. This step used to name the «Перенести историю» screen, and added that getting it once at a cold start was still shipped behaviour with P2 as its address. That has happened: the transfer offer is removed from the product outright, so on no launch and no return is there a transfer screen to get. What to look for now is the general form — a return must add nothing to the screen — because that is what `FIU-P1-INV-001`'s off-device leg was rewritten to assert too.)*
    - **since L3-P2, check what a FIRST launch does, on a device with no child yet.** Install onto a handset that has never held this app (or clear its data), open it, and close the greeting. The app must ask you to create a child's profile by itself — the create-profile window, with a name and a birthdate. **There must be no offer to move anything from a browser, at any point.** Fill it in: the header must then carry the child's name, and ticking a skill must stick. That whole path is `FIU-P2-INV-001`, and this is the only place it is observed on a real handset; the browser channel's half of it runs on every push.
+   - **since L3-P3, check that the greeting closes FOR GOOD, and that you can get it back.** On a first
+     launch, close the greeting with the **✕** (not the «Закрыть» button — the ✕ is the one that used to
+     forget). Force-stop the app and open it again: the greeting must **not** appear. Then press the round
+     **«?»** in the header: the same window must open, and it must open again every time you press it. That
+     pair is `FIU-DL-001` debt 14 as a parent's phone performs it — a text read once, reachable always.
+   - **since L3-P3, check that there is NO privacy-policy link yet, and that this is the correct state.**
+     Open the greeting with «?» and scroll to the bottom. Until the document is published and the shell
+     declares it (see "Privacy policy" below), there must be **no** link there. A link under that word with
+     nothing behind it is worse than no link, which is why the declaration fails closed. After you publish
+     the document and ship a build carrying `content="published"`, the same place must show
+     «Политика конфиденциальности» and it must open the real page.
    - **`chrome://inspect` finds nothing since L3-P1, and no test can tell you so.** `android.webkit.WebView` has a static setter and no getter, so `FIU-P1-INV-002` asserts the value handed to it and stops there. If you want the effect itself, this is the only place it can be looked at: with the device attached, open `chrome://inspect/#devices` in a desktop Chrome and confirm the app's WebView is **not** listed. Record what you saw — that observation exists nowhere else in this repository (`FIU-DL-001` debt 16).
 
 **Building locally instead (only on a machine with the full toolchain).**
@@ -978,7 +1023,14 @@ not a case the parent can fix and not one this procedure has a command for.
     `localStorage` after a confirmed transfer (nothing in the code removes, rewrites or marks the source
     consumed — the decision and the moment are the owner's). Removing the install prompt (PDR-034 §3, gated
     on this smoke). The GA4 surface, which stays until authentication appears at L4. Retiring `m/v1`–`m/v5`.
-    The privacy-policy and consent surface, whose address is a separate owner decision. And the artefact work
+    The **analytics-consent surface for the web channel**, which is still owed and is separate work
+    (`A3-DL-003` debt 2; PDR-035 §5 assigns it to the web channel only). *(Rewritten at L3-P3. This line
+    used to say "the privacy-policy and consent surface, whose address is a separate owner decision" —
+    half of that is settled: the address is fixed at `https://theygrow.app/privacy`, declared once in
+    `CHANNEL_CONFIG.policyUrl`, and the app links it from the intro window as soon as the shell declares
+    the document published. What is still owed is the DOCUMENT — see "Privacy policy" below — and the
+    consent surface, which this milestone deliberately does not build: making the policy reachable is the
+    obligation, collecting acceptance is not.)* And the artefact work
     the 2026-08-17 gate addressed to **L3** — until it ships, the archive carries marks and journal history
     only, which the diary's own corrupt-store message already tells a parent in their own words.
 
