@@ -205,3 +205,164 @@ test.describe('a refusal leaves the parent holding their text', () => {
         }
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE FIRST LAUNCH AFTER AN INSTALL (L3-P2, FIU-DL-002).
+//
+// Until this packet the first screen a family met was the transfer offer: on
+// the native channel `offerImportIfPending()` opened `#importModal` at boot
+// whenever nothing was staged, and on a phone that modal is 100vw/100dvh, so it
+// was a SCREEN — over an empty tracker, offering to move a history the app
+// could not see. Dead by construction on that channel too: the WebView lives at
+// https://localhost and the browser history is on the production origin, so
+// `readProfilesRaw()` there had always returned null.
+//
+// The owner removed the offer outright. That leaves a first launch with exactly
+// one path to a profile, so these legs execute that it exists, that it is taken
+// without the parent knowing anything about transfer, and — the anti-vacuity —
+// that it stops the moment there is a child.
+//
+// A STORE THAT OPENS IS REQUIRED HERE, and that is why this block uses the
+// bridge seam rather than the `isNativePlatform` stand-in the blocks above use.
+// "No profile" and "no store" are different refusals with different cures, and
+// the stand-in can only ever produce the second one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const fs = require('fs');
+const path = require('path');
+const { installPageBridge, shippedStatements } = require('./support/page-bridge');
+const { currentMount } = require('./support/ship-list');
+
+const APP_ROOT = path.resolve(__dirname, '..');
+const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'utf8'));
+const STATEMENTS = shippedStatements(APP_ROOT, MOUNT.dir);
+
+const SELF = 'p-first-install-self';
+const A_CHILD = {
+    id: 'child-first-install',
+    name: 'Проба',
+    birthdate: '2024-09-15',
+    createdAtUtc: 1_700_000_000_000,
+};
+
+/** Boots the app on the native branch with a store that opens and holds `child`. */
+async function bootWithStore(page, child) {
+    await installPageBridge(page, {
+        mountBase: MOUNT.prefix,
+        statements: STATEMENTS,
+        child,
+        selfParticipantId: SELF,
+    });
+    await gotoApp(page, { state: STATES.empty });
+}
+
+const createProfileModal = (page) => page.locator('#createProfileModal');
+
+test.describe('a fresh install reaches a working profile by itself', () => {
+    test('the transfer offer is not merely hidden — it is not in the document', async ({ page }) => {
+        await bootWithStore(page, null);
+
+        // ANTI-VACUITY: a shell that failed to boot would make every count zero.
+        await expect(page.locator('#diaryBtn')).toBeVisible();
+        expect(
+            await page.locator('#importModal').count(),
+            'the transfer offer is back in the shell'
+        ).toBe(0);
+        expect(await page.locator('#importHandoffBtn').count()).toBe(0);
+        expect(await page.locator('#importRunBtn').count()).toBe(0);
+    });
+
+    test('with nobody in the store the app asks for the child itself', async ({ page }) => {
+        await bootWithStore(page, null);
+        await expect(
+            createProfileModal(page),
+            'a first launch offered nothing at all — the one path to a profile is a dropdown'
+                + ' the parent has no reason to open (FIU-P2-INV-001)'
+        ).toHaveCSS('display', 'block');
+        await expect(page.locator('#childName')).toBeVisible();
+        await expect(page.locator('#childBirthdate')).toBeVisible();
+    });
+
+    test('THE ARM — with a child in the store it asks nothing', async ({ page }) => {
+        // Without this the leg above could be green on a surface that opens the
+        // create-profile window at every launch, which is the defect L3-P1 just
+        // finished removing in its other form.
+        await bootWithStore(page, A_CHILD);
+        await expect(createProfileModal(page)).toHaveCSS('display', 'none');
+    });
+
+    test('THE SECOND ARM — a browser is asked nothing either', async ({ page }) => {
+        // The offer is a runtime branch on the backend, not a second build. The
+        // web channel keeps the first visit it has always had.
+        await gotoApp(page, { state: STATES.empty });
+        await expect(createProfileModal(page)).toHaveCSS('display', 'none');
+    });
+
+    // WHAT THIS BLOCK DOES NOT EXECUTE, AND WHERE IT IS EXECUTED INSTEAD.
+    // Filling that form in and pressing Создать is NOT driven here. On this
+    // backend the child is appended to the journal, and the seam behind these
+    // legs deliberately does not model `v_child_attribute_current` — projecting
+    // a child out of the entries it just recorded would be a fake proving a
+    // fake, the same rule that keeps FTS matching out of it (see the seam's own
+    // header). So the two halves are executed where each is real:
+    //
+    //   the SURFACE half — the form, the handler, the switch, the header and
+    //   the table rebuild — `app/tests/behavior.spec.js`, on the web channel,
+    //   where `createProfile` goes through core/repo-local.js and needs no
+    //   store at all. It is the same shipped handler either way;
+    //   the JOURNAL half — `appendChild` against a real SQLCipher store —
+    //   `DiaryEntryTest` on `android-instrumented`.
+    //
+    // Written down because until L3-P2 NEITHER existed: the app's only path to
+    // a profile had no executor anywhere, on any channel.
+});
+
+test.describe('the diary refusal offers the act that resolves it', () => {
+    test('with no child the diary names the button, and pressing it opens the form', async ({
+        page,
+    }) => {
+        await bootWithStore(page, null);
+
+        // The parent puts the boot-time question aside — they came to write,
+        // not to fill in a form — and goes to the diary instead.
+        await page.locator('#cancelProfile').click();
+        await expect(createProfileModal(page)).toHaveCSS('display', 'none');
+
+        await page.locator('#diaryBtn').click();
+        await expect(page.locator('#diaryModal')).toBeVisible();
+        await expect(page.locator('#diaryNoChild')).toBeVisible();
+        await expect(
+            page.locator('#diaryNoStore'),
+            'a missing profile was named as a store that did not open — two causes with two'
+                + ' different cures, and only one of them is true here'
+        ).toBeHidden();
+        await expect(page.locator('#diaryNewBtn')).toBeHidden();
+
+        const createButton = page.locator('#diaryCreateProfileBtn');
+        await expect(
+            createButton,
+            'the refusal names a menu and offers nothing — the parent is told what is wrong and'
+                + ' left to find the cure (FIU-P2-INV-001)'
+        ).toBeVisible();
+        await createButton.click();
+
+        // BOTH HALVES. The diary has to close first: every .modal shares one
+        // z-index, #createProfileModal precedes #diaryModal in the markup, and
+        // a create window opened UNDER a full-screen white panel is a button
+        // that does nothing.
+        await expect(
+            page.locator('#diaryModal'),
+            'the diary stayed open over the window it just opened'
+        ).toBeHidden();
+        await expect(createProfileModal(page)).toHaveCSS('display', 'block');
+        await expect(page.locator('#childName')).toBeVisible();
+    });
+
+    test('THE ARM — with a child there is no such button', async ({ page }) => {
+        await bootWithStore(page, A_CHILD);
+        await page.locator('#diaryBtn').click();
+        await expect(page.locator('#diaryNewBtn')).toBeVisible();
+        await expect(page.locator('#diaryCreateProfileBtn')).toBeHidden();
+        await expect(page.locator('#diaryNoChild')).toBeHidden();
+    });
+});

@@ -109,13 +109,14 @@
     <link rel="stylesheet" href="/m/v7/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v7/ graph — FORTY-SIX today. The count is written here as a series
+         /m/v7/ graph — FORTY-FIVE today. The count is written here as a series
          because the series is the point: fifteen at A1-P6, twenty-one once
-         L1-P2 added the native store, and forty-six since DIA-P3 added the
-         diary. It had been left at twenty-one through four packets, which read
-         as a claim about the list below rather than as the history it is; the
-         number is only worth carrying if it is the current one, so it is
-         corrected here rather than left to drift further.
+         L1-P2 added the native store, forty-six once DIA-P3 added the diary,
+         and forty-five since L3-P2 deleted the transfer offer's surface. It had
+         been left at twenty-one through four packets, which read as a claim
+         about the list below rather than as the history it is; the number is
+         only worth carrying if it is the current one, so it is corrected in
+         every packet that moves it rather than left to drift.
 
          Nobody needs to count by hand to check it: app/tests/delivery-contract.
          spec.js asserts this set EQUALS the walked import graph in both
@@ -173,7 +174,6 @@
     <link rel="modulepreload" href="/m/v7/channel/config.js">
     <link rel="modulepreload" href="/m/v7/surfaces/diary.js">
     <link rel="modulepreload" href="/m/v7/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/import.js">
     <link rel="modulepreload" href="/m/v7/export/run.js">
     <link rel="modulepreload" href="/m/v7/export/build.js">
     <link rel="modulepreload" href="/m/v7/export/readout.js">
@@ -391,40 +391,6 @@
         </div>
     </div>
 
-    <!-- Модальное окно архива (L1-P3). Два утверждения в нём намеренно
-         несмягчённые и проверяются тестом app/tests/export-contour.spec.js:
-         медиа в архив не входит, и облачной резервной копии этих данных нет.
-         Оба показываются ДО нажатия кнопки, а не после. -->
-    <div id="importModal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" id="importModalClose">&times;</span>
-            <h2>Перенести историю в приложение</h2>
-            <p>Раньше отметки хранились в браузере. Приложение может перенести их сюда, на устройство, — вместе с именем и датой рождения ребёнка.</p>
-            <p class="export-plain">Из браузера ничего не удаляется. Всё, что там записано, останется там же и после переноса.</p>
-            <p class="export-plain">Браузерная версия продолжает работать со своим хранилищем. Отметка, поставленная в браузере ПОСЛЕ этого переноса, здесь не появится, пока перенос не будет запущен ещё раз. Отметки, сделанные здесь, в браузере не появятся никогда.</p>
-            <p>У перенесённых отметок нет даты наблюдения: в браузере она не записывалась. Они получат дату переноса, и в архиве будет прямо сказано, что настоящая дата неизвестна.</p>
-            <p>Отметьте, кого перенести. Снятый профиль можно перенести позже — а вот отменить перенос нельзя: журнал только пополняется.</p>
-
-            <!-- DIA-P1 — предложение начать перенос. Показывается, когда со
-                 стороны браузера ещё ничего не пришло; после возврата на его
-                 месте появляется список профилей и кнопка «Перенести».
-                 Родителю не показывают выбор между «ссылкой» и «файлом»:
-                 запасной путь включается сам, а объяснение — одна строка
-                 (#importFallback) и та же кнопка. См. ADR-048 §3. -->
-            <p id="importHandoffOffer" hidden>История лежит в браузере, и приложение её оттуда не видит. Нажмите — откроется браузер, там будет одна кнопка, и вы вернётесь сюда.</p>
-
-            <div id="importChoices" class="import-choices"></div>
-            <p id="importFallback" class="export-status" hidden></p>
-            <p id="importStatus" class="export-status" hidden></p>
-            <div class="modal-buttons">
-                <button type="button" class="modal-button modal-button-secondary" id="importCloseBtn">Не сейчас</button>
-                <button type="button" class="modal-button modal-button-secondary" id="importPickBtn" hidden>Выбрать файл</button>
-                <button type="button" class="modal-button modal-button-primary" id="importHandoffBtn" hidden>Открыть браузер</button>
-                <button type="button" class="modal-button modal-button-primary" id="importRunBtn">Перенести</button>
-            </div>
-        </div>
-    </div>
-
     <div id="storeUnavailableModal" class="modal">
         <div class="modal-content">
             <span class="modal-close" id="storeUnavailableClose">&times;</span>
@@ -449,7 +415,10 @@
     <!-- Дневник (DIA-P3). Одно окно, две панели: список записей и форма.
          Второе модальное окно поверх первого было бы стопкой, которой у этой
          оболочки никогда не было; переключение панелей — это `hidden`, тот же
-         приём, что у скрытых кнопок в #importModal.
+         приём, что у скрытой строки #storeDiskFullNote выше. Ровно поэтому
+         кнопка «Создать профиль» ниже СНАЧАЛА закрывает это окно и только
+         потом открывает #createProfileModal: у всех .modal один z-index, и
+         порядок в разметке решил бы за нас не в ту сторону (FIU-DL-002).
 
          СПИСОК — ЭТО И ЕСТЬ ПОДТВЕРЖДЕНИЕ. После сохранения окно НЕ
          закрывается: запись появляется первой в списке, там, куда родитель уже
@@ -499,10 +468,24 @@
                 <!-- Две причины, по которым писать некуда, и они лечатся
                      разным. Показывается ровно одна (m/v7/surfaces/diary.js). -->
                 <p id="diaryNoStore" class="export-status" hidden>Дневник хранится в приложении на этом устройстве, а хранилище сейчас не открылось. Записать пока некуда — закройте и откройте приложение. Уже записанное не потеряно.</p>
-                <p id="diaryNoChild" class="export-status" hidden>Сначала создайте профиль ребёнка — запись дневника ведётся о ком-то, и без профиля её некуда отнести. Профиль создаётся в меню вверху.</p>
+                <p id="diaryNoChild" class="export-status" hidden>Сначала создайте профиль ребёнка — запись дневника ведётся о ком-то, и без профиля её некуда отнести. Нажмите «Создать профиль» — это займёт полминуты, и дневник откроется снова.</p>
+                <!-- ЧЕТВЁРТЫЙ СЛУЧАЙ, И ОН ПРО ЧТЕНИЕ, А НЕ ПРО ЗАПИСЬ
+                     (FIU-P2). Список не прочитался: до этого пакета такой отказ
+                     не говорил ничего вообще — окно уже было открыто, список
+                     уже был очищен, и родитель видел пустой дневник, то есть
+                     утверждение «вы ничего не писали» о хранилище, которое
+                     просто не ответило. Строки здесь того же устройства, что и
+                     у поиска (m/v7/surfaces/diary.js, LIST_REFUSAL): список НЕ
+                     прочитан, записи на месте, вот что сделать. -->
+                <p id="diaryListStatus" class="export-status" hidden></p>
                 <ul id="diaryList" class="diary-list"></ul>
                 <div class="modal-buttons">
                     <button type="button" class="modal-button modal-button-secondary" id="diaryCloseBtn">Закрыть</button>
+                    <!-- Отказ, который предлагает то, что его снимает (ADR-015).
+                         Кнопка раскрывается только когда причина — отсутствие
+                         профиля, и закрывает это окно перед тем, как открыть
+                         окно создания: см. довод про z-index в шапке блока. -->
+                    <button type="button" class="modal-button modal-button-primary" id="diaryCreateProfileBtn" hidden>Создать профиль</button>
                     <button type="button" class="modal-button modal-button-primary" id="diaryNewBtn">Новая запись</button>
                 </div>
             </div>
@@ -581,7 +564,7 @@
                 <h2>Привет!</h2>
             </div>
             <div class="onboarding-modal-body">
-                <p>Это приложение позволяет отслеживать прогресс твоего ребёнка и видеть список подходящих развивающих активностей. Все персональные данные сейчас хранятся в твоём браузере, что обеспечивает полную приватность. Позже функционал расширится, и потребуется регистрация, но сейчас всё работает без регистрации прямо на твоём устройстве.</p>
+                <p>Это приложение позволяет отслеживать прогресс твоего ребёнка и видеть список подходящих развивающих активностей. Все персональные данные хранятся только на этом устройстве и никуда не отправляются, что обеспечивает полную приватность. Позже функционал расширится, и потребуется регистрация, но сейчас всё работает без регистрации прямо на твоём устройстве.</p>
                 <p>Чтобы весь функционал работал в полном объёме, нужно:</p>
                 <ol>
                     <li>создать профиль ребёнка (кнопка наверху) и указать его дату рождения;</li>

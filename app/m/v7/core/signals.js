@@ -217,7 +217,16 @@ export const SIGNAL_TAXONOMY = Object.freeze({
             'skipped',
         ]),
         producingStage: 'L1-P4',
-        emittedNow: true,
+        // changed_in: FIU-DL-002 — DECLARED, NOT EMITTED, and the flag is what
+        // says so out loud. L3-P2 deleted the only emitter (surfaces/import.js)
+        // with the transfer offer; the import path itself stays shipped and
+        // reachable through store/boot.js, so the kind stays declared and the
+        // day something calls runImport again this flips back with its emitter.
+        // A kind whose flag claims a producer that no longer exists is exactly
+        // the drift ADR-013's coupling rule exists to catch — and emitSignal
+        // REFUSES a kind flagged false, so the state is enforced rather than
+        // documented.
+        emittedNow: false,
     }),
 
     // changed_in: LSC-DL-004 — a mark that was refused rather than recorded
@@ -343,6 +352,34 @@ export const SIGNAL_TAXONOMY = Object.freeze({
         boolean: Object.freeze([]),
         numeric: Object.freeze(['bytes', 'chunks', 'profiles', 'handoff_ms']),
         producingStage: 'DIA-P1',
+        // changed_in: FIU-DL-002 — declared, not emitted, for the same reason
+        // and by the same act as `history.import` above: the handoff's only
+        // emitter was the offer surface. The plugin, the envelope and the drain
+        // are all still shipped, and the handoff page still hands bytes over —
+        // what no longer exists is the app-side surface that reported it.
+        emittedNow: false,
+    }),
+
+    // changed_in: FIU-DL-002 — WHAT ONE RENDER OF THE DIARY LIST DID, and it
+    // exists because until L3-P2 a list that failed to load said NOTHING
+    // anywhere. `renderList` awaited the store with no try/catch
+    // (DIA-DL-010 debt 10): the window was already open, the list was already
+    // cleared, so a refusal left the parent looking at an empty diary — a
+    // silent claim that they had never written anything — and left the owner
+    // with no line to read either. The counterpart of `diary.write` on the read
+    // side, and deliberately emitted on BOTH outcomes: a kind that only ever
+    // appears on failure cannot be used to prove the path ran.
+    //
+    // COUNTS AND A TIMING, and the absences are the design: no entry id, no
+    // text, no length of any text, no event date. `records` is how many entries
+    // came back — the same class of number as `diary.search`'s `results` — and
+    // it is computed into a local before the payload literal, the discipline
+    // app/tests/signal-payload.spec.js enforces on every push.
+    'diary.list': Object.freeze({
+        fields: Object.freeze(['outcome', 'failure_class', 'records', 'list_ms']),
+        boolean: Object.freeze([]),
+        numeric: Object.freeze(['records', 'list_ms']),
+        producingStage: 'FIU-P2',
         emittedNow: true,
     }),
 });

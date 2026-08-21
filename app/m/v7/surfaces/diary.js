@@ -35,6 +35,10 @@
 
 import { emitSignal } from '../core/signals.js';
 import { BACKEND, getCurrentProfile, historyBackend, selfParticipant } from '../core/state.js';
+// Поверхность зовёт поверхность, и это уже принятая здесь форма: ровно так
+// surfaces/skill-completion.js предлагает создать профиль, когда отметку некуда
+// приписать. Цикла нет — surfaces/profile.js импортирует только core/*.
+import { openCreateProfileModal } from './profile.js';
 import {
     createRecord,
     loadRecords,
@@ -44,7 +48,7 @@ import {
 } from '../store/boot.js';
 
 // Каждая локальная переменная связана РОВНО с одним id — то же правило, что в
-// surfaces/import.js: угадывать, какой элемент имеет в виду имя, тесты
+// surfaces/channel.js: угадывать, какой элемент имеет в виду имя, тесты
 // отказываются (EMV-P1-INV-001, app/tests/show-rule-coverage.spec.js).
 function el(id) {
     return document.getElementById(id);
@@ -119,12 +123,37 @@ function author() {
     };
 }
 
+// ЧТО РОДИТЕЛЬ ЧИТАЕТ, КОГДА СПИСОК НЕ ПРОЧИТАЛСЯ (FIU-P2).
+//
+// Того же устройства, что и SEARCH_REFUSAL ниже, и по той же причине. «Записей
+// нет» — утверждение о ДНЕВНИКЕ. Отказ хранилища на чтении — утверждение о НАС.
+// До этого пакета второе показывалось как первое, и даже не строкой: renderList
+// ждал хранилище без try/catch (DIA-DL-010, долг 10), окно уже было открыто, а
+// список уже очищен — поэтому родитель видел ПУСТОЙ дневник и ни одного слова.
+// Пустой дневник — это готовое утверждение «вы ничего не писали», сказанное
+// человеку, который писал. Каждая строка ниже говорит три вещи: список НЕ
+// прочитан, записи на месте, вот что сделать.
+const LIST_REFUSAL = Object.freeze({
+    disk_full:
+        'Список не прочитан: на устройстве закончилось место. Записи на месте —'
+        + ' освободите место и откройте дневник ещё раз.',
+    unavailable:
+        'Список не прочитан: хранилище сейчас недоступно. Записи на месте — закройте'
+        + ' и откройте приложение, потом откройте дневник ещё раз.',
+    corrupt:
+        'Список не прочитан: хранилище не отвечает как обычно. Записи, которые вы уже'
+        + ' написали, никуда не делись — закройте и откройте приложение.',
+    other: 'Список не прочитан. Записи на месте — откройте дневник ещё раз.',
+});
+
 async function renderList() {
     const list = el('diaryList');
     const empty = el('diaryEmpty');
     const noChild = el('diaryNoChild');
     const noStore = el('diaryNoStore');
     const newButton = el('diaryNewBtn');
+    const createButton = el('diaryCreateProfileBtn');
+    const listStatus = el('diaryListStatus');
     const searchForm = el('diarySearchForm');
     list.replaceChildren();
 
@@ -134,6 +163,9 @@ async function renderList() {
     el('diarySearchEmpty').hidden = true;
     el('diarySearchStatus').hidden = true;
     el('diarySearchClearBtn').hidden = true;
+    // И строка отказа СПИСКА — здесь же: она относится к отрисовке, которая
+    // сейчас начинается заново.
+    listStatus.hidden = true;
 
     // ЧЕСТНАЯ ДЕГРАДАЦИЯ (ADR-015): кнопка «Новая запись» НЕ предлагается, когда
     // писать некуда. Предложить форму, которая заведомо откажет на сохранении,
@@ -143,6 +175,14 @@ async function renderList() {
     noStore.hidden = blocked !== NO_STORE;
     noChild.hidden = blocked !== NO_SUBJECT;
     newButton.hidden = blocked !== null;
+    // ОТКАЗ, КОТОРЫЙ ПРЕДЛАГАЕТ ТО, ЧТО ЕГО СНИМАЕТ (FIU-P2). Из двух причин
+    // ровно у одной есть действие, которое родитель может совершить прямо
+    // отсюда, — и до этого пакета окно называло вместо него МЕСТО («профиль
+    // создаётся в меню вверху»), хотя ровно этот отказ на соседней поверхности
+    // (surfaces/skill-completion.js) уже открывает нужное окно сам. Хранилищу,
+    // которое не открылось, предложить нечего: перезапуск приложения — не
+    // кнопка, и рисовать её значило бы обещать несуществующее лечение.
+    createButton.hidden = blocked !== NO_SUBJECT;
     if (blocked) {
         empty.hidden = true;
         searchForm.hidden = true;
@@ -152,15 +192,58 @@ async function renderList() {
         return;
     }
 
-    const rows = await loadRecords(author());
+    // ХРАНИЛИЩЕ СПРАШИВАЮТ В try, И ЭТО ВЕСЬ ДОЛГ 10 (DIA-DL-010).
+    //
+    // Отказ на чтении отсюда больше никуда не улетает — ни в openDiaryModal,
+    // ни, что важнее, в catch функции saveEntry, где он превращался в
+    // «Запись НЕ сохранена» о сохранённой записи (долг 11; вторая половина
+    // починки — там же, в saveEntry).
+    //
+    // Сигнал — только там, где хранилище действительно спросили. Ветка выше
+    // уже отчиталась своим write.refused, и второй строкой про то же самое
+    // событие счёт отрисовок перестал бы что-либо значить.
+    const startedAt = Date.now();
+    let rows;
+    try {
+        rows = await loadRecords(author());
+    } catch (error) {
+        const listMs = Date.now() - startedAt;
+        const failureClass = storeFailureCode(error);
+        emitSignal('diary.list', {
+            outcome: 'failed',
+            failure_class: failureClass,
+            list_ms: listMs,
+        });
+        // ТОЛЬКО ИМЯ КЛАССА, по доводу пути поиска: сообщение движка на этом
+        // пути могло бы нести текст запроса, а класса хватает, чтобы понять,
+        // что случилось, во время прогона по RUNBOOK.
+        // eslint-disable-next-line no-console
+        console.error('[diary] the list did not load:', error?.name, failureClass);
+        listStatus.textContent = LIST_REFUSAL[failureClass] ?? LIST_REFUSAL.other;
+        listStatus.hidden = false;
+        // Пустой список НЕ выдаётся за пустой дневник: обе строки про «записей
+        // нет» и про поиск остаются скрытыми, потому что мы не знаем, что там.
+        empty.hidden = true;
+        searchForm.hidden = true;
+        return;
+    }
+
+    const listMs = Date.now() - startedAt;
+    const recordCount = rows.length;
+    emitSignal('diary.list', {
+        outcome: 'complete',
+        failure_class: 'none',
+        records: recordCount,
+        list_ms: listMs,
+    });
     for (const row of rows) {
         list.append(entryItem(row));
     }
-    empty.hidden = rows.length > 0;
+    empty.hidden = recordCount > 0;
     // Искать предлагается, только когда есть что искать. В пустом дневнике поиск
     // мог бы вернуть только «ничего не нашлось» — строку, которая прочиталась бы
     // как поломка, хотя всё в порядке и записей просто нет.
-    searchForm.hidden = rows.length === 0;
+    searchForm.hidden = recordCount === 0;
 }
 
 // ЧТО РОДИТЕЛЬ ЧИТАЕТ, КОГДА ПОИСК НЕ ВЫПОЛНИЛСЯ — и почему это отдельный
@@ -402,6 +485,21 @@ async function saveEntry(event) {
     saveButton.disabled = true;
     setStatus('Сохраняю…');
     const startedAt = Date.now();
+    // ЧТО ЛЕЖИТ ВНУТРИ try, И ЭТО ВЕСЬ ДОЛГ 11 (DIA-DL-010).
+    //
+    // Ровно одно: запись. До этого пакета внутри стояло и обновление списка —
+    // ПОСЛЕ того, как запись прошла и как diary.write outcome=complete уже
+    // ушёл, — и отказ хранилища на том обновлении попадал в catch ниже:
+    // второй diary.write, теперь outcome=failed, и строка «Запись НЕ
+    // сохранена» о записи, которая сохранена. Это ADR-015 наоборот: честная
+    // деградация существует, чтобы приложение не утверждало БОЛЬШЕ, чем
+    // случилось, а здесь оно утверждало МЕНЬШЕ — и стоило это родителю доверия
+    // к списку, в котором его запись на самом деле лежит.
+    //
+    // Флаг, а не переупорядочивание внутри try: так «после записи ничего не
+    // может отчитаться об отказе записи» становится свойством формы кода, а не
+    // следствием того, где именно стоит await.
+    let saved = false;
     try {
         if (editingRecordId) {
             await overwriteRecord({
@@ -419,16 +517,7 @@ async function saveEntry(event) {
             chars: charCount,
             write_ms: writeMs,
         });
-        // Окно НЕ закрывается: подтверждение — это список, в котором запись
-        // теперь стоит первой. Сначала список, потом переключение панели, чтобы
-        // не было кадра с пустым списком.
-        //
-        // clearSearch, а не renderList, и это про то же подтверждение: если в
-        // списке стоял фильтр, только что сохранённая запись могла бы в него не
-        // попасть — и родитель увидел бы список без своей записи ровно в тот
-        // момент, когда список ЕСТЬ подтверждение (DIA-DL-005 (g)).
-        await clearSearch();
-        showList();
+        saved = true;
     } catch (error) {
         const writeMs = Date.now() - startedAt;
         const failureClass = storeFailureCode(error);
@@ -448,6 +537,23 @@ async function saveEntry(event) {
     } finally {
         saveButton.disabled = false;
     }
+
+    if (!saved) return;
+
+    // Окно НЕ закрывается: подтверждение — это список, в котором запись теперь
+    // стоит первой. Сначала список, потом переключение панели, чтобы не было
+    // кадра с пустым списком.
+    //
+    // clearSearch, а не renderList, и это про то же подтверждение: если в
+    // списке стоял фильтр, только что сохранённая запись могла бы в него не
+    // попасть — и родитель увидел бы список без своей записи ровно в тот
+    // момент, когда список ЕСТЬ подтверждение (DIA-DL-005 (g)).
+    //
+    // Отказ ЗДЕСЬ больше не может ничего сказать о сохранении: renderList
+    // ловит его сам и говорит про список (FIU-P2). Запись при этом сохранена,
+    // и об этом уже отчитались.
+    await clearSearch();
+    showList();
 }
 
 function startEdit(event) {
@@ -477,6 +583,17 @@ export function wireDiary() {
     el('diaryModalClose').addEventListener('click', closeDiaryModal);
     el('diaryCloseBtn').addEventListener('click', closeDiaryModal);
     el('diaryNewBtn').addEventListener('click', () => showForm());
+    // СНАЧАЛА ЗАКРЫТЬ ЭТО ОКНО, ПОТОМ ОТКРЫТЬ ТО, и порядок здесь — не вкус.
+    // У всех .modal один z-index (app.css), поэтому кто выше — решает порядок в
+    // разметке, а #createProfileModal стоит РАНЬШЕ #diaryModal: открытое
+    // изнутри дневника окно создания оказалось бы ПОД белой панелью во весь
+    // экран, и родитель нажал бы кнопку, после которой ничего не произошло.
+    // Стопки окон у этой оболочки никогда не было (см. комментарий у
+    // #diaryModal в index.html), и заводить её ради одной кнопки не надо.
+    el('diaryCreateProfileBtn').addEventListener('click', () => {
+        closeDiaryModal();
+        openCreateProfileModal();
+    });
     el('diaryCancelBtn').addEventListener('click', () => {
         setStatus('');
         showList();
