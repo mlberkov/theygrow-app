@@ -3,11 +3,12 @@
 // LSC-P1-INV-002 — the native channel ships the web channel's bytes unchanged,
 // and exports nothing off the device (L1-P1).
 //
-// FOUR CLAIMS, ONE FILE. The first two are the two halves of "the Android
+// FIVE CLAIMS, ONE FILE. The first two are the two halves of "the Android
 // shell is a shell"; the third (EMV-P5-INV-001) is what keeps the native side
 // pointed at the generation the shell actually runs; the fourth (DIA-P5-INV-001)
 // pins the knob that stops the framework beneath the shell writing the family's
-// data to the device log:
+// data to the device log; the fifth (FIU-P1-INV-002) pins the knob that closes
+// the OTHER door into the same build:
 //
 //  (a) BYTE-IDENTITY. The APK's web root is assembled by
 //      native/tools/stage-webdir.js from app/Dockerfile's COPY list — the same
@@ -36,6 +37,20 @@
 //      here for the same reason (b) is — one JSON key, in a file a toolchain
 //      upgrade or a careless `cap sync` could quietly reshape. The device half
 //      of the claim is DeviceLogTest, on the emulator; this half is static.
+//
+//  (e) NO REMOTE WEBVIEW INSPECTION. The same `isDebug` default reaches a
+//      second, independent knob: CapConfig.java:286 resolves
+//      webContentsDebuggingEnabled from FLAG_DEBUGGABLE and Bridge.java:618
+//      hands it to WebView.setWebContentsDebuggingEnabled. `loggingBehavior`
+//      does nothing to it — different sink, same build, same phone: an
+//      authorised adb connection reaches the DOM, the JS heap and WebView
+//      storage over chrome://inspect. Pinned here for the reason (d) is pinned
+//      here: one JSON key that a toolchain upgrade or a careless `cap sync`
+//      could reshape, on a gate that runs every push while the device leg runs
+//      on dispatch only. The device half is WebInspectionTest; this half is
+//      static, and neither of them executes "chrome://inspect finds nothing" —
+//      the WebView exposes no getter for the flag it was handed, so what is
+//      checkable is the value that reaches it (DIA-DL-010 debt 12, FIU-DL-001).
 //
 // This spec reads native/www/ AS IT STANDS and deliberately does NOT stage it
 // first: staging inside the test would wipe a hand-added file moments before
@@ -221,6 +236,38 @@ test.describe('native shell — family data does not leave the device (LSC-P1-IN
       'native/capacitor.config.json must set android.loggingBehavior to "none" — Capacitor\'s'
         + ' default traces every plugin call\'s arguments to logcat in any debuggable build'
     ).toBe('none');
+  });
+
+  test('the build does not expose the WebView to chrome://inspect (FIU-P1-INV-002)', () => {
+    // A SECOND KNOB WITH THE SAME DEFAULT AND A DIFFERENT SINK. The test above
+    // pins loggingBehavior, which closes logcat. It does nothing at all to this
+    // one: CapConfig.java:286 resolves `android.webContentsDebuggingEnabled`
+    // from FLAG_DEBUGGABLE independently, and Bridge.java:618 hands the result
+    // to WebView.setWebContentsDebuggingEnabled. Left at the default, the build
+    // docs/RUNBOOK.md tells the owner to install on the phone that holds the
+    // family's real history answers chrome://inspect over an authorised adb
+    // connection with the DOM, the JS heap and WebView storage — the store's
+    // contents included, decrypted, because the WebView is on the inside of the
+    // encryption boundary.
+    //
+    // `false` EXPLICITLY, not "absent and therefore false". Absent is exactly
+    // the state that produced the exposure: the resolver's default argument is
+    // `isDebug`, so an unset key means ON in the build that matters.
+    //
+    // This is a STATIC check of a knob and it carries no runtime claim (§11).
+    // Its device twin is WebInspectionTest, on the emulator, which reads what
+    // the bridge actually parsed out of the APK's own generated asset. NEITHER
+    // executes "chrome://inspect finds nothing": android.webkit.WebView has a
+    // static setter and no getter, so the flag's effect is not readable by any
+    // test this repository can write. What is checkable is the value that
+    // reaches the setter, and that is what both legs check.
+    const config = JSON.parse(fs.readFileSync(path.join(NATIVE_ROOT, 'capacitor.config.json'), 'utf8'));
+    expect(
+      config.android && config.android.webContentsDebuggingEnabled,
+      'native/capacitor.config.json must set android.webContentsDebuggingEnabled to false —'
+        + ' Capacitor defaults it to the debuggable flag, which exposes the DOM, the JS heap'
+        + ' and WebView storage over chrome://inspect on the build the owner installs'
+    ).toBe(false);
   });
 });
 

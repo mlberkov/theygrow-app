@@ -4,7 +4,8 @@
   "webDir": "www",
   "android": {
     "allowMixedContent": false,
-    "loggingBehavior": "none"
+    "loggingBehavior": "none",
+    "webContentsDebuggingEnabled": false
   },
   "server": {
     "androidScheme": "https",
