@@ -665,7 +665,7 @@ The archive is the family's way out of this device, and it is deliberately the l
 3. Read `text/` for the data in words — participants, children and their current attributes, the whole journal, current skill state, and the diary. **`text/diary.txt` is the one written to be READ rather than parsed** (L3-P4): each entry appears under the day it is about, in the parent's own words and wrapped as prose, with the record's fields listed under it. The same entries are in `index.json` field-by-field for anything that wants to parse them.
 4. Read `index.json` for the same data machine-readably. Its `declaration` section is a verbatim copy of the current mount's `export/declaration.json` and carries a plain-language explanation of **every field**, which is what makes the archive interpretable with no access to this repository.
 5. `MANIFEST.json` records what produced it: the app version, the canon (`kb-v1.json`) version, and the schema identifier and version **as the device actually held them** — plus per-dataset row counts and the export time.
-6. `print/archive.pdf` is the same text again, as **PDF/A-2b** — the archival profile: the font is embedded whole, the colour profile travels inside the file, nothing is encrypted and nothing points outside the file. Open it in any PDF reader, or print it. It is the **secondary** copy: a character the embedded font does not cover appears there as `�` (U+FFFD), while the text files and `index.json` always carry the exact character. When the two disagree, the text files are right, and `declaration.json` says so.
+6. `print/archive.pdf` is the same text again, as **PDF/A-2b** — the archival profile: the font is embedded whole, the colour profile travels inside the file, nothing is encrypted and nothing points outside the file. Open it in any PDF reader, or print it. It is the **secondary** copy: a character the embedded font does not cover appears there as `◊` (U+25CA), while the text files and `index.json` always carry the exact character. When the two disagree, the text files are right, and `declaration.json` says so.
 
 **What is in the archive and what is not, stated the way the interface states it.** Photographs, video and audio are **not** included; `attachments/` is empty and says so. There is **no cloud backup** of this data — the archive is not a supplement to one, it is the only copy that exists off the device.
 
@@ -958,7 +958,8 @@ not a case the parent can fix and not one this procedure has a command for.
    participants' diary entries in the store and reads the produced archive back to prove only the
    exporter's own travelled. The same dispatch is also the only place veraPDF runs, and since L3-P4 the
    PDF it validates carries real diary prose, a codepoint the embedded font does not cover and a
-   hard-broken long token — so a PDF/A verdict on that run is a verdict about what a parent types. Three numbers arrive with it and
+   hard-broken long token — so a PDF/A verdict on that run is a verdict about what a parent types, which run **32530473473** proved by failing on exactly that codepoint (L3-P5). **If that step is red, the log now names the rule:** since L3-P5 it prints the failing
+   clause, its test number, the rule's description and the first object it failed on, before the verdict line — so the `pdfa-validation` artefact is where you go for the rest of the report, not for the first fact about it. Three numbers arrive with it and
    exist nowhere else. **Each is logged under the tag of the suite that measures it**, so no single tag
    carries all three and a reader who greps one of them concludes the others never arrived — the defect
    that cost this milestone a full diagnostic round (`DIA-DL-009` (f)):
