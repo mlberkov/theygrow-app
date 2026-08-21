@@ -102,6 +102,39 @@ test.describe('the conformance gate can actually pass', () => {
         expect(WORKFLOW).toContain('VERAPDF_EXPECTED_VERSION');
         expect(WORKFLOW).toMatch(/VERAPDF_EXPECTED_VERSION:\s*'\d+\.\d+\.\d+'/);
     });
+
+    test('a failing verdict prints the rule that failed, and the printer exists', () => {
+        // FIU-P5. Run 32530473473 red the step with `failedRules=1` and nothing
+        // else; the clause, the object and the reason came out of the artifact
+        // by hand. The step now runs an evidence printer first.
+        //
+        // THIS IS A SOURCE SCAN and claims exactly what a source scan can: that
+        // the step names the script and that the script is there to be named. It
+        // does not execute either. What the printer DOES is executed by
+        // app/tests/export/test_verapdf_failure_report.py against a recorded copy
+        // of that run's own report; that the whole step passes on a conformant
+        // file is veraPDF's to say, on `android-instrumented`.
+        const invocation = /python3 scripts\/verapdf_failures\.py/;
+        expect(WORKFLOW).toMatch(invocation);
+        const script = path.join(APP_ROOT, '..', 'scripts', 'verapdf_failures.py');
+        expect(
+            fs.existsSync(script),
+            'the validate step invokes a script that is not in the repository'
+        ).toBeTruthy();
+    });
+
+    test('the evidence printer is not wired into the verdict', () => {
+        // The one permitted change to this workflow was failing-branch printing.
+        // The verdict block must still be the thing that decides, so the printer
+        // is required to sit OUTSIDE it: a `sys.exit` reached through the printer
+        // would be a second gate nobody declared.
+        const step = WORKFLOW.split('- name: Validate the print layer against PDF/A-2b')[1]
+            .split('\n      - name:')[0];
+        const heredoc = step.split("<<'PY'")[1];
+        expect(heredoc, 'the verdict heredoc is gone from the validate step').toBeTruthy();
+        expect(heredoc).not.toContain('verapdf_failures');
+        expect(heredoc).toContain('isCompliant');
+    });
 });
 
 test.describe('the print layer binaries are pinned', () => {

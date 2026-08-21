@@ -565,6 +565,23 @@ jobs:
           # failure. A crashed validator writes nothing and fails there too.
           "${RUNNER_TEMP}/verapdf/verapdf" --flavour 2b --format mrr \
             "${RUNNER_TEMP}/pdfa/archive.pdf" > "${RUNNER_TEMP}/pdfa/verapdf.xml" || true
+          # THE EVIDENCE, PRINTED BEFORE THE VERDICT (FIU-P5). Run 32530473473
+          # red this step with `failedRules=1 failedChecks=1` and nothing more:
+          # WHICH of the 144 rules, on WHICH object, and WHY had to be dug out of
+          # the `pdfa-validation` artifact by hand after the run. `--format text`
+          # above was no help either — it is 49 bytes and reads `FAIL <path> 2b`.
+          # So the report's own words are printed here: clause, test number,
+          # description and the first failing context, bounded and saying so.
+          #
+          # IT DECIDES NOTHING, and that is what keeps this step's pass/fail
+          # semantics exactly where they were. The verdict block below is
+          # untouched; this exits 0 whatever it reads, including an unreadable
+          # report, which the verdict already fails on in its own words. It
+          # prints NOTHING for a compliant report, so its output appears only on
+          # the failing branch. Its behaviour is executed off a recorded copy of
+          # that run's own report by app/tests/export/test_verapdf_failure_report.py,
+          # on every push, rather than being discovered on the next red run.
+          python3 scripts/verapdf_failures.py "${RUNNER_TEMP}/pdfa/verapdf.xml"
           python3 - "${RUNNER_TEMP}/pdfa/verapdf.xml" <<'PY'
           import sys
           import xml.etree.ElementTree as ET
