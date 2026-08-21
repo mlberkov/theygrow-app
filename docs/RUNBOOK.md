@@ -567,7 +567,8 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
    - **the service worker inside the WebView is settled as of L1-P4, and no longer needs a human observation here.** The native channel registers none and purges a registration a previously installed APK left behind together with its shell caches, so Cache Storage cannot hold a second copy of the shell. `WebViewStorageTest` measures it on the emulator and prints the probe facts into the instrumented report — whether `serviceWorker` is in `navigator` at all, what `caches.keys()` returns — so the answer is recorded rather than re-asked (`LSC-DL-004` (i), `LSC-P4-INV-004`). It has now been measured: run `31683691498` is green with `android-instrumented` at 8m39s and 16/16 instrumented tests, on head 460bd39 (`LSC-DL-005` (a)). **What that run settles and what it does not:** the emulator is fresh, so it proves no registration and no shell cache exist after a booted native app — it cannot prove a *prior* registration is purged, which is what steps 1 → 2 of the owner sequence below exist to observe. *(This bullet previously read "the one open question the repository cannot settle", and carried the disposition to L1-P4. It could be settled; it needed a device.)*
    - **since L1-P2, check the local store came up.** With the device attached, `adb logcat -s TheyGrowSignal | grep 'store.open'` must print `[signal] store.open outcome=opened failure_class=none …`. *(Rewritten in DIA-P5, and the rewrite is the point rather than a tidy-up. This step used to read `grep -i "\[store\]"` and expect **nothing**, because the store logged only on failure — and DIA-P5 stopped forwarding that line: `store/boot.js`'s failure path prints the engine's own message, and an engine message is exactly the string that can carry statement text, so the allowlist drops it. Left as it was, the step would have gone **silently green on a broken store as well as a healthy one**, which is worse than a step that fails. `outcome` and `failure_class` carry the same information in the closed-code form the signal was built for: `opened`, or `failed` with the reason named.)* To see it positively without reading a log, use the instrumented job instead (below).
    - **since L3-P1, check what BACKGROUNDING does — this is the step that tells a parent's device from a test's.** With the device attached and `adb logcat -s TheyGrowSignal` running: press **Home**, or lock the screen. Within a second a `[signal] store.close outcome=complete failure_class=none close_ms=…` must appear. Then reopen the app **and touch something that reads the store** — open the diary — and a second `[signal] store.open …` must appear carrying **`previous_run_clean=true`**. Those two lines together are the whole of `FIU-P1-INV-001` as a parent's phone performs it, and `previous_run_clean=true` is the one that says the `PRAGMA integrity_check` at every launch is over. **If the close line never appears**, this handset's WebView does not deliver the visibility change at `onStop` and the park needs the native belt `FIU-DL-001` alternative 3 describes — record the handset and its Android version, because that is the finding.
-   - **and check the return, which is a UX step and not a log step.** Open the diary or the activities window, press **Home**, come back. The app must be where you left it, with **no** «Перенести историю» screen over it. Getting that screen on every return is the defect L3-P1 fixed; getting it once at a cold start is still shipped behaviour, and P2 is where it goes.
+   - **and check the return, which is a UX step and not a log step.** Open the diary or the activities window, press **Home**, come back. The app must be where you left it, with **nothing** over it. *(Rewritten at L3-P2. This step used to name the «Перенести историю» screen, and added that getting it once at a cold start was still shipped behaviour with P2 as its address. That has happened: the transfer offer is removed from the product outright, so on no launch and no return is there a transfer screen to get. What to look for now is the general form — a return must add nothing to the screen — because that is what `FIU-P1-INV-001`'s off-device leg was rewritten to assert too.)*
+   - **since L3-P2, check what a FIRST launch does, on a device with no child yet.** Install onto a handset that has never held this app (or clear its data), open it, and close the greeting. The app must ask you to create a child's profile by itself — the create-profile window, with a name and a birthdate. **There must be no offer to move anything from a browser, at any point.** Fill it in: the header must then carry the child's name, and ticking a skill must stick. That whole path is `FIU-P2-INV-001`, and this is the only place it is observed on a real handset; the browser channel's half of it runs on every push.
    - **`chrome://inspect` finds nothing since L3-P1, and no test can tell you so.** `android.webkit.WebView` has a static setter and no getter, so `FIU-P1-INV-002` asserts the value handed to it and stops there. If you want the effect itself, this is the only place it can be looked at: with the device attached, open `chrome://inspect/#devices` in a desktop Chrome and confirm the app's WebView is **not** listed. Record what you saw — that observation exists nowhere else in this repository (`FIU-DL-001` debt 16).
 
 **Building locally instead (only on a machine with the full toolchain).**
@@ -665,8 +666,20 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 
 ### The write path and the legacy import — L1-P4
 
+> **READ THIS FIRST, SINCE L3-P2 (`FIU-DL-002`): STEPS 3–7 BELOW CANNOT BE PERFORMED ANY MORE, AND
+> THE SECTION IS KEPT RATHER THAN DELETED BECAUSE STEPS 1, 2 AND 8 STILL CAN.** The owner removed
+> the in-app transfer offer outright on 2026-08-21. There is no import modal, no profile list and no
+> *Перенести* button in the app: `surfaces/import.js` and `#importModal` are deleted. What remains
+> shipped is the MECHANISM — the plugin, the deep link, the envelope, the drain and the importer —
+> as insurance, plus the standalone handoff page at `/transfer.html`, which still emits the link and
+> still saves the file and now says plainly that the app does not pick either up. Whether any of that
+> is retired is an open owner question this packet deliberately did not answer. **The one path a
+> fresh install has to a profile is to create one in the app** — see the first-launch step in *§4
+> verification* above. Everything below is left standing as the record of what L1-P4 shipped and how
+> it was verified; the steps that drove the removed surface are marked where they stand.
+
 From L1-P4 the app **writes**. A tick is an attributed assertion in the encrypted journal, not a
-string in a browser array, and the family's existing history moves across by an explicit act. Two
+string in a browser array, and the family's existing history moved across by an explicit act. Two
 things about that act matter more than any step below:
 
 - **The import never touches `localStorage`.** It reads it and nothing else. Nothing in this packet
@@ -674,10 +687,12 @@ things about that act matter more than any step below:
   does not exist yet**. Until you take it deliberately, the live PWA still holds its own copy.
 - **The two channels diverge from here, and this milestone does not resolve it.** The browser keeps
   writing to its own storage. A mark made in the browser after an import will not appear on the phone
-  until the import is run again — the app offers it again, because the offer is keyed on what is
-  missing. A mark made on the phone never reaches the browser at all. The import is a one-way bridge,
-  not a reconciliation; reconciliation is L7's. The import modal states this in Russian before the
-  parent presses anything.
+  until the import is run again — the app used to offer it again, because the offer was keyed on what
+  is missing. A mark made on the phone never reaches the browser at all. The import is a one-way
+  bridge, not a reconciliation; reconciliation is L7's. The import modal stated this in Russian
+  before the parent pressed anything. *(Since L3-P2 there is no modal and no offer; the divergence
+  itself is unchanged, and is now stated by nothing in the app, because the app no longer proposes
+  the act it was a warning about.)*
 
 **The owner-run sequence, in order.** Steps 1–2 need an APK built from a commit *before* this packet
 if you want to see the service-worker purge do anything; from step 3 on, any L1-P4 APK will do.
@@ -692,13 +707,21 @@ if you want to see the service-worker purge do anything; from step 3 on, any L1-
    what it asserts — and observed in run `31683691498` — is that no registration and no shell cache
    exist after a booted native app, not that an existing one was removed (`LSC-DL-005` (b)).
    **Expect `previous_run_clean` to read `false` on every launch but the first, and do not treat it
-   as a store fault.** `closeStore()` is defined and never called, so `clean_shutdown` is never set
-   back to 1 and each launch after the first pays an `integrity_check`. The signal is reporting the
+   as a store fault.** *(Superseded at L3-P1: `closeStore()` is called on background since then and
+   `previous_run_clean` reads `true` after an orderly one — see the backgrounding step in §4
+   verification. The paragraph is left as the state it described.)* `closeStore()` is defined and
+   never called, so `clean_shutdown` is never set back to 1 and each launch after the first pays an
+   `integrity_check`. The signal is reporting the
    true state; the defect is upstream of it. Known side-find, `LSC-DL-004` (debt 1); the L1 milestone
    close weighed it and **left it OPEN** (`LSC-DL-005` (f)(2)) — it turns on whether the WebView
    reliably fires `pagehide` before process death, which needs its own evidence rather than a guess,
    and that evidence is what would close it.
-3. **Run the import.** With browser history present in `localStorage`, the import modal appears after
+3. **Run the import. — NOT PERFORMABLE SINCE L3-P2; steps 3 to 7 drove the removed surface.** What
+   they verified about the IMPORTER (idempotence, completion after an interruption, a revocation
+   surviving a re-run) is executed on every push by `app/tests/import-legacy.spec.js` and on a device
+   by `HistoryTransferTest`, which since L3-P2 drives `pendingTransfer → drainTransfer → runImport`
+   out of the shipped modules rather than through a modal. Left as written, below.
+   With browser history present in `localStorage`, the import modal appears after
    the table is built. It lists each profile by name with its mark count, everything ticked. Read the
    modal — the divergence paragraph is the point of it — then press *Перенести*. Confirm the table
    still shows the same marks afterwards.
