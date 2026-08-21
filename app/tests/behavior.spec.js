@@ -162,20 +162,64 @@ test.describe('reload with seeded localStorage state', () => {
     await expect(page.locator('#profileName')).toContainText(PROFILE.name);
   });
 
-  test('onboarding shows on first run and stays dismissed afterwards', async ({ page }) => {
-    await gotoApp(page, { state: STATES.firstRun });
-    await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+  // WHAT CLOSING THE INTRO MEANS, EXECUTED ON EACH OF ITS THREE DOORS (L3-P3,
+  // FIU-DL-001 debt 14). Until this packet only ONE of the three was ever
+  // executed — the close button with the checkbox ticked — and the other two
+  // silently persisted nothing, which is precisely why a parent who used the ✕
+  // met the window again on every cold start. The checkbox is gone; each door
+  // now means "read it", and each door is driven here.
+  //
+  // The arm is the same for all three: remove `writeOnboardingDismissed()` from
+  // `closeOnboardingModal()` and all three go red on the storage assertion.
+  for (const [door, close] of [
+    ['the close button', (page) => page.locator('#onboardingCloseBtn').click()],
+    ['the ✕', (page) => page.locator('#onboardingModalClose').click()],
+    // The backdrop is the element itself; clicking its centre would land on the
+    // content, so the click is aimed at a corner outside the card.
+    ['the backdrop', (page) => page.locator('#onboardingModal').click({ position: { x: 5, y: 5 } })],
+  ]) {
+    test(`the intro closes for good when it is closed with ${door}`, async ({ page }) => {
+      await gotoApp(page, { state: STATES.firstRun });
+      await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
 
-    await page.locator('#onboardingDismissCheckbox').check();
-    await page.locator('#onboardingCloseBtn').click();
+      await close(page);
+      await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
+      expect(await readStorage(page, STORAGE_KEYS.onboardingDismissed)).toBe('true');
+
+      await page.reload();
+      await page.waitForFunction(
+        () => document.querySelectorAll('#tableBody tr[data-skill-id]').length > 0
+      );
+      await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
+    });
+  }
+
+  // THE LEG THAT MAKES THE «?» MORE THAN MARKUP. The intro now closes forever,
+  // and from L3-P3 it carries the privacy-policy link — so the whole promise
+  // rests on the document being reachable a second time. This drives the real
+  // sequence: dismiss it, reload the page (a fresh boot, where
+  // checkAndShowOnboarding() deliberately does not open it), then press the
+  // control and read the window.
+  //
+  // The arm: unwire `#aboutBtn` in surfaces/onboarding.js and this reds, while
+  // every other leg above stays green.
+  test('the ? control opens the intro again on a later launch', async ({ page }) => {
+    await gotoApp(page, { state: STATES.firstRun });
+    await page.locator('#onboardingModalClose').click();
     await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
-    expect(await readStorage(page, STORAGE_KEYS.onboardingDismissed)).toBe('true');
 
     await page.reload();
     await page.waitForFunction(
       () => document.querySelectorAll('#tableBody tr[data-skill-id]').length > 0
     );
     await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
+
+    await expect(page.locator('#aboutBtn')).toBeVisible();
+    await page.locator('#aboutBtn').click();
+    await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+    // Not merely class-toggled: the window is on screen and its text readable.
+    await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
+    await expect(page.locator('#onboardingModal h2')).toBeVisible();
   });
 });
 
@@ -460,5 +504,71 @@ test.describe('kb-load error path', () => {
 
     // init() never ran, so the table stayed empty rather than half-built.
     await expect(page.locator('#tableBody tr[data-skill-id]')).toHaveCount(0);
+  });
+});
+
+test.describe('nothing that ships hidden renders (FIU-P3-INV-001)', () => {
+  // THE GUARD DIA-DL-008 DESIGNED AND DID NOT BUILD, built here to that design.
+  //
+  // WHY IT EXISTS. `display` in a class rule outranks the `display: none` the
+  // browser's user-agent stylesheet gives the `hidden` attribute, so an element
+  // can ship `hidden=""` and render anyway. That has bitten twice in this
+  // repository: `.header-action` at DIA-P2 (both channel actions rendered in the
+  // browser, including a download link for a release that did not exist) and
+  // `.diary-search` at DIA-P4 (a search form offered in an empty diary). Both
+  // times the defect was caught by a NEW test on its first run — that is, by
+  // luck of scheduling rather than by a guard, and only for the one element that
+  // test happened to look at.
+  //
+  // WHY IT IS THIS SHAPE AND NOT A STYLESHEET SCAN. It executes the real cascade
+  // in a real page instead of reading CSS and reasoning about specificity, which
+  // is the difference AGENTS.md §11 item 4 was written about. It also needs no
+  // list: it asks the document which elements are hidden RIGHT NOW, so a surface
+  // added in a later packet is covered the day it lands rather than the day
+  // someone remembers to add it here.
+  //
+  // WHY BOOT IS ENOUGH, and no modal is opened. Computed `display` is not
+  // affected by an ancestor being `display: none` — it is the element's own
+  // computed value — so a control inside a closed window is answered here just
+  // as truthfully as one in the header. What boot does NOT reach is an element
+  // that only becomes `hidden` later; that is why the sweep is anchored on the
+  // live document rather than on the shell's markup.
+  //
+  // TWO COMPOSITIONS FOR FREE. This file runs in `behavior` (web branch,
+  // desktop) and in `native` (Capacitor asset root, mobile). The hidden SET
+  // differs between them — the web branch hides the archive and the diary, the
+  // native branch hides the download offer — so both channel compositions are
+  // swept, at both viewports, by the same eight lines.
+  //
+  // SOUNDNESS, MEASURED. Deleting `.header-action[hidden] { display: none }`
+  // from the mount's app.css reds this with exactly two violations,
+  // `exportBtn -> flex` and `diaryBtn -> flex`, at 1280x800 and at 412x760.
+  test('every element carrying [hidden] computes to display: none', async ({ page }) => {
+    await gotoApp(page, { state: STATES.seeded });
+
+    const hidden = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[hidden]')).map((el) => ({
+        id: el.id || '(no id)',
+        classes: (el.className && el.className.toString()) || '(no class)',
+        display: getComputedStyle(el).display,
+      }))
+    );
+
+    // Anti-vacuity. A selector that matched nothing would make the assertion
+    // below vacuously green, which is the failure mode this milestone keeps
+    // paying for. The shell carries nineteen `hidden` elements today; the floor
+    // is set well under that so an honest deletion does not red it, and the
+    // second assertion pins the class the defect actually landed on twice.
+    expect(hidden.length, 'the [hidden] sweep found almost nothing — it is not looking at the app').toBeGreaterThanOrEqual(12);
+    expect(
+      hidden.some((el) => /(^|\s)header-action(\s|$)/.test(el.classes)),
+      'no hidden .header-action in this composition — the class both known instances of this defect landed on is not being swept'
+    ).toBe(true);
+
+    const rendered = hidden.filter((el) => el.display !== 'none');
+    expect(
+      rendered,
+      'these elements ship hidden and render anyway — a class rule is beating the hidden attribute, and the parent is being offered something the channel does not do. Give each of them its own `<selector>[hidden] { display: none }` line'
+    ).toEqual([]);
   });
 });

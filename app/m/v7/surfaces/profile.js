@@ -109,9 +109,22 @@ function toggleProfileDropdown() {
     }
 }
 
+/**
+ * Открывает окно создания профиля.
+ *
+ * L3-P3: `classList.add('show')`, а не инлайновый `style.display` (FIU-DL-002,
+ * долг 19). Это единственный элемент с голым классом .modal, который открывался
+ * инлайном, и потому единственный, которого не видел
+ * app/tests/show-rule-coverage.spec.js: сканер ищет `classList.add('show')` и
+ * ничего другого. Пока окно было третьим по важности, это было безобидно; с
+ * L3-P2 оно — первый экран свежей установки, и правило, которое его показывает,
+ * стоит держать под тем же охраняемым правилом, что и остальные три. Инлайновый
+ * стиль вдобавок оставался на элементе навсегда после первого закрытия и
+ * перебивал бы .modal.show, если бы кто-то позже открыл окно классом.
+ */
 export function openCreateProfileModal() {
     closeProfileDropdown();
-    document.getElementById('createProfileModal').style.display = 'block';
+    document.getElementById('createProfileModal').classList.add('show');
 }
 
 /**
@@ -141,7 +154,9 @@ export function openCreateProfileModal() {
  * решение, а не недосмотр. Условие снимается самим действием и снимается
  * навсегда; работы, поверх которой можно было бы лечь, в этом состоянии ещё
  * нет — приложение без профиля не умеет ничего. Это другой класс, чем
- * онбординг, который возвращается вечно (FIU-DL-001, долг 14).
+ * онбординг: тот возвращался вечно, пока L3-P3 не решил, что значит его ✕
+ * (FIU-DL-001, долг 14 — закрыт), и теперь он не возвращается вовсе, а
+ * открывается по «?» в шапке.
  */
 export function offerProfileIfNone() {
     if (historyBackend() !== BACKEND.journal) return;
@@ -150,7 +165,7 @@ export function offerProfileIfNone() {
 }
 
 function closeCreateProfileModal() {
-    document.getElementById('createProfileModal').style.display = 'none';
+    document.getElementById('createProfileModal').classList.remove('show');
     document.getElementById('createProfileForm').reset();
 }
 
