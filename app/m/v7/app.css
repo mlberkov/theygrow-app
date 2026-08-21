@@ -173,6 +173,53 @@ header h1 {
     flex-shrink: 0;
 }
 
+/* СПРАВКА В ШАПКЕ (L3-P3): постоянный вход во вступительное окно.
+   Круг с «?», а не пилюля с подписью, и это разделение ролей, а не украшение:
+   .header-action — ОДНО главное действие канала, и оно должно оставаться самым
+   заметным предметом в шапке; эта кнопка стоит рядом с ним и не спорит за
+   внимание. Размер тот же (44px, на мобильном 40px), потому что палец у
+   родителя один и тот же. */
+.header-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--primary-purple);
+    border-radius: 50%;
+    color: var(--primary-purple);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+/* Правило по тому же правилу, что .header-action[hidden] и .diary-search[hidden]
+   (третий случай в проекте): класс задаёт display, значит скрытому состоянию
+   нужна своя строка. Эта кнопка сегодня не скрывается ни на одном канале — она
+   объявлена заранее, чтобы день, когда её начнут скрывать, не стал четвёртым
+   случаем. Исполняет это правило app/tests/behavior.spec.js (FIU-P3-INV-001). */
+.header-help[hidden] {
+    display: none;
+}
+
+.header-help:hover {
+    background: var(--accent-lavender);
+}
+
+.header-help:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: 2px;
+}
+
+.header-help-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
 /* Выпадающее меню профилей */
 .profile-dropdown {
     position: absolute;
@@ -231,11 +278,13 @@ header h1 {
 
 /* EMV-DL-001. Правило, которого здесь не было до /m/v2/.
  *
- * Четыре элемента носят голый класс .modal: #createProfileModal,
- * #importModal, #storeUnavailableModal и #exportModal. Первый открывается
- * инлайновым style.display (surfaces/profile.js) и потому работал всегда;
- * остальные три открываются classList.add('show') — и без этого правила
- * обработчик отрабатывал до конца, а окно оставалось display: none.
+ * Голый класс .modal носят пять элементов: #createProfileModal, #installModal,
+ * #storeUnavailableModal, #diaryModal и #exportModal, — и с L3-P3 все пять
+ * открываются одинаково, classList.add('show'). Без этого правила обработчик
+ * отрабатывал до конца, а окно оставалось display: none. (Список здесь дважды
+ * отставал от разметки: #importModal ушёл вместе с предложением переноса на
+ * L3-P2, а #createProfileModal открывался инлайновым style.display до L3-P3 —
+ * то есть работал, но мимо охраняемой идиомы, FIU-DL-002, долг 19.)
  *
  * block, а не flex: .modal-content центрируется через margin: 10% auto, а
  * мобильная ветка (<=767px) ставит margin: 0 и 100vw/100dvh — обе схемы
@@ -259,6 +308,59 @@ header h1 {
     max-width: 450px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     position: relative;
+}
+
+/* ОКНО ПЕРЕД УСТАНОВКОЙ (L3-P3): текста в нём больше, чем в остальных .modal,
+   поэтому шире и с собственной прокруткой. Ширина 560px, а не 450px, — читать
+   четыре коротких раздела в колонку 450px на десктопе неудобно; на мобильном
+   ветка <=767px и так растягивает .modal-content на весь экран. */
+.install-modal-content {
+    max-width: 560px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* padding-right — под ✕, который стоит абсолютом в правом верхнем углу
+   .modal-content: без него заголовок в две строки на телефоне заезжает под
+   крестик. Измерено на 412px. */
+.install-modal-content h2 {
+    margin: 0 0 4px;
+    padding-right: 32px;
+    font-size: 20px;
+    color: var(--text-primary, #333);
+}
+
+.install-modal-content h3 {
+    margin: 20px 0 6px;
+    font-size: 15px;
+    color: var(--primary-purple);
+}
+
+.install-modal-content p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary, #333);
+}
+
+/* ССЫЛКА НА ПОЛИТИКУ КОНФИДЕНЦИАЛЬНОСТИ (L3-P3). Спокойная, не кнопка: это
+   документ, а не действие, и он не должен спорить с «Закрыть» за внимание. */
+.policy-link {
+    display: inline-block;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--primary-purple);
+}
+
+/* ЧЕТВЁРТОЕ ПРАВИЛО ЭТОГО ВИДА В ПРОЕКТЕ, и написано оно теперь не задним
+   числом: класс задаёт display, значит скрытому состоянию нужна своя строка,
+   иначе `hidden` в разметке ничего не значит. Первые три (.header-action,
+   .diary-search, .header-help) появлялись после того, как дефект уже случился
+   дважды; с L3-P3 за этим следит app/tests/behavior.spec.js — и именно эта
+   ссылка приходит скрытой в каждой сборке, пока документ не объявлен, так что
+   охраняется здесь не гипотетический случай, а сегодняшнее состояние. */
+.policy-link[hidden] {
+    display: none;
 }
 
 .modal-close {
@@ -457,6 +559,20 @@ header h1 {
 .modal-button-primary {
     background: var(--primary-purple);
     color: #ffffff;
+}
+
+/* ССЫЛКА, ОДЕТАЯ КАК КНОПКА ДИАЛОГА (L3-P3). Одна такая есть — «Скачать APK»
+   внутри окна перед установкой, — и она действительно ссылка: она ведёт наружу,
+   в отличие от предмета в шапке, который теперь открывает это окно и потому стал
+   кнопкой. Правила ниже добирают то, чего у <a> нет по сравнению с <button>:
+   строчный бокс, центрирование текста и снятое подчёркивание. Тот же довод, что
+   у .header-action: у соседних предметов один вид, потому что у них одна роль. */
+a.modal-button {
+    display: inline-block;
+    box-sizing: border-box;
+    text-align: center;
+    text-decoration: none;
+    line-height: 1.2;
 }
 
 .modal-button-primary:hover {
@@ -1083,7 +1199,7 @@ thead .col-done {
 
 .onboarding-modal-footer {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     margin-top: 20px;
     padding-top: 20px;
@@ -1092,21 +1208,9 @@ thead .col-done {
     gap: 15px;
 }
 
-.onboarding-checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    color: #666;
-    font-size: 14px;
-}
-
-.onboarding-checkbox-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: var(--primary-purple);
-}
+/* L3-P3: правила .onboarding-checkbox-label удалены вместе с самой галочкой
+   «Больше не показывать» — таблица стилей, которая продолжает одевать удалённую
+   поверхность, это способ, которым поверхность возвращается. */
 
 .onboarding-close-btn {
     background-color: var(--primary-purple);
@@ -1143,6 +1247,34 @@ thead .col-done {
 
     .header-action-label {
         display: none;
+    }
+
+    /* НО У ПРЕДЛОЖЕНИЯ ПРИЛОЖЕНИЯ ПОДПИСЬ ОСТАЁТСЯ (L3-P3). Правило выше
+       написано для НАТИВНОЙ шапки, где действий несколько и они конкурируют за
+       ширину телефона. На веб-канале действие ровно одно, оно главное, и места
+       под него измеренно хватает: при 360px кнопка с подписью заканчивается на
+       348 = 360 − 12 отступа шапки, при 412px — на 400. Значок телефона со
+       стрелкой сам по себе не называет ничего — родитель, пришедший на витрину,
+       видел серую плитку там, где ему предлагают приложение. */
+    #apkBtn {
+        width: auto;
+        padding: 0 14px;
+        gap: 8px;
+    }
+
+    #apkBtn .header-action-label {
+        display: inline;
+    }
+
+    /* Размер справки на мобильном НЕ переопределяется, и это измеренный факт, а
+       не пропуск: ниже, в блоке <=767px, стоит правило touch-targets
+       `button:not(footer button) { min-height: 44px; min-width: 44px }`, и оно
+       побеждает любую попытку сжать кнопку до 40px. Написать здесь 40px значило
+       бы оставить правило, которое ничего не делает. Значок при этом уменьшается
+       до тех же 20px, что у соседей. */
+    .header-help-icon {
+        width: 20px;
+        height: 20px;
     }
 
     header {
@@ -1226,10 +1358,31 @@ thead .col-done {
     width: 100%;
   }
 
-  /* Кнопка профиля - переместить влево */
+  /* Кнопка профиля - переместить влево.
+
+     `margin-right: auto` — ЭТО И ЕСТЬ ВЫРАВНИВАНИЕ ДЕЙСТВИЙ ПО ПРАВОМУ КРАЮ
+     (L3-P3). .header-right тут `width: 100%`, поэтому `margin-left: auto` из
+     базового правила поглощать нечего, а собственного justify-content у этого
+     правила нет — дети падали к левому краю, и весь запас шапки оставался
+     справа: при 412px кнопка канала заканчивалась на 283 из 400 доступных.
+     Отступ на чипе профиля толкает вправо всё, что идёт ПОСЛЕ него, и делает
+     это одинаково для одного, двух и трёх раскрытых действий — в отличие от
+     justify-content: space-between, который разложил бы их по-разному на разных
+     каналах.
+
+     min-width/эллипсис — плата за возвращённую подпись у #apkBtn: без них
+     длинное имя ребёнка переносит чип на вторую строку и растит шапку. */
   .profile-button {
-    margin: 0;
+    margin: 0 auto 0 0;
     order: -1;
+    min-width: 0;
+  }
+
+  .profile-button > #profileName {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Выпадающий список профилей - выровнять по левому краю */
@@ -1609,32 +1762,16 @@ thead .col-done {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* PWA INSTALL PROMPT BANNERS                                                  */
+/* SLIDE-UP, ОБЩАЯ ДЛЯ БАННЕРОВ ОБОЛОЧКИ                                        */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-#installBanner,
-#iosBanner {
-    display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--bg-white);
-    border-top: 2px solid var(--primary-purple);
-    padding: 16px 20px;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 9999;
-    animation: slideUp 0.3s ease-out;
-}
-
-#installBanner.visible,
-#iosBanner.visible {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
+/* L3-P3: здесь стоял блок правил предложения установить PWA (#installBanner,
+   #iosBanner и их кнопки). Он удалён вместе с самим предложением: продукт — это
+   нативное приложение, а веб-канал — витрина и точка входа, и витрина, которая
+   предлагает установить себя, обещает не тот продукт (PDR-034 §1, аннотация
+   владельца 2026-08-18). Анимация пережила блок, потому что она никогда ему не
+   принадлежала: её же используют .app-banner (подтверждение архива) и
+   #updateBanner (новая версия). */
 @keyframes slideUp {
     from {
         transform: translateY(100%);
@@ -1643,91 +1780,6 @@ thead .col-done {
     to {
         transform: translateY(0);
         opacity: 1;
-    }
-}
-
-#installBanner span {
-    flex: 1;
-    color: var(--text-primary);
-    font-size: 14px;
-    line-height: 1.4;
-}
-
-#installBtn,
-#iosDismiss {
-    background: var(--primary-purple);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.2s;
-}
-
-#installBtn:hover,
-#iosDismiss:hover {
-    background: var(--primary-purple-light);
-}
-
-#installDismiss {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 28px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 8px;
-    margin-left: 8px;
-    transition: color 0.2s;
-}
-
-#installDismiss:hover {
-    color: var(--text-primary);
-}
-
-#iosBanner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-    padding: 20px;
-}
-
-#iosBanner p {
-    color: var(--text-primary);
-    font-size: 14px;
-    line-height: 1.6;
-    margin: 0;
-    text-align: left;
-}
-
-#iosBanner strong {
-    color: var(--primary-purple);
-    font-weight: 600;
-}
-
-#iosDismiss {
-    align-self: center;
-    min-width: 120px;
-}
-
-@media (max-width: 480px) {
-    #installBanner,
-    #iosBanner {
-        padding: 14px 16px;
-    }
-
-    #installBanner span,
-    #iosBanner p {
-        font-size: 13px;
-    }
-
-    #installBtn,
-    #iosDismiss {
-        padding: 8px 16px;
-        font-size: 13px;
     }
 }
 

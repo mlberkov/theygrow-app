@@ -3,7 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="/manifest.json">
+    <!-- НЕТ <link rel="manifest">, И ЭТО РЕШЕНИЕ (L3-P3, FIU-DL-003).
+         Продукт — нативное приложение; веб-канал — витрина и точка входа
+         (PDR-034 §1, аннотация владельца 2026-08-18). Витрина, которая
+         предлагает установить СЕБЯ, обещает не тот продукт, поэтому вместе с
+         собственным баннером установки убрана и та строка, из-за которой
+         предложение вообще возможно: событие `beforeinstallprompt`
+         срабатывает только у страницы с манифестом, объявляющим
+         `display: standalone`. Убрать баннер и оставить манифест значило бы
+         отдать то же предложение браузеру, где мы его уже не контролируем.
+
+         Сам /manifest.json остаётся на месте — он по-прежнему копируется
+         образом, отдаётся nginx и лежит в предкэше воркера, — чтобы у клиента,
+         который УЖЕ поставил PWA, ничего не сломалось. Файл, на который шелл
+         больше не ссылается, записан долгом на закрывающий пакет. -->
     <meta name="theme-color" content="#000000">
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
@@ -31,6 +44,26 @@
          этот тег существует, чтобы не допустить. См. docs/RUNBOOK.md, раздел
          "Release build + APK distribution". -->
     <meta name="theygrow-apk-release" content="published">
+
+    <!-- ОПУБЛИКОВАНА ЛИ ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ (L3-P3, changed_in:
+         FIU-DL-003). Тот же вид, что у объявления релиза выше, и по тем же
+         причинам: одно значение, меняется рукой владельца, `none` — документа
+         ещё нет, `published` — он лежит по адресу, объявленному в
+         m/v{N}/channel/config.js как CHANNEL_CONFIG.policyUrl. Любое другое
+         содержимое, как и отсутствие тега, значит «нет»: ссылка не
+         показывается ни на одном канале.
+
+         ПОЧЕМУ ОТКАЗ ПО УМОЛЧАНИЮ ЗДЕСЬ ВАЖНЕЕ, ЧЕМ У КНОПКИ ЗАГРУЗКИ. Мёртвая
+         ссылка на страницу релизов — сломанный канал распространения. Мёртвая
+         ссылка со словами «политика конфиденциальности» — обещание о данных
+         семьи, за которым ничего нет, и это хуже, чем её отсутствие.
+
+         ПОРЯДОК ДЛЯ ВЛАДЕЛЬЦА: сначала опубликовать документ, потом переключить
+         это значение. И одно отличие от релизного тега, которое стоит помнить:
+         шелл едет внутри APK, поэтому на вебе переключение доезжает деплоем, а
+         на телефоне — только следующей сборкой. См. docs/RUNBOOK.md, раздел
+         "Privacy policy". -->
+    <meta name="theygrow-privacy-policy" content="none">
 
     <!-- Google tag (gtag.js) -->
     <script>
@@ -187,18 +220,6 @@
     <link rel="modulepreload" href="/m/v7/export/errors.js">
 </head>
 <body>
-    <!-- PWA Install Prompt Banners -->
-    <div id="installBanner">
-        <span>Установите приложение для удобной работы</span>
-        <button id="installBtn">Установить</button>
-        <button id="installDismiss" aria-label="Закрыть">&times;</button>
-    </div>
-
-    <div id="iosBanner">
-        <p>Чтобы установить приложение, нажмите <strong>Поделиться</strong> (Share) и выберите <strong>«На экран Домой»</strong> (Add to Home Screen).</p>
-        <button id="iosDismiss">Понятно</button>
-    </div>
-
     <!-- PWA Update Available Banner -->
     <div id="updateBanner" role="alert">
         <span>Новая версия доступна — обновить</span>
@@ -236,6 +257,42 @@
                         <!-- Профили будут добавлены динамически -->
                     </div>
                 </div>
+                <!-- О ПРИЛОЖЕНИИ (L3-P3). Постоянный вход во вступительное окно,
+                     на ОБОИХ каналах и без объявлений: он не предлагает
+                     действия, которого канал не выполняет, — он открывает текст,
+                     который лежит в тех же байтах.
+
+                     ПОЧЕМУ ОН ВООБЩЕ ПОЯВИЛСЯ. Вступление закрывается навсегда
+                     первым же ✕ (FIU-DL-003, решение про ✕), а с этого пакета
+                     внутри него лежит ссылка на политику конфиденциальности.
+                     Окно, которое нельзя открыть второй раз, сделало бы документ
+                     недостижимым после первого закрытия — то есть обещание,
+                     которое исполняется ровно один раз. Эта кнопка и есть то,
+                     что превращает «показали однажды» в «доступно всегда».
+
+                     ЗНАЧОК, А НЕ ПОДПИСЬ, и круг, а не пилюля: действие канала в
+                     шапке одно и оно главное (см. .header-action), а это —
+                     справка рядом с ним. Имя у кнопки нарочно шире её сегодняшнего
+                     содержимого: «О приложении», а не «Инструкция». Окно позже
+                     может стать несколькими разделами, и тогда меняется то, что
+                     за кнопкой, а не кнопка.
+
+                     Ни onclick, ни телеметрии здесь нет — как и у соседей
+                     (решение владельца 2026-08-16, гейт D). -->
+                <button type="button"
+                        class="header-help"
+                        id="aboutBtn"
+                        title="О приложении"
+                        aria-label="О приложении">
+                    <svg class="header-help-icon" width="24" height="24" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true" focusable="false">
+                        <circle cx="12" cy="12" r="9"/>
+                        <path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.6"/>
+                        <path d="M12 16.8h.01"/>
+                    </svg>
+                </button>
                 <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
                      файл наружу». Не дискета: дискета означает «сохранить внутри
                      приложения» и вдобавок мертвый предмет для артефакта, весь
@@ -305,19 +362,26 @@
 
                      Приходит СКРЫТОЙ и раскрывается только в браузере И только
                      когда <meta name="theygrow-apk-release"> объявляет, что
-                     релиз опубликован. href проставляется из объявленного
-                     CHANNEL_CONFIG.apkReleaseUrl, а не из разметки: адрес
-                     продукта объявлен в одном месте.
+                     релиз опубликован.
 
-                     Здесь НЕТ onclick и никакой телеметрии — ни события GA4, ни
-                     сигнала (решение владельца 2026-08-16, гейт D). -->
-                <a class="header-action"
-                   id="apkBtn"
-                   hidden
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   title="Скачать APK"
-                   aria-label="Скачать APK">
+                     С L3-P3 ЭТО КНОПКА, А НЕ ССЫЛКА, и это не косметика. Она
+                     больше никуда не ведёт: она открывает окно #installModal, в
+                     котором сказано, что это за приложение и где живут данные, —
+                     а сам адрес лежит на ссылке ВНУТРИ окна. Элемент,
+                     открывающий диалог, — кнопка; вспомогательные технологии
+                     называют её кнопкой, Пробел её нажимает, и браузер не
+                     показывает адрес в статусной строке и не предлагает
+                     «копировать ссылку» для действия, которое никуда не ведёт.
+                     Ровно этим предмет в шапке и читался как случайная ссылка.
+
+                     Здесь НЕТ телеметрии — ни события GA4, ни сигнала (решение
+                     владельца 2026-08-16, гейт D). -->
+                <button type="button"
+                        class="header-action"
+                        id="apkBtn"
+                        hidden
+                        title="Скачать APK"
+                        aria-label="Скачать APK">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
                          stroke-linecap="round" stroke-linejoin="round"
@@ -327,7 +391,7 @@
                         <path d="M9 11l3 3 3-3"/>
                     </svg>
                     <span class="header-action-label">Скачать APK</span>
-                </a>
+                </button>
             </div>
         </div>
         <div class="header-subtitle">
@@ -534,6 +598,71 @@
         </div>
     </div>
 
+    <!-- ЧТО ЭТО ЗА ПРИЛОЖЕНИЕ И ГДЕ ЖИВУТ ДАННЫЕ — экран перед установкой
+         (L3-P3). Открывается кнопкой «Скачать APK» в шапке, то есть ровно в тот
+         момент, когда посетитель решил ставить. До этого пакета в этот момент он
+         получал голую загрузку: страницу релизов, файл .apk и ни одного слова о
+         том, что он ставит и что случится с записями о его ребёнке.
+
+         ОКНО ЖИВЁТ ТОЛЬКО НА ВЕБ-КАНАЛЕ, и не потому, что разметка вторая — она
+         одна на оба канала, — а потому, что кнопка, которая его открывает,
+         раскрывается только в браузере (surfaces/channel.js). У того, кто уже
+         поставил приложение, этого вопроса нет.
+
+         ЧЕГО ЗДЕСЬ НЕТ И НЕ БУДЕТ. Ни сравнения с другими детьми, ни
+         процентилей, ни серий и полос, ни «успейте, окно развития закрывается»
+         (PDR-006 слой B, PDR-003 §2). Это ровно та поверхность, на которой такой
+         текст продавал бы лучше всего, и ровно поэтому запрет на него записан
+         здесь, рядом с текстом, а не только в решении.
+
+         И КАЖДОЕ УТВЕРЖДЕНИЕ НИЖЕ — ПРО ТО, ЧТО ПРИЛОЖЕНИЕ ДЕЛАЕТ НА САМОМ ДЕЛЕ.
+         Шифрованное хранилище — SQLCipher, `androidIsEncryption: true`
+         (StoreEngineTest читает cipher_version). «Никуда не отправляются» —
+         LSC-P4-INV-004: нативный канал не обращается к аналитике. «Ни копии в
+         облаке, включая автобэкап» — allowBackup="false" и оба формата правил,
+         LSC-P1-INV-002 (b). «Копия одна» — docs/RUNBOOK.md, «The first install
+         destroys the app sandbox». Архив собирается локально и не передаётся —
+         LSC-P3-INV-002. Про цену здесь не сказано ничего: это публичное
+         обещание на границе free/paid, и молчание её не двигает.
+
+         Ссылки на политику конфиденциальности здесь НЕТ, и это решение владельца
+         (FIU-DL-003): в этот момент посетитель не вводит никаких данных, ссылка
+         добавила бы обязанность прочитать документ, не добавив выбора, а рядом с
+         кнопкой загрузки читалась бы как предупреждение. На вопрос «что будет с
+         данными» здесь отвечает сам текст. Документ живёт во вступительном окне,
+         которое открывается «?» в шапке на обоих каналах. -->
+    <div id="installModal" class="modal">
+        <div class="modal-content install-modal-content">
+            <span class="modal-close" id="installModalClose">&times;</span>
+            <h2>Приложение TheyGrow для Android</h2>
+
+            <h3>Что это</h3>
+            <p>Список навыков по месяцам, ваши отметки о том, что ребёнок уже освоил, и занятия, которые с этими навыками связаны. Месяцы — это ориентир, по которому удобно искать, а не оценка и не диагноз: приложение ничего не измеряет и ни с кем вашего ребёнка не сравнивает.</p>
+
+            <h3>Где живут данные</h3>
+            <p>Имя, дата рождения, отметки и записи дневника хранятся в зашифрованном хранилище на самом телефоне. Они никуда не отправляются: у приложения нет ни аккаунта, ни синхронизации, ни копии в облаке — включая автоматический бэкап Android, который в нём выключен.</p>
+
+            <h3>Обратная сторона</h3>
+            <p>Копия одна. Если удалить приложение, записи исчезнут вместе с ним. Поэтому в приложении есть архив: оно собирает его на телефоне, по вашей команде, и никуда не передаёт.</p>
+
+            <h3>Как установить</h3>
+            <p>Файл .apk лежит на странице релизов; Android спросит разрешение на установку из неизвестных источников. Регистрация не нужна.</p>
+
+            <div class="modal-buttons">
+                <button type="button" class="modal-button modal-button-secondary" id="installCloseBtn">Закрыть</button>
+                <!-- Адрес проставляется из объявленного CHANNEL_CONFIG.apkReleaseUrl,
+                     а не из разметки: адрес продукта объявлен в одном месте, и
+                     статический скан отказывается видеть его где-либо ещё
+                     (app/tests/export-contour.spec.js). ЭТО ссылка, а не кнопка:
+                     она действительно ведёт наружу. -->
+                <a class="modal-button modal-button-primary"
+                   id="installDownloadLink"
+                   target="_blank"
+                   rel="noopener noreferrer">Скачать APK</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно деталей навыка -->
     <div id="skillModal" class="skill-modal">
         <div class="skill-modal-content">
@@ -577,12 +706,38 @@
                     <li>"Показать навыки, готовые к освоению" - оставляет только навыки, которые ребёнок уже готов осваивать прямо сейчас: те, для которых всё необходимое уже освоено.</li>
                     <li>"Подходящие активности" - выводит на экран наборы игр и других активностей, которые могут помочь упростить и ускорить освоение навыков, которые ребёнку ещё предстоит освоить.</li>
                 </ol>
+
+                <!-- ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ (L3-P3, FIU-DL-003). Единственный
+                     дом этой ссылки в приложении, на ОБОИХ каналах: окно, которое
+                     объясняет, что это за сервис, — и есть то место, где такому
+                     документу место. Открывается «?» в шапке, сколько угодно раз.
+
+                     ПРИХОДИТ СКРЫТОЙ и раскрывается, только когда <meta
+                     name="theygrow-privacy-policy"> объявляет, что документ
+                     опубликован; адрес проставляется из объявленного
+                     CHANNEL_CONFIG.policyUrl, а не из разметки. Пока объявления
+                     нет, здесь нет ничего — не заглушка, не «скоро», не
+                     неактивный пункт: ссылка со словом «конфиденциальность»,
+                     ведущая в 404, хуже её отсутствия.
+
+                     Согласия здесь НЕТ и не предполагается: ни галочки, ни
+                     блокировки закрытия. Обязанность — сделать документ
+                     достижимым, а не собрать согласие; галочка, которую нельзя
+                     не нажать, согласием не является, а согласию потребовалась бы
+                     запись, которой этой вехе негде хранить. -->
+                <a class="policy-link"
+                   id="introPolicyLink"
+                   hidden
+                   target="_blank"
+                   rel="noopener noreferrer">Политика конфиденциальности</a>
             </div>
+            <!-- ГАЛОЧКИ «БОЛЬШЕ НЕ ПОКАЗЫВАТЬ» ЗДЕСЬ БОЛЬШЕ НЕТ (L3-P3,
+                 FIU-DL-001 долг 14). Закрытие этого окна — любое из трёх: ✕,
+                 «Закрыть», клик по фону — теперь значит «прочитал», и второй раз
+                 оно само не приходит. Три выхода, из которых запоминался ровно
+                 один, и были тем дефектом; галочка не чинила его, а перекладывала
+                 на родителя. Прочитать заново можно кнопкой «?» в шапке. -->
             <div class="onboarding-modal-footer">
-                <label class="onboarding-checkbox-label">
-                    <input type="checkbox" id="onboardingDismissCheckbox">
-                    Больше не показывать
-                </label>
                 <button class="onboarding-close-btn" id="onboardingCloseBtn">Закрыть</button>
             </div>
         </div>
@@ -594,134 +749,6 @@
          m/v7/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
     <script type="module" src="/m/v7/app.js"></script>
-
-    <!-- PWA Install Prompt -->
-    <script>
-        (function() {
-            let deferredPrompt = null;
-            const installBanner = document.getElementById('installBanner');
-            const installBtn = document.getElementById('installBtn');
-            const installDismiss = document.getElementById('installDismiss');
-            const iosBanner = document.getElementById('iosBanner');
-            const iosDismiss = document.getElementById('iosDismiss');
-
-            // Проверка: приложение уже установлено?
-            function isAppInstalled() {
-                // Standalone mode (PWA запущено как приложение)
-                if (window.matchMedia('(display-mode: standalone)').matches) {
-                    return true;
-                }
-                // iOS standalone
-                if (window.navigator.standalone === true) {
-                    return true;
-                }
-                return false;
-            }
-
-            // Если приложение уже установлено, не показываем промпты
-            if (isAppInstalled()) {
-                return;
-            }
-
-            // ═══════════════════════════════════════════════════════════
-            // Android / Desktop: beforeinstallprompt
-            // ═══════════════════════════════════════════════════════════
-            window.addEventListener('beforeinstallprompt', (e) => {
-                // Предотвращаем автоматический промпт браузера
-                e.preventDefault();
-                // Сохраняем событие для последующего использования
-                deferredPrompt = e;
-
-                // Показываем наш баннер
-                installBanner.classList.add('visible');
-
-                // GA tracking
-                if (typeof trackEvent === 'function') {
-                    trackEvent('pwa_install_prompt_shown', { platform: 'android_desktop' });
-                }
-            });
-
-            // Обработчик кнопки "Установить"
-            if (installBtn) {
-                installBtn.addEventListener('click', async () => {
-                    if (!deferredPrompt) return;
-
-                    // Показываем нативный промпт
-                    deferredPrompt.prompt();
-
-                    // Ждём выбора пользователя
-                    const choiceResult = await deferredPrompt.userChoice;
-
-                    // GA tracking
-                    if (typeof trackEvent === 'function') {
-                        trackEvent('pwa_install_accepted', {
-                            outcome: choiceResult.outcome,
-                            platform: 'android_desktop'
-                        });
-                    }
-
-                    // Скрываем баннер независимо от выбора
-                    installBanner.classList.remove('visible');
-
-                    // Очищаем сохранённый промпт
-                    deferredPrompt = null;
-                });
-            }
-
-            // Обработчик кнопки закрытия (×)
-            if (installDismiss) {
-                installDismiss.addEventListener('click', () => {
-                    installBanner.classList.remove('visible');
-                });
-            }
-
-            // ═══════════════════════════════════════════════════════════
-            // iOS: показываем подсказку один раз
-            // ═══════════════════════════════════════════════════════════
-            function isIOS() {
-                return /iP(hone|od|ad)/.test(navigator.userAgent);
-            }
-
-            function shouldShowIOSHint() {
-                // Не iOS
-                if (!isIOS()) return false;
-
-                // Уже в standalone mode
-                if (window.navigator.standalone === true) return false;
-
-                // Пользователь уже закрыл подсказку ранее
-                if (localStorage.getItem('iosInstallDismissed') === 'true') return false;
-
-                return true;
-            }
-
-            if (shouldShowIOSHint()) {
-                // Показываем баннер с небольшой задержкой для лучшего UX
-                setTimeout(() => {
-                    iosBanner.classList.add('visible');
-
-                    // GA tracking
-                    if (typeof trackEvent === 'function') {
-                        trackEvent('pwa_ios_hint_shown', { platform: 'ios' });
-                    }
-                }, 1500);
-            }
-
-            // Обработчик кнопки "Понятно" для iOS
-            if (iosDismiss) {
-                iosDismiss.addEventListener('click', () => {
-                    iosBanner.classList.remove('visible');
-                    // Сохраняем флаг, чтобы больше не показывать
-                    localStorage.setItem('iosInstallDismissed', 'true');
-
-                    // GA tracking
-                    if (typeof trackEvent === 'function') {
-                        trackEvent('pwa_ios_hint_dismissed', { platform: 'ios' });
-                    }
-                });
-            }
-        })();
-    </script>
 
     <!-- Service Worker Registration + update-available prompt -->
     <script type="module" src="/m/v7/sw-register.js"></script>

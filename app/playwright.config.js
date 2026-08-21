@@ -143,7 +143,15 @@ module.exports = defineConfig({
       // this repository carries no eslint on purpose, and the class it belongs
       // to is bought by diary-save.spec.js in `behavior`, which EXECUTES the
       // path rather than reading it.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse)\.spec\.js/,
+      // L3-P3 adds one: install-channel, an ABSENCE guard over the shell and the
+      // running mount — no install banner, no `beforeinstallprompt` path, no
+      // rules left dressing a deleted surface, and no `<link rel="manifest">`.
+      // It is here rather than in `behavior` because an absence is a property of
+      // the tree, which is the admissible static kind (AGENTS.md §11), and
+      // because there is nothing for a browser to execute: its subject is a
+      // surface that no longer exists. What DOES exist and ships hidden is swept
+      // at runtime, by behavior.spec.js.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse|install-channel)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

@@ -9,12 +9,17 @@
 // here would flatten those differences, which is a behaviour change this
 // refactor packet is not allowed to make.
 //
-// Two further keys exist in the shell and are NOT owned here: `ga_debug` (the
-// inline <head> gtag shim, which the inline onclick still needs as a global)
-// and `iosInstallDismissed` (the install-prompt IIFE). A1-P5 left the IIFE
-// inline on purpose: it registers `beforeinstallprompt` at parse time, and no
-// level of the parity suite can observe that event, so the move to a deferred
-// module could not be proven equivalent. See A1-DL-006 (f).
+// ONE further key exists in the shell and is NOT owned here: `ga_debug` (the
+// inline <head> gtag shim, which the inline onclick still needs as a global).
+// There were two until L3-P3: `iosInstallDismissed` belonged to the
+// install-prompt IIFE, which A1-P5 left inline on purpose because it registered
+// `beforeinstallprompt` at parse time and no level of the parity suite could
+// observe that event (A1-DL-006 (f)). The IIFE is gone with the offer itself
+// (FIU-DL-003), so the exception is gone with it — including from
+// DECLARED_SHELL_ACCESSES in app/tests/storage-seam.spec.js, which reds on a
+// declared door that no longer exists. The key may still sit in the storage of
+// a browser that saw the old shell; nothing reads it, and clearing it would be
+// a write this packet has no reason to make.
 
 // LocalStorage ключи
 const STORAGE_KEY_PROFILES = 'childDevTracker_profiles';
