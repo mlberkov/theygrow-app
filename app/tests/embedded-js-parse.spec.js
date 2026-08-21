@@ -190,7 +190,11 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'ExportTransferTest.java',
-        line: 575,
+        // Moved from 575 by L3-P4, which added the diary-scope case and its
+        // fixture above this method. The line is asserted rather than trusted,
+        // so a drift like this one reds and gets re-read — which is the whole
+        // point of carrying the number.
+        line: 779,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
