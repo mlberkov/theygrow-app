@@ -109,6 +109,15 @@ const INLINED_BY_THE_APP = Object.freeze({
         + ' ON CONFLICT (id) DO UPDATE SET opened_at_utc = excluded.opened_at_utc,'
         + ' clean_shutdown = 0',
     projectionContext: 'UPDATE projection_context SET as_of_date = ? WHERE id = 1',
+    // FIU-P1 — the marker `closeStore()` writes on its way out. It is the whole
+    // point of the close: the NEXT open reads it and decides whether a full
+    // `PRAGMA integrity_check` over the family's history is owed. Declared here
+    // because the seam matches by exact equality and throws on a miss, so
+    // without it the first park in any behavior leg would throw the statement's
+    // own text rather than being quietly answered — which is the fail-closed
+    // direction, and also a red in a suite that has nothing to do with parking.
+    markClean:
+        'UPDATE store_lifecycle SET clean_shutdown = 1, opened_at_utc = ? WHERE id = 1',
 });
 
 /** Every statement the seam knows, keyed by name, read where it can be read. */
@@ -248,6 +257,7 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                 if (statement === sql.AREA_INSERT_SQL) return;
                 if (statement === sql.AREA_CHILD_INSERT_SQL) return;
                 if (statement === sql.markOpen) return;
+                if (statement === sql.markClean) return;
                 if (statement === sql.projectionContext) return;
                 if (statement === sql.RECORD_INSERT_SQL) {
                     // Positional, as the shipped statement declares it: id,
@@ -308,6 +318,14 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
 
                     if (method === 'isSecretStored') return { result: true };
                     if (method === 'createConnection' || method === 'open') return {};
+                    // FIU-P1 — the close path. Answered rather than simulated,
+                    // on the same terms as the transaction envelope below: this
+                    // seam holds rows in an array and has no connection to close.
+                    // What it must not do is REFUSE them, because the app now
+                    // closes its store whenever the page goes hidden, and a
+                    // fail-closed throw there would surface as a store that
+                    // broke on a tab switch.
+                    if (method === 'close' || method === 'closeConnection') return {};
                     // The envelope store/bridge.js issues around a set since
                     // DIA-DL-007. Answered rather than simulated: this seam holds
                     // rows in an array and has no transaction to begin, so

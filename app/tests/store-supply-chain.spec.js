@@ -120,9 +120,19 @@ test.describe('the wrapper stays replaceable', () => {
         const allowed = new Set(Array.from(block[1].matchAll(/'([^']+)'/g)).map((m) => m[1]));
         expect(allowed.size).toBeGreaterThan(5);
 
+        // TWO CALL SHAPES SINCE FIU-P1, and the second is named here rather
+        // than left to weaken the scan silently. store/bridge.js now has a
+        // park gate, and the open and close paths cannot pass through the gate
+        // they operate — so the ungated core is `dispatch(...)`, and the
+        // lifecycle shapes reach the plugin through it. A scan that still knew
+        // only `callPlugin(` would have gone on passing while four shapes left
+        // its sight, which is the failure mode this file exists to prevent.
+        // Both spellings are literal-first-argument calls into the same
+        // dispatcher; neither is a way around the allowlist, because
+        // `dispatch` checks it.
         const called = new Set();
         for (const { source } of STORE_SOURCES) {
-            for (const match of source.matchAll(/callPlugin\(\s*'([^']+)'/g)) {
+            for (const match of source.matchAll(/(?:callPlugin|dispatch)\(\s*'([^']+)'/g)) {
                 called.add(match[1]);
             }
         }
