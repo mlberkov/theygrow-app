@@ -44,13 +44,26 @@ These items are explicitly deferred. They are named here only to be named-and-de
 
 ## §6 Milestone map (summary)
 
-This is the map, not the spec. Roadmap v2 is the spec.
+This is the map, not the spec. Roadmap v2 is the spec, and **`docs/execution-map.md` is the state** — which rung is current, what landed and what is open lives there, not here. This section says only what the ladders ARE.
 
-- **M1** — Repository preparation for agentic development (enablement harness; this milestone).
-- **M2** — `/api` skeleton.
+**The engine spine (`M`).**
+
+- **M1** — Repository preparation for agentic development (enablement harness). Closed.
+- **M2** — `/api` skeleton. Closed.
 - **M3** — Episodic store + `/export` importer.
 - **M4** — Retrieval lift from the engine.
-- **M5** — Closed-corpus family-memory chat.
+- **M5** — Closed-corpus family-memory chat. Deferred by `ADR-017`; it is not naively "next".
+
+**The device ladder (`L`), which is where the product runs today (`PDR-026`).**
+
+- **L1** — Local structured core: the Capacitor Android shell, the on-device encrypted append-only store, the write path, and the keyless export artifact.
+- **L2** — Local diary: a parent's own text, its search, and the device-log privacy work that came out of it.
+- **L3** — First live-install UX: what the first real install showed, the removal of the in-app transfer offer, diary text in the long-term artifact, and the in-app privacy-policy link.
+- **L4** — The server contour (`ADR-008` describes it as a specification of this rung, not of where family data lives today).
+
+**Cross-cutting tracks.** `А` (delivery / spa-split / accounts), `Б` (ZPD and reference layers), `В` (domain-KB vendoring), plus named correctness tracks such as `XPT` (the export contour). Each carries its own decision-id prefix; the execution map lists them.
+
+**Id shape.** The ladder id names the rung (`L3`); decision and invariant ids take the track's own prefix (`FIU-DL-{NNN}`, `FIU-P{k}-INV-{NNN}` for L3), so nothing collides across tracks that ran in parallel.
 
 ## §7 M1 scope guardrails
 

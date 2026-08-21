@@ -662,14 +662,18 @@ The archive is the family's way out of this device, and it is deliberately the l
 
 1. Unzip it. Any archiver on any operating system will do; nothing inside is compressed, so even a damaged archive is recoverable by hand.
 2. Open `README.txt` first. It explains what the archive is, what opens it, what every dataset holds, how the journal is ordered, how a journal row is joined to its detail row, and what the time fields mean.
-3. Read `text/` for the data in words — participants, children and their current attributes, the whole journal, current skill state, diary records.
+3. Read `text/` for the data in words — participants, children and their current attributes, the whole journal, current skill state, and the diary. **`text/diary.txt` is the one written to be READ rather than parsed** (L3-P4): each entry appears under the day it is about, in the parent's own words and wrapped as prose, with the record's fields listed under it. The same entries are in `index.json` field-by-field for anything that wants to parse them.
 4. Read `index.json` for the same data machine-readably. Its `declaration` section is a verbatim copy of the current mount's `export/declaration.json` and carries a plain-language explanation of **every field**, which is what makes the archive interpretable with no access to this repository.
 5. `MANIFEST.json` records what produced it: the app version, the canon (`kb-v1.json`) version, and the schema identifier and version **as the device actually held them** — plus per-dataset row counts and the export time.
 6. `print/archive.pdf` is the same text again, as **PDF/A-2b** — the archival profile: the font is embedded whole, the colour profile travels inside the file, nothing is encrypted and nothing points outside the file. Open it in any PDF reader, or print it. It is the **secondary** copy: a character the embedded font does not cover appears there as `�` (U+FFFD), while the text files and `index.json` always carry the exact character. When the two disagree, the text files are right, and `declaration.json` says so.
 
 **What is in the archive and what is not, stated the way the interface states it.** Photographs, video and audio are **not** included; `attachments/` is empty and says so. There is **no cloud backup** of this data — the archive is not a supplement to one, it is the only copy that exists off the device.
 
-**Scope.** The archive carries every child-shared entry plus the private entries of the participant who created it. Another participant's private entries never travel; at L7, each participant exports their own.
+**Scope.** The archive carries every child-shared journal entry plus the private journal entries of the participant who created it. Another participant's private journal entries never travel; at L7, each participant exports their own.
+
+**And for DIARY TEXT the rule is stricter, since L3-P4 (`FIU-DL-004`): only the exporting participant's OWN entries travel, and they are selected by the entry's AUTHOR rather than by the area it sits in.** Before that packet the diary was scoped through its area, so another participant's entry written into the child-shared area would have travelled — text, print layer and row count alike. It could not have happened yet (one participant per device, and every entry the diary writes goes to that participant's own private area), which is exactly why it had to be closed before a second participant exists rather than after. The archive states the rule in its own words in `README.txt` and in `index.json`'s `scope.diary`, and the format version is **2** because of it: a v1 archive was written under the older, wider promise.
+
+**One thing worth knowing about archives made before this milestone.** They carry the parent's own diary text too — the dataset has been in the format since L1-P3, ahead of the diary existing — even though the product said in three places that they did not. Nothing in them can hold anyone else's text, for the reason above. Re-exporting after L3 gives a v2 archive; it is an owner option, not an obligation, and it is one button press.
 
 **Running the checks that do not need a device.**
 
@@ -694,6 +698,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 6. **Read the signal, on the same run** (XPT-P1): `adb logcat -s TheyGrowSignal | grep 'export.run'` shows one line of the form `[signal] export.run outcome=complete archive_bytes=… chunks=… export_ms=…`. Counts and timings only — it carries no filename and no document URI, by decision. `outcome=nothing_selected` is a closed picker; `outcome=failed` names a run the app itself knows failed, which is a different and much easier state to be in than the silent one this packet ended. *(Corrected in DIA-P5. This step said `-s chromium`, and that was false when written: signal lines were carried by Capacitor's console bridge under tag `Capacitor/Console`, and `-s chromium` matched two DNS warnings and no signal at all — measured on runs 32044006357 and the L1-era artefact both. Since DIA-P5 the app forwards them itself under `TheyGrowSignal`, which is what this command now names.)*
 7. Export twice without changing anything. The two archives must differ **only** in `MANIFEST.json` — that is the determinism guarantee, and it is the cheapest place to notice it breaking.
 8. **Before L1-P4** the archive was correct and nearly empty, by design: the contour existed before the records did, so the first records were recoverable before they were written. **L1-P4 lands the write path, so it is no longer empty** — see *The write path and the legacy import* below, whose step 8 says what to look for in it. *(Corrected in L1-P4: this step read as a standing expectation and would have told the owner an archive with records in it was wrong.)*
+9. **Read your own diary back out of it, on the same run (L3-P4).** Write an entry in the app first (the *Дневник* smoke below), then export and open `text/diary.txt`. Your sentence must be there, under the day you chose, wrapped as text — not as a `body:` field. Open `print/archive.pdf` and find the same sentence on the page. **Two things are the point of the check, not decoration:** a character the embedded font does not cover — an emoji, say — appears in the PDF as `�` while `text/diary.txt` and `index.json` carry the exact character (that asymmetry is declared, and `README.txt` says which is authoritative); and no line of any text file or printed page runs off its edge, however long a word you paste in. If the entry is missing from either layer, stop: that is the packet's whole subject failing, and `pytest app/tests/export` plus `ExportTransferTest` should both have caught it before the phone did.
 
 **Diary smoke (owner-run, after installing the APK — DIA-P3).** The instrumented gate presses these same controls, but on a fresh emulator image with an engine that was made full on purpose. What no test can do is read the sentences as a parent reads them, so read them.
 
@@ -704,7 +709,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 5. **Force-stop the app, reopen it, and open the diary again.** The entry must still be there. That is the whole point of the packet and the only step that observes the store surviving a process death.
 6. **Read the signal on the same run:** `adb logcat -s TheyGrowSignal | grep 'diary.write'` shows one line per save of the form `[signal] diary.write outcome=complete failure_class=none chars=<n> write_ms=<n>`. `chars` is a length; if anything resembling the text you typed appears in that line, stop — that is a §4 breach and `LSC-P4-INV-003` should have made it impossible. *(Corrected in DIA-P5, same as the export step above: `-s chromium` named a tag these lines never carried. And read the whole log once, not only this tag — `adb logcat | grep 'подоконник'`, substituting a word you actually typed: **until DIA-P5 the bridge wrote every entry you saved to logcat verbatim**, under tag `Capacitor`, and a grep scoped to the signal would never have shown it. That is the check this step could not make, and it is now `DIA-P5-INV-001`'s.)*
 7. **What this smoke cannot reach, and nobody should pretend otherwise:** a phone that is actually out of storage. The disk-full refusal is exercised on the emulator by making the ENGINE refuse (`DiaryEntryTest`), which is a real `SQLITE_FULL` and not a real full phone — a device with no space left also fails in ways SQLite never sees. If you ever meet one for real, the sentence you should see says the entry was NOT saved, that your text is still in the field, and to free space — not to restart the app.
-8. **One thing to know before this smoke and not after it:** the archive does **not** contain diary text. It carries the marks and the journal, so an exported archive is not a backup of anything written in the diary. *(Corrected at DIA-P4: this said the owner decision had not been taken. It has — the gate of 2026-08-17 chose that the long-lived artefact **will** carry diary text and addressed the work to **L3**. Read the sentence above as a state with an address: until L3 ships, a parent's diary text exists in exactly one copy on one device. `DIA-DL-005`'s pointer and `DIA-DL-008`.)*
+8. **One thing to know before this smoke and not after it: the archive DOES contain your diary text, and it has since the diary shipped.** Write an entry, export, and it is in `text/diary.txt`, in `index.json` and on the printed page — the parent's own entries only, never another participant's, selected by the entry's author (`FIU-DL-004`). *(Rewritten at L3-P4, and the previous wording is worth keeping in view rather than deleting quietly: it said the archive did NOT contain diary text. That was false the day it was written. The `record` dataset carries the `body` column in `export/declaration.json` since L1-P3 — declared ahead of the table having rows — so from DIA-P3 onward every export carried the entries. The same false sentence stood in the app itself, in the diary's corrupt-store message, where a parent reads it while deciding whether to copy their text out by hand; it was corrected in the same packet. What L3-P4 actually changed is the SCOPE and the READABILITY: the entries are now selected by author rather than by area, and `text/diary.txt` is written to be read rather than parsed. The earlier note that the 2026-08-17 gate had addressed this work to L3 stands — that work is this packet.)*
 
 **Note for the web channel (rewritten in DIA-P2).** In a browser there is **no archive control at all**. Until that packet the control opened a modal that explained why it could not act; the browser cannot produce an archive under any circumstances — there is no web branch in the export sink and there never was — so the action is no longer offered where it does not happen (PDR-034 §1). What the browser says instead is a line above the table: everything marked there lives only in that browser, it has no backup, and the archive is something the phone app makes. That statement is true until a transfer is confirmed (ADR-048 §5), and it is on screen without anything being opened.
 
@@ -935,7 +940,7 @@ them about it; `rebuilt=true` in the signal line above is where an operator read
 search that should hit keeps missing across a full restart of the app, that is the case to report — it is
 not a case the parent can fix and not one this procedure has a command for.
 
-### Closing a milestone: the owner sequence, end to end (L2 / DIA-P4)
+### Closing a milestone: the owner sequence, end to end (L2 / DIA-P4; step 4 added at L3 / FIU-P4)
 
 > **The order is the procedure.** Each step's output is the next step's premise, and two of them are
 > irreversible-ish in practice: a merge is what makes the branch history public on `main`, and a promotion
@@ -948,7 +953,12 @@ not a case the parent can fix and not one this procedure has a command for.
    job is **skipped by design** and `android-instrumented` uploads `theygrow-debug-apk` itself, so one
    dispatch yields both the verdict and the installable build.
 2. **Read the verdict before anything else — and read it out of THIS run's artefact.** Expected at the
-   close of L2: `DiaryEntryTest` **5/5** and `StoreEngineTest` **11/11**. Three numbers arrive with it and
+   close of L2: `DiaryEntryTest` **5/5** and `StoreEngineTest` **11/11**. **At the close of L3, add
+   `ExportTransferTest` 3/3** — it grew a third case in L3-P4, the one that presses export with two
+   participants' diary entries in the store and reads the produced archive back to prove only the
+   exporter's own travelled. The same dispatch is also the only place veraPDF runs, and since L3-P4 the
+   PDF it validates carries real diary prose, a codepoint the embedded font does not cover and a
+   hard-broken long token — so a PDF/A verdict on that run is a verdict about what a parent types. Three numbers arrive with it and
    exist nowhere else. **Each is logged under the tag of the suite that measures it**, so no single tag
    carries all three and a reader who greps one of them concludes the others never arrived — the defect
    that cost this milestone a full diagnostic round (`DIA-DL-009` (f)):
@@ -998,13 +1008,36 @@ not a case the parent can fix and not one this procedure has a command for.
    **Done on run 32074105863: `DeviceLogTest` 2/2, the suite 36/36, and the field now reads Observed — so no
    `Not yet observed.` field remains anywhere in `docs/INVARIANTS.md` again.** The zero worth checking there
    is the passphrase's, on a run whose own `store.open` line reports `freshly_created=true`. `DIA-DL-010`.
-4. **Open the milestone PR** (`feat/l2-local-diary` → `main`). The PR event runs `android-instrumented`
+4. **Re-bless the visual baselines, and read what moved before committing them.** Owner-run because the
+   visual projects are docker-backed and cannot run on an agent's machine, and **before the PR**, because
+   the `parity` job runs those projects on the PR and a stale baseline reds the gate:
+
+   ```
+   scripts/parity-suite.sh --project=visual-desktop --project=visual-mobile --update-snapshots
+   git status --porcelain app/tests/__baselines__/visual-desktop app/tests/__baselines__/visual-mobile
+   ```
+
+   The docker daemon needs a real terminal with `sudo`; the run stages the Capacitor web root itself.
+   **There are 20 PNGs, 10 per project.** For L3 the expected movement is the header and everything
+   carrying it — `header`, `shell-seeded`, `shell-no-profile`, `shell-zpd-filtered`,
+   `shell-zpd-empty-state` — plus `modal-onboarding` (the intro window gained the policy link and a way
+   back) and `modal-create-profile`. On mobile the header also grew 57 px → 61 px, because the download
+   offer became a `<button>` and met the 44 px tap-target rule the old `<a>` escaped.
+
+   **What is a FINDING rather than a re-bless**, i.e. stop and report instead of committing the PNG:
+   movement in `modal-skill`, `modal-activities` or `control-footer` — this milestone did not touch those
+   surfaces; any red outside the two visual projects; or a screenshot that fails to render at all. The
+   baselines have been inherited-red since `a8b2ec2` (the APK button losing `hidden=""`), so this run is
+   expected to absorb that too rather than to show it as a separate diff — if the header PNGs come back
+   unchanged, something did not run.
+
+5. **Open the milestone PR** (the milestone branch → `main`; `feat/l3-first-install-ux` at L3). The PR event runs `android-instrumented`
    again, plus the PDF/A validation leg, plus `quality` and `parity` — the full gate.
-5. **Merge.** Nothing deploys from a branch; the merge is what makes the next step possible.
-6. **The push to `main` builds and deploys at 0% traffic.** `app/cloudbuild.yaml` Step 3 lands a fresh
+6. **Merge.** Nothing deploys from a branch; the merge is what makes the next step possible.
+7. **The push to `main` builds and deploys at 0% traffic.** `app/cloudbuild.yaml` Step 3 lands a fresh
    revision with `--no-traffic --tag sha-$SHORT_SHA`. The live revision keeps serving. **Nothing has reached
    the family yet at this point.**
-7. **Curl-smoke the tagged revision** — the full list in **Promotion + rollback (L1 deploy-safety gate)**,
+8. **Curl-smoke the tagged revision** — the full list in **Promotion + rollback (L1 deploy-safety gate)**,
    step 3. Note that L2 did **not** bump the mount: `/m/v6/` was created on the branch and edited
    in place, so through that milestone `CACHE_VERSION` stayed **v16** and the mount checks addressed `/m/v6/`.
    *(Corrected at L3-P1, `FIU-DL-001`: that sentence was written while `/m/v6/` was still unpublished, and it
@@ -1012,14 +1045,19 @@ not a case the parent can fix and not one this procedure has a command for.
    **v17**, so the checks in step 3 address `/m/v7/` — as the corrected lines there now do. The rule the L2
    note is an instance of, and the one to apply at every future close, is `Module mount` item 1: read the
    current values out of `app/index.html` and `app/sw.js` rather than out of this sentence.)*
-8. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
+9. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
    That step asks about a client that had the app *before* this deploy; a fresh browser does not qualify and
    the honest answer, if no such client exists, is to write that in the note.
-9. **The on-device smoke, in this order and no other:** the **transfer** (*The browser-to-native history
-   transfer*), then the **diary and its search** (the section above). The order is load-bearing — the diary
-   needs a child profile and the transfer is what puts one there — and the transfer's own step 1 says to read
-   the instrumented result before installing anything, which step 2 above has already done.
-10. **The still-gated owner items, none of which this milestone performs.** Clearing the browser's
+10. **The on-device smoke.** *(Rewritten at L3-P4, because L3-P2 removed the premise of the old ordering.)*
+   This step used to read "the **transfer** first, then the **diary** — the order is load-bearing, because the
+   diary needs a child profile and the transfer is what puts one there". **The in-app transfer offer is gone**
+   (`FIU-DL-002`) and a fresh install now asks for the child itself, so the diary no longer depends on it. The
+   order at L3 is: **the diary and its search** (the section above — write an entry, that is what the next one
+   needs), then **the export archive** (*The export archive*, steps 1-9, whose step 9 reads that entry back out
+   of the archive and off the printed page). The transfer section is kept for the mechanism still shipped as
+   insurance; its steps 3-7 cannot be performed any more and it says so at its head. Read the instrumented
+   result before installing anything either way — which step 2 above has already done.
+11. **The still-gated owner items, none of which this milestone performs.** Clearing the browser's
     `localStorage` after a confirmed transfer (nothing in the code removes, rewrites or marks the source
     consumed — the decision and the moment are the owner's). Removing the install prompt (PDR-034 §3, gated
     on this smoke). The GA4 surface, which stays until authentication appears at L4. Retiring `m/v1`–`m/v5`.
@@ -1030,9 +1068,17 @@ not a case the parent can fix and not one this procedure has a command for.
     `CHANNEL_CONFIG.policyUrl`, and the app links it from the intro window as soon as the shell declares
     the document published. What is still owed is the DOCUMENT — see "Privacy policy" below — and the
     consent surface, which this milestone deliberately does not build: making the policy reachable is the
-    obligation, collecting acceptance is not.)* And the artefact work
-    the 2026-08-17 gate addressed to **L3** — until it ships, the archive carries marks and journal history
-    only, which the diary's own corrupt-store message already tells a parent in their own words.
+    obligation, collecting acceptance is not.)* *(The artefact work the
+    2026-08-17 gate addressed to **L3** is no longer on this list: it shipped in L3-P4. The archive carries
+    the exporting participant's own diary text, in the data layer and in the print layer, under format
+    version 2 — see **The export archive** above. The sentence that used to stand here, and the diary's
+    corrupt-store message it pointed at, both said the archive carried marks and journal history only;
+    both were false and both were corrected in that packet.)* And one item this milestone closed by
+    RECORDING rather than by acting: `app/manifest.json` stays served, copied and precached while the
+    shell no longer names it (`FIU-DL-003` debt 20). Removing it would edit `app/Dockerfile`,
+    `app/nginx.conf` and `app/sw.js` — the live delivery path — and would break the manifest for a client
+    that installed the PWA before L3-P3. It is inert for every new visitor, because the
+    `<link rel="manifest">` is gone.
 
 ### `/api` (FastAPI)
 
