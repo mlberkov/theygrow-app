@@ -6,6 +6,12 @@
 // выполняется. Это ветка времени выполнения, а не вторая сборка: каналы
 // поставляют байт-в-байт одно и то же (LSC-P1-INV-002, PDR-034 §3).
 //
+// L3-P3 добавляет сюда ТРЕТИЙ предмет, и он устроен иначе: ссылка на политику
+// конфиденциальности раскрывается не по каналу, а по объявлению, и на обоих
+// каналах одинаково. Здесь же теперь открывается окно перед установкой — по
+// тому же доводу, по которому этот модуль вообще существует: что именно
+// предлагает канал, решается в одном месте.
+//
 // ПОЧЕМУ СКРЫТО ПО УМОЛЧАНИЮ, А НЕ ПОКАЗАНО. Обратный порядок — показать и
 // спрятать — на вебе мигал бы обещанием архива при каждой загрузке, а при
 // сломанном JS оставлял бы это обещание стоять. Нераскрытое действие — честный
@@ -62,6 +68,29 @@ export function shouldOfferApk(releaseState, native) {
     return releaseState === CHANNEL_CONFIG.releaseStatePublished;
 }
 
+/** Объявленное состояние публикации политики, как его назвал шелл. */
+function declaredPolicyState(doc) {
+    const tag = doc.querySelector(`meta[name="${CHANNEL_CONFIG.policyStateMeta}"]`);
+    return tag ? tag.getAttribute('content') : null;
+}
+
+/**
+ * Показывать ли ссылку на политику конфиденциальности (L3-P3).
+ *
+ * ФУНКЦИЯ ОДНОГО АРГУМЕНТА, И ЭТО РЕШЕНИЕ, А НЕ ЭКОНОМИЯ. У shouldOfferApk два:
+ * загрузка бессмысленна там, где приложение уже стоит. У политики канала нет —
+ * читает её тот, кто ВВОДИТ ДАННЫЕ (PDR-035 §2), а данные вводят на обоих
+ * каналах. Добавить сюда `native` значило бы утверждать, что у родителя с
+ * телефоном этого права меньше.
+ *
+ * Отказ по умолчанию, как и у релиза: всё, кроме объявленного значения, значит
+ * «документа нет». Ссылка со словом «конфиденциальность», ведущая в 404, — не
+ * недоделанная функция, а нарушенное обещание про данные семьи.
+ */
+export function shouldOfferPolicy(policyState) {
+    return policyState === CHANNEL_CONFIG.policyStatePublished;
+}
+
 /**
  * Раскрывает действия, которые этот канал действительно выполняет.
  *
@@ -82,14 +111,52 @@ export function wireChannel({ doc = document } = {}) {
     const diaryButton = doc.getElementById('diaryBtn');
     if (diaryButton) diaryButton.hidden = !native;
 
-    const downloadLink = doc.getElementById('apkBtn');
-    if (downloadLink) {
-        const offered = shouldOfferApk(declaredReleaseState(doc), native);
-        // Адрес проставляется здесь, а не в разметке: одно объявление на
-        // продукт, в объявленном месте (CHANNEL_CONFIG), и статический скан
-        // отказывается видеть этот адрес где-либо ещё.
-        downloadLink.href = CHANNEL_CONFIG.apkReleaseUrl;
-        downloadLink.hidden = !offered;
+    // ПРЕДЛОЖЕНИЕ ПРИЛОЖЕНИЯ — ТЕПЕРЬ В ДВА ПРЕДМЕТА (L3-P3): кнопка в шапке,
+    // которая открывает окно, и ссылка ВНУТРИ окна, которая ведёт на страницу
+    // релизов. Между решением поставить и загрузкой встал текст о том, что это
+    // за приложение и где живут данные, — до этого пакета там не было ничего.
+    const downloadButton = doc.getElementById('apkBtn');
+    const installWindow = doc.getElementById('installModal');
+    const downloadLink = doc.getElementById('installDownloadLink');
+
+    // Адрес проставляется здесь, а не в разметке: одно объявление на продукт, в
+    // объявленном месте (CHANNEL_CONFIG), и статический скан отказывается видеть
+    // этот адрес где-либо ещё. Безусловно, как и раньше: ссылка никогда не
+    // остаётся ведущей в никуда, даже пока окно недостижимо.
+    if (downloadLink) downloadLink.href = CHANNEL_CONFIG.apkReleaseUrl;
+
+    if (downloadButton) {
+        downloadButton.hidden = !shouldOfferApk(declaredReleaseState(doc), native);
+    }
+
+    if (downloadButton && installWindow) {
+        downloadButton.addEventListener('click', () => {
+            installWindow.classList.add('show');
+        });
+    }
+
+    if (installWindow) {
+        const closeInstallWindow = () => installWindow.classList.remove('show');
+
+        const installCross = doc.getElementById('installModalClose');
+        if (installCross) installCross.addEventListener('click', closeInstallWindow);
+
+        const installCloseButton = doc.getElementById('installCloseBtn');
+        if (installCloseButton) installCloseButton.addEventListener('click', closeInstallWindow);
+
+        installWindow.addEventListener('click', (e) => {
+            if (e.target === installWindow) closeInstallWindow();
+        });
+    }
+
+    // ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ. Один дом — вступительное окно, на обоих
+    // каналах; поэтому здесь нет ветки по каналу, только по объявлению. Адрес,
+    // как и у загрузки, ставится безусловно: элемент, который однажды покажут,
+    // не должен быть в этот момент ссылкой в никуда.
+    const policyLink = doc.getElementById('introPolicyLink');
+    if (policyLink) {
+        policyLink.href = CHANNEL_CONFIG.policyUrl;
+        policyLink.hidden = !shouldOfferPolicy(declaredPolicyState(doc));
     }
 
     // ЧТО ГОВОРИТ ВЕБ-КАНАЛ О СОХРАННОСТИ ДАННЫХ, ПОСЛЕ ТОГО КАК КНОПКА АРХИВА

@@ -18,6 +18,12 @@
 // window.Capacitor, in surfaces/channel.js — a branch, never a second build
 // (PDR-034 §3).
 //
+// L3-P3 adds a SECOND declaration of the same shape, for the privacy policy —
+// same fail-closed rule, same value-in-the-shell / vocabulary-in-the-mount
+// split, and one deliberate difference recorded at the knob itself: the policy
+// link is offered on BOTH channels, because the person who needs it is the one
+// entering data.
+//
 // WHAT THIS SURFACE IS FOR, in one paragraph. PDR-034 §1 splits the roles: the
 // native app is the product, and the web channel is a showcase and an ENTRY
 // POINT that accepts no new family data. So the web channel stops offering the
@@ -75,4 +81,52 @@ export const CHANNEL_CONFIG = Object.freeze({
     // changed_in: DIA-DL-004 — the ONE content value that means "a release is
     // published and its assets are on that page". Anything else is gated.
     releaseStatePublished: 'published',
+
+    // changed_in: FIU-DL-003 — the address of the privacy policy, and the same
+    // class of public identifier as apkReleaseUrl and TRANSFER_CONFIG
+    // .handoffOrigin: it says where a PUBLIC document is, not where anything is
+    // deployed, so it belongs here and not in docs/RUNBOOK.md.
+    //
+    // Apex, not a subdomain; an HTML page, not a PDF. Both are owner decisions
+    // (PDR-035 §2) rather than preferences: the policy is read on a phone, by a
+    // parent who has not installed anything yet, and a PDF on a phone is a
+    // download and a pinch-zoom rather than a document.
+    //
+    // WHY THE APP LINKS IT AT ALL, since a showcase page could carry it alone:
+    // the person who needs it is the one ENTERING DATA, and that happens inside
+    // the app. So the link lives on both channels, which is also why the
+    // decision function below takes no channel argument — unlike shouldOfferApk,
+    // whose whole subject is that one channel already has the app.
+    policyUrl: 'https://theygrow.app/privacy',
+
+    // changed_in: FIU-DL-003 — where the publication state of that document
+    // lives, by the same argument as releaseStateMeta above and with one
+    // difference that is worth saying out loud.
+    //
+    // SAME ARGUMENT: the value changes on an OWNER ACT — the day the document is
+    // actually published — and the mount is served immutable at a URL whose
+    // bytes are never rewritten (A1-DL-004), so a boolean here would cost a
+    // generation, a CACHE_VERSION bump and a promotion to flip. The shell is
+    // `max-age=3600, must-revalidate` and network-first. So the VALUE is a
+    // <meta> in app/index.html and the VOCABULARY is here.
+    //
+    // THE DIFFERENCE: the shell is also what the APK carries. On the web channel
+    // the flip costs a deploy and reaches installed clients on their next
+    // navigation; on the native channel it reaches a phone only in the NEXT
+    // release build. That asymmetry is stated in docs/RUNBOOK.md rather than
+    // engineered around, because engineering around it means a second
+    // declaration under /m/v{N}/ — exactly the cost this split exists to avoid.
+    //
+    // FAIL-CLOSED, and here it is the whole point: until the document exists,
+    // any content that is not exactly `policyStatePublished` — a missing tag, an
+    // empty value, a typo, a stale `none` — means NOT PUBLISHED, and no policy
+    // link is rendered anywhere. A privacy policy is the one link a parent is
+    // entitled to trust; a 404 under that word is worse than its absence.
+    policyStateMeta: 'theygrow-privacy-policy',
+
+    // changed_in: FIU-DL-003 — the ONE content value that means "the policy is
+    // published at policyUrl". Anything else is gated. Deliberately the same
+    // token as releaseStatePublished: two declarations of the same shape, and an
+    // owner who has learnt one has learnt both.
+    policyStatePublished: 'published',
 });

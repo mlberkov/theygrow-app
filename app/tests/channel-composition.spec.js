@@ -51,6 +51,38 @@ const DECLARED_STATE = new RegExp(
     `<meta name="${STATE_META}" content="([^"]*)"`
 ).exec(SHELL)[1];
 
+// The second declaration of the same shape (L3-P3), read the same way.
+const POLICY_URL = /policyUrl:\s*'([^']+)'/.exec(CONFIG_SOURCE)[1];
+const POLICY_PUBLISHED_VALUE = /policyStatePublished:\s*'([^']+)'/.exec(CONFIG_SOURCE)[1];
+const POLICY_META = /policyStateMeta:\s*'([^']+)'/.exec(CONFIG_SOURCE)[1];
+const DECLARED_POLICY_STATE = new RegExp(
+    `<meta name="${POLICY_META}" content="([^"]*)"`
+).exec(SHELL)[1];
+
+/**
+ * Rewrites one <meta> declaration before the app boots.
+ *
+ * The listener is registered before any script in the page, so it runs before
+ * the one m/v{N}/app.js adds — listeners fire in registration order, so the
+ * attribute is already changed by the time wireChannel() reads it. This is
+ * exactly the edit an owner makes after publishing the thing.
+ */
+async function declareBeforeBoot(page, meta, value) {
+    await page.addInitScript(
+        ([name, content]) => {
+            document.addEventListener(
+                'DOMContentLoaded',
+                () => {
+                    const tag = document.querySelector(`meta[name="${name}"]`);
+                    if (tag) tag.setAttribute('content', content);
+                },
+                { once: true }
+            );
+        },
+        [meta, value]
+    );
+}
+
 /**
  * Installs the smallest thing the channel probe accepts as the native shell.
  *
@@ -97,20 +129,108 @@ test.describe('the web channel offers what it can deliver, and nothing else', ()
     test('the download control follows the declared release state', async ({ page }) => {
         await gotoApp(page, { state: STATES.seeded });
 
-        const link = page.locator('#apkBtn');
-        await expect(link).toHaveCount(1);
+        const control = page.locator('#apkBtn');
+        await expect(control).toHaveCount(1);
 
         // The address is wired from the knob whichever branch is taken — the
-        // link is never left addressing nothing.
-        await expect(link).toHaveAttribute('href', RELEASE_URL);
+        // link is never left addressing nothing. Since L3-P3 the address is on
+        // the link INSIDE the pre-install window, and the header control is a
+        // button that opens that window.
+        await expect(page.locator('#installDownloadLink')).toHaveAttribute('href', RELEASE_URL);
 
         if (DECLARED_STATE === PUBLISHED_VALUE) {
-            await expect(link).toBeVisible();
+            // THE STATE THIS BUILD SHIPS since a8b2ec2, which declared the
+            // release published.
+            await expect(control).toBeVisible();
         } else {
-            // THE STATE THIS BUILD SHIPS. No release exists — no tag, no
-            // published asset — so the control is withheld rather than pointing
-            // a visitor at an empty page.
-            await expect(link).toBeHidden();
+            // No release declared, so the control is withheld rather than
+            // pointing a visitor at an empty page.
+            await expect(control).toBeHidden();
+        }
+    });
+
+    test('pressing the download control opens the pre-install window, and it closes again', async ({
+        page,
+    }) => {
+        // WHAT A VISITOR MEETS BETWEEN DECIDING AND DOWNLOADING (L3-P3). Before
+        // this packet the answer was "nothing": the control went straight to a
+        // releases page, and no surface anywhere said what the app is or what
+        // happens to the family's data.
+        //
+        // THE ARM: empty the click handler in surfaces/channel.js, or delete the
+        // `.modal.show` rule, and this reds. show-rule-coverage.spec.js is a
+        // static scan and cannot stand in for it (AGENTS.md §11).
+        test.skip(
+            DECLARED_STATE !== PUBLISHED_VALUE,
+            'the control is withheld in this build, so it cannot be pressed'
+        );
+        await gotoApp(page, { state: STATES.seeded });
+
+        await expect(page.locator('#installModal')).toBeHidden();
+
+        await page.locator('#apkBtn').click();
+
+        await expect(page.locator('#installModal')).toBeVisible();
+        await expect(page.locator('#installModal')).toHaveCSS('display', 'block');
+        // The parent can actually read it, and the download is inside it.
+        await expect(page.locator('#installModal h2')).toBeVisible();
+        await expect(page.locator('#installDownloadLink')).toBeVisible();
+
+        await page.locator('#installModalClose').click();
+        await expect(page.locator('#installModal')).toBeHidden();
+    });
+
+    test('the pre-install window says where the data lives, and sells nothing', async ({ page }) => {
+        // The value contract, executed on the rendered text rather than asserted
+        // about the source: PDR-006 layer B and PDR-003 §2 forbid comparison,
+        // percentile, streak and deadline framing, and this is the one surface
+        // where that framing would sell. A packet that "improves the copy" and
+        // reaches for it reds here.
+        test.skip(
+            DECLARED_STATE !== PUBLISHED_VALUE,
+            'the control is withheld in this build, so the window cannot be opened'
+        );
+        await gotoApp(page, { state: STATES.seeded });
+        await page.locator('#apkBtn').click();
+
+        const text = await page.locator('#installModal .modal-content').innerText();
+
+        // It answers the question a parent actually has, and it disclaims the
+        // two readings the subject matter invites. Asserted POSITIVELY rather
+        // than by forbidding the word "сравнивать": the honest copy uses that
+        // word to deny comparison, so a stem ban would forbid the sentence that
+        // does the work.
+        for (const promised of [
+            'на самом телефоне',
+            'никуда не отправляются',
+            'не оценка и не диагноз',
+            'ни с кем вашего ребёнка не сравнивает',
+        ]) {
+            expect(
+                text,
+                `the pre-install screen no longer says "${promised}" — this is where a parent decides whether to trust the app with their child`
+            ).toContain(promised);
+        }
+
+        // And the framings that have no honest use on this surface. A packet
+        // that "improves the copy" and reaches for one of these reds here.
+        for (const forbidden of [
+            'процентил',
+            'рейтинг',
+            'серия дней',
+            'успей',
+            'успеть',
+            'не упусти',
+            'отстава',
+            'опережа',
+            // Price is a public promise on the free/paid boundary; this packet
+            // deliberately says nothing about it (FIU-DL-003).
+            'бесплатн',
+        ]) {
+            expect(
+                text.toLowerCase(),
+                `the pre-install screen reaches for "${forbidden}" — ranking, deadline and price framing are forbidden here (PDR-006 layer B, PDR-003 §2)`
+            ).not.toContain(forbidden);
         }
     });
 
@@ -120,23 +240,7 @@ test.describe('the web channel offers what it can deliver, and nothing else', ()
         // changed before boot: exactly the edit the owner makes after publishing
         // a release. Without this leg the reveal path would ship unobserved and
         // the gate could be inverted without anything going red.
-        await page.addInitScript(
-            ([meta, value]) => {
-                // Registered before any script in the page, so this listener is
-                // registered before the one m/v{N}/app.js adds — listeners fire
-                // in registration order, so the attribute is already changed by
-                // the time wireChannel() reads it.
-                document.addEventListener(
-                    'DOMContentLoaded',
-                    () => {
-                        const tag = document.querySelector(`meta[name="${meta}"]`);
-                        if (tag) tag.setAttribute('content', value);
-                    },
-                    { once: true }
-                );
-            },
-            [STATE_META, PUBLISHED_VALUE]
-        );
+        await declareBeforeBoot(page, STATE_META, PUBLISHED_VALUE);
         await gotoApp(page, { state: STATES.seeded });
 
         // The mutation took — otherwise the assertion below would be about the
@@ -149,7 +253,7 @@ test.describe('the web channel offers what it can deliver, and nothing else', ()
         ).toBe(PUBLISHED_VALUE);
 
         await expect(page.locator('#apkBtn')).toBeVisible();
-        await expect(page.locator('#apkBtn')).toHaveAttribute('href', RELEASE_URL);
+        await expect(page.locator('#installDownloadLink')).toHaveAttribute('href', RELEASE_URL);
     });
 });
 
@@ -205,6 +309,7 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
     // two page legs above cannot both hold at once — a native shell that also
     // declares a published release, and an unknown state token.
     let shouldOfferApk = null;
+    let shouldOfferPolicy = null;
 
     test.beforeAll(async () => {
         // The same Node plumbing store-unit.spec.js documents: a real dynamic
@@ -226,7 +331,7 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
                 `${sub}/${path.basename(from)} was not copied verbatim — this spec would test a different file`
             ).toBeTruthy();
         }
-        ({ shouldOfferApk } = await dynamicImport(
+        ({ shouldOfferApk, shouldOfferPolicy } = await dynamicImport(
             `file://${path.join(root, 'surfaces', 'channel.js')}`
         ));
     });
@@ -246,4 +351,92 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
             expect(shouldOfferApk(state, false), `"${state}" was treated as published`).toBe(false);
         }
     });
+
+    test('the policy offer needs a published document, and nothing else', () => {
+        // ONE ARGUMENT, DELIBERATELY (L3-P3). The download decision takes the
+        // channel because a download is pointless where the app is installed;
+        // the policy decision does not, because the person who needs it is the
+        // one entering data, and that happens on both channels (PDR-035 §2).
+        // This test is what would red if a later packet quietly added a channel
+        // branch to it.
+        expect(shouldOfferPolicy.length, 'shouldOfferPolicy grew an argument').toBe(1);
+        expect(shouldOfferPolicy(POLICY_PUBLISHED_VALUE)).toBe(true);
+        expect(shouldOfferPolicy('none')).toBe(false);
+    });
+
+    test('anything that is not the declared value means no policy', () => {
+        // The same fail-closed table, and here it carries more: a link labelled
+        // "privacy policy" that 404s is a promise about family data with nothing
+        // behind it.
+        for (const state of [null, undefined, '', ' published', 'Published', 'yes', 'true']) {
+            expect(shouldOfferPolicy(state), `"${state}" was treated as published`).toBe(false);
+        }
+    });
+});
+
+test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)', () => {
+    // BOTH LEGS EXECUTE. The undeclared leg is the state this build ships, and
+    // it is the one that matters most: the document is not published yet, so
+    // nothing may offer it. The declared leg rewrites the shell's <meta> before
+    // boot — the same edit the owner makes, on the same shipped module — so the
+    // reveal path does not ship unobserved.
+    //
+    // THE ARM: make shouldOfferPolicy default-true, or drop the reveal from
+    // wireChannel, and one of the two legs reds either way.
+
+    test('while the shell declares nothing, no policy link is offered', async ({ page }) => {
+        test.skip(
+            DECLARED_POLICY_STATE === POLICY_PUBLISHED_VALUE,
+            'this build declares the policy published, so the withheld state cannot be observed here'
+        );
+        await gotoApp(page, { state: STATES.firstRun });
+
+        // In the document — one set of bytes for both channels — and not in view.
+        await expect(page.locator('#introPolicyLink')).toHaveCount(1);
+        await expect(page.locator('#introPolicyLink')).toBeHidden();
+
+        // The intro is open on a first run, so "hidden" here is a fact about the
+        // link and not about the window it sits in.
+        await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+        await expect(page.locator('#onboardingModal h2')).toBeVisible();
+
+        // And nowhere else either: this is the only home the link has.
+        expect(
+            await page.evaluate(() =>
+                Array.from(document.querySelectorAll('a')).filter(
+                    (a) => a.offsetParent !== null && /privacy|конфиденциальн/i.test(a.textContent + a.href)
+                ).length
+            ),
+            'something is offering a policy link while the shell declares none'
+        ).toBe(0);
+    });
+
+    for (const [channel, prepare] of [
+        ['the web channel', async () => {}],
+        ['the native channel', simulateNativeShell],
+    ]) {
+        test(`a shell declaring the policy published offers it on ${channel}`, async ({ page }) => {
+            // BOTH CHANNELS, because that is the decision this packet made: the
+            // parent reads it where they enter data, and they enter data in the
+            // app. A regression that made this web-only would red here.
+            await prepare(page);
+            await declareBeforeBoot(page, POLICY_META, POLICY_PUBLISHED_VALUE);
+            await gotoApp(page, { state: STATES.firstRun });
+
+            // The mutation took — otherwise this would pass for the wrong reason.
+            expect(
+                await page.evaluate(
+                    (meta) => document.querySelector(`meta[name="${meta}"]`).getAttribute('content'),
+                    POLICY_META
+                )
+            ).toBe(POLICY_PUBLISHED_VALUE);
+
+            const link = page.locator('#introPolicyLink');
+            await expect(link).toBeVisible();
+            await expect(link).toHaveAttribute('href', POLICY_URL);
+            // A new tab, and no referrer or opener handed to it.
+            await expect(link).toHaveAttribute('target', '_blank');
+            await expect(link).toHaveAttribute('rel', /noopener/);
+        });
+    }
 });
