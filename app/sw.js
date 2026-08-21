@@ -41,7 +41,17 @@
 // never rewritten. The cost is a SIXTH generation shipped and served immutable,
 // stated here rather than absorbed — see DIA-DL-005 for what retiring the early
 // generations would take, which is still deferred.
-const CACHE_VERSION = 'v16';
+//
+// changed_in: FIU-DL-001 — v16 -> v17 with the /m/v7/ mount bump, the first of
+// L3, which carries the store's close-on-background lifecycle and the resume
+// defect that put a parent back on the first-install screen every time they
+// unlocked their phone. FORCED for the same reason the last one was: bytes at a
+// published mount URL are never rewritten, and /m/v6/ has been published since
+// the L2 merge. Both changes are bytes the WEB channel loads, so the bump is
+// the delivery mechanism and not a formality — though only the native channel
+// has a store to close. The cost is a SEVENTH generation shipped and served
+// immutable; retiring the early ones stays an owner cleanup (DIA-DL-008 debt 7).
+const CACHE_VERSION = 'v17';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -58,16 +68,16 @@ const OFFLINE_URLS = [
   //
   // (No apostrophe in this block, deliberately — see the trap named below.)
   '/transfer.html',
-  '/m/v6/transfer/handoff-page.js',
-  '/m/v6/transfer/config.js',
-  '/m/v6/transfer/errors.js',
-  '/m/v6/transfer/format.js',
+  '/m/v7/transfer/handoff-page.js',
+  '/m/v7/transfer/config.js',
+  '/m/v7/transfer/errors.js',
+  '/m/v7/transfer/format.js',
   // Versioned module mount (A1-DL-004): the shell references these by URL, so
   // they are precached by name. Content changes ship as a NEW mount version
-  // (/m/v6/...), never as new bytes at these URLs — inside the 30-day immutable
+  // (/m/v7/...), never as new bytes at these URLs — inside the 30-day immutable
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
-  '/m/v6/app.css',
-  '/m/v6/sw-register.js',
+  '/m/v7/app.css',
+  '/m/v7/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
   // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
@@ -77,62 +87,62 @@ const OFFLINE_URLS = [
   // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
   // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
-  '/m/v6/app.js',
-  '/m/v6/core/kb-boot.js',
-  '/m/v6/core/state.js',
-  '/m/v6/core/storage.js',
-  '/m/v6/core/repo-local.js',
-  '/m/v6/core/signals.js',
-  '/m/v6/core/dom-utils.js',
-  '/m/v6/core/format.js',
-  '/m/v6/core/zpd.js',
-  '/m/v6/core/urgency.js',
-  '/m/v6/surfaces/table.js',
-  '/m/v6/surfaces/skill-completion.js',
-  '/m/v6/surfaces/zpd-filter.js',
-  '/m/v6/surfaces/skill-modal.js',
-  '/m/v6/surfaces/profile.js',
-  '/m/v6/surfaces/activities.js',
-  '/m/v6/surfaces/onboarding.js',
-  '/m/v6/surfaces/accordion.js',
+  '/m/v7/app.js',
+  '/m/v7/core/kb-boot.js',
+  '/m/v7/core/state.js',
+  '/m/v7/core/storage.js',
+  '/m/v7/core/repo-local.js',
+  '/m/v7/core/signals.js',
+  '/m/v7/core/dom-utils.js',
+  '/m/v7/core/format.js',
+  '/m/v7/core/zpd.js',
+  '/m/v7/core/urgency.js',
+  '/m/v7/surfaces/table.js',
+  '/m/v7/surfaces/skill-completion.js',
+  '/m/v7/surfaces/zpd-filter.js',
+  '/m/v7/surfaces/skill-modal.js',
+  '/m/v7/surfaces/profile.js',
+  '/m/v7/surfaces/activities.js',
+  '/m/v7/surfaces/onboarding.js',
+  '/m/v7/surfaces/accordion.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the
   // import graph reaches them, and an installed client must not boot offline
   // with a broken graph. The DDL artifact they read
-  // (/m/v6/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // (/m/v7/store/schema/001-core.sql) is deliberately NOT here: only the native
   // channel ever fetches it, and that channel does not use this worker.
   //
   // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
   // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
   // quotes — an apostrophe swallows every entry after it and the guard then
   // reports the icons as unprecached.
-  '/m/v6/store/boot.js',
-  '/m/v6/store/store.js',
-  '/m/v6/store/journal.js',
-  '/m/v6/store/repo-journal.js',
-  '/m/v6/store/import-legacy.js',
+  '/m/v7/store/boot.js',
+  '/m/v7/store/store.js',
+  '/m/v7/store/journal.js',
+  '/m/v7/store/repo-journal.js',
+  '/m/v7/store/import-legacy.js',
   // DIA-P3 — the diary record path. Precached with the rest of the store
   // because the diary is the app shell now, not an extra: a parent who opens
   // the app offline must still be able to write down what happened today.
-  '/m/v6/store/records.js',
-  '/m/v6/store/bridge.js',
+  '/m/v7/store/records.js',
+  '/m/v7/store/bridge.js',
   // DIA-P1 — the transfer seam. The three transfer/ modules it imports are
   // already precached above, for the handoff page; this is the app-side door
   // to them, and it is inert on the web exactly as store/bridge.js is.
-  '/m/v6/store/transfer.js',
-  '/m/v6/store/config.js',
-  '/m/v6/store/errors.js',
+  '/m/v7/store/transfer.js',
+  '/m/v7/store/config.js',
+  '/m/v7/store/errors.js',
   // DIA-P2 — the channel composition: which of the two header actions this
   // channel offers, and the knobs that decide it.
-  '/m/v6/surfaces/channel.js',
-  '/m/v6/channel/config.js',
+  '/m/v7/surfaces/channel.js',
+  '/m/v7/channel/config.js',
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
   // FETCH at runtime are deliberately NOT here: the declaration
-  // (/m/v6/export/declaration.json) plus the two print-layer binaries, the
-  // embedded font and the ICC profile under /m/v6/export/assets/. Only the
+  // (/m/v7/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v7/export/assets/. Only the
   // native channel ever reads them, that channel does not use this worker, and
   // the web channel cannot export at all — so precaching them would spend
   // roughly 443 KB of an installed web client cache budget on bytes it can
@@ -140,20 +150,20 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
-  '/m/v6/surfaces/diary.js',
-  '/m/v6/surfaces/export.js',
-  '/m/v6/surfaces/import.js',
-  '/m/v6/export/run.js',
-  '/m/v6/export/build.js',
-  '/m/v6/export/readout.js',
-  '/m/v6/export/sink.js',
-  '/m/v6/export/text.js',
-  '/m/v6/export/readme.js',
-  '/m/v6/export/zip.js',
-  '/m/v6/export/pdf.js',
-  '/m/v6/export/ttf.js',
-  '/m/v6/export/config.js',
-  '/m/v6/export/errors.js',
+  '/m/v7/surfaces/diary.js',
+  '/m/v7/surfaces/export.js',
+  '/m/v7/surfaces/import.js',
+  '/m/v7/export/run.js',
+  '/m/v7/export/build.js',
+  '/m/v7/export/readout.js',
+  '/m/v7/export/sink.js',
+  '/m/v7/export/text.js',
+  '/m/v7/export/readme.js',
+  '/m/v7/export/zip.js',
+  '/m/v7/export/pdf.js',
+  '/m/v7/export/ttf.js',
+  '/m/v7/export/config.js',
+  '/m/v7/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

@@ -106,10 +106,10 @@
     </script>
 
     <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v6/app.css">
+    <link rel="stylesheet" href="/m/v7/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v6/ graph — FORTY-SIX today. The count is written here as a series
+         /m/v7/ graph — FORTY-SIX today. The count is written here as a series
          because the series is the point: fifteen at A1-P6, twenty-one once
          L1-P2 added the native store, and forty-six since DIA-P3 added the
          diary. It had been left at twenty-one through four packets, which read
@@ -126,7 +126,7 @@
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v6/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v7/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -139,52 +139,52 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v6/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v6/core/state.js">
-    <link rel="modulepreload" href="/m/v6/core/storage.js">
-    <link rel="modulepreload" href="/m/v6/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v6/core/signals.js">
-    <link rel="modulepreload" href="/m/v6/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v6/core/format.js">
-    <link rel="modulepreload" href="/m/v6/core/zpd.js">
-    <link rel="modulepreload" href="/m/v6/core/urgency.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v6/store/boot.js">
-    <link rel="modulepreload" href="/m/v6/store/store.js">
-    <link rel="modulepreload" href="/m/v6/store/journal.js">
-    <link rel="modulepreload" href="/m/v6/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v6/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v6/store/records.js">
-    <link rel="modulepreload" href="/m/v6/store/bridge.js">
-    <link rel="modulepreload" href="/m/v6/store/transfer.js">
-    <link rel="modulepreload" href="/m/v6/transfer/config.js">
-    <link rel="modulepreload" href="/m/v6/transfer/errors.js">
-    <link rel="modulepreload" href="/m/v6/transfer/format.js">
-    <link rel="modulepreload" href="/m/v6/store/config.js">
-    <link rel="modulepreload" href="/m/v6/store/errors.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/channel.js">
-    <link rel="modulepreload" href="/m/v6/channel/config.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/diary.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v6/surfaces/import.js">
-    <link rel="modulepreload" href="/m/v6/export/run.js">
-    <link rel="modulepreload" href="/m/v6/export/build.js">
-    <link rel="modulepreload" href="/m/v6/export/readout.js">
-    <link rel="modulepreload" href="/m/v6/export/sink.js">
-    <link rel="modulepreload" href="/m/v6/export/text.js">
-    <link rel="modulepreload" href="/m/v6/export/readme.js">
-    <link rel="modulepreload" href="/m/v6/export/zip.js">
-    <link rel="modulepreload" href="/m/v6/export/pdf.js">
-    <link rel="modulepreload" href="/m/v6/export/ttf.js">
-    <link rel="modulepreload" href="/m/v6/export/config.js">
-    <link rel="modulepreload" href="/m/v6/export/errors.js">
+    <link rel="modulepreload" href="/m/v7/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v7/core/state.js">
+    <link rel="modulepreload" href="/m/v7/core/storage.js">
+    <link rel="modulepreload" href="/m/v7/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v7/core/signals.js">
+    <link rel="modulepreload" href="/m/v7/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v7/core/format.js">
+    <link rel="modulepreload" href="/m/v7/core/zpd.js">
+    <link rel="modulepreload" href="/m/v7/core/urgency.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v7/store/boot.js">
+    <link rel="modulepreload" href="/m/v7/store/store.js">
+    <link rel="modulepreload" href="/m/v7/store/journal.js">
+    <link rel="modulepreload" href="/m/v7/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v7/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v7/store/records.js">
+    <link rel="modulepreload" href="/m/v7/store/bridge.js">
+    <link rel="modulepreload" href="/m/v7/store/transfer.js">
+    <link rel="modulepreload" href="/m/v7/transfer/config.js">
+    <link rel="modulepreload" href="/m/v7/transfer/errors.js">
+    <link rel="modulepreload" href="/m/v7/transfer/format.js">
+    <link rel="modulepreload" href="/m/v7/store/config.js">
+    <link rel="modulepreload" href="/m/v7/store/errors.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v7/channel/config.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/diary.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v7/surfaces/import.js">
+    <link rel="modulepreload" href="/m/v7/export/run.js">
+    <link rel="modulepreload" href="/m/v7/export/build.js">
+    <link rel="modulepreload" href="/m/v7/export/readout.js">
+    <link rel="modulepreload" href="/m/v7/export/sink.js">
+    <link rel="modulepreload" href="/m/v7/export/text.js">
+    <link rel="modulepreload" href="/m/v7/export/readme.js">
+    <link rel="modulepreload" href="/m/v7/export/zip.js">
+    <link rel="modulepreload" href="/m/v7/export/pdf.js">
+    <link rel="modulepreload" href="/m/v7/export/ttf.js">
+    <link rel="modulepreload" href="/m/v7/export/config.js">
+    <link rel="modulepreload" href="/m/v7/export/errors.js">
 </head>
 <body>
     <!-- PWA Install Prompt Banners -->
@@ -244,7 +244,7 @@
                      aria-label и title дословно повторяют видимую подпись.
 
                      DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
-                     канале (m/v6/surfaces/channel.js). В браузере архив не
+                     канале (m/v7/surfaces/channel.js). В браузере архив не
                      собирается вообще — веб-ветки в export/sink.js нет и не было
                      (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
                      происходит. Разметка одна на оба канала: это ветка времени
@@ -273,7 +273,7 @@
                      перезаписью (PDR-026 §4, правило 1).
 
                      Приходит СКРЫТОЙ и раскрывается только на нативном канале
-                     (m/v6/surfaces/channel.js): дневник пишется в устройственное
+                     (m/v7/surfaces/channel.js): дневник пишется в устройственное
                      хранилище, а в браузере его нет вообще — store/bridge.js там
                      инертен по построению (LSC-P1-INV-001). Предлагать действие,
                      которого на этом канале не происходит, — ровно тот дефект,
@@ -457,7 +457,7 @@
          2026-08-16 (DIA-DL-004) была про подтверждение внутри окна, которое
          вот-вот исчезнет; это окно не исчезает.
 
-         Текст записи ставится только через textContent (m/v6/surfaces/diary.js).
+         Текст записи ставится только через textContent (m/v7/surfaces/diary.js).
          Это семейный текст: он не проходит через innerHTML нигде. -->
     <div id="diaryModal" class="modal">
         <div class="modal-content">
@@ -472,7 +472,7 @@
                      ФОРМА ПОКАЗЫВАЕТСЯ, ТОЛЬКО ЕСЛИ ЕСТЬ ЧТО ИСКАТЬ. Пустому
                      дневнику предлагать поиск незачем: родитель искал бы в том,
                      чего нет, и «ничего не нашлось» прочиталось бы как поломка.
-                     Решает это m/v6/surfaces/diary.js по числу записей. -->
+                     Решает это m/v7/surfaces/diary.js по числу записей. -->
                 <form id="diarySearchForm" class="diary-search" hidden>
                     <label for="diarySearchInput">Найти:</label>
                     <input type="search" id="diarySearchInput" name="diarySearchInput" autocomplete="off">
@@ -494,10 +494,10 @@
                      это значило бы сказать родителю, что он чего-то не писал,
                      когда на самом деле мы не смогли посмотреть. Каждая строка
                      здесь говорит, что поиск не выполнен и что записи на месте
-                     (m/v6/surfaces/diary.js, SEARCH_REFUSAL). -->
+                     (m/v7/surfaces/diary.js, SEARCH_REFUSAL). -->
                 <p id="diarySearchStatus" class="export-status" hidden></p>
                 <!-- Две причины, по которым писать некуда, и они лечатся
-                     разным. Показывается ровно одна (m/v6/surfaces/diary.js). -->
+                     разным. Показывается ровно одна (m/v7/surfaces/diary.js). -->
                 <p id="diaryNoStore" class="export-status" hidden>Дневник хранится в приложении на этом устройстве, а хранилище сейчас не открылось. Записать пока некуда — закройте и откройте приложение. Уже записанное не потеряно.</p>
                 <p id="diaryNoChild" class="export-status" hidden>Сначала создайте профиль ребёнка — запись дневника ведётся о ком-то, и без профиля её некуда отнести. Профиль создаётся в меню вверху.</p>
                 <ul id="diaryList" class="diary-list"></ul>
@@ -515,7 +515,7 @@
                  одним голосом с остальными отказами: что записи НЕТ, что текст
                  на месте, что делать дальше. Семантика поля при этом не
                  теряется — aria-required сообщает её вспомогательным
-                 технологиям, — а проверку выполняет m/v6/surfaces/diary.js,
+                 технологиям, — а проверку выполняет m/v7/surfaces/diary.js,
                  который её и объясняет. -->
             <form id="diaryForm" hidden>
                 <div class="modal-form-group">
@@ -605,12 +605,12 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v6/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v7/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v6/app.js for boot order, and the modulepreload block in the head
+         m/v7/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v6/app.js"></script>
+    <script type="module" src="/m/v7/app.js"></script>
 
     <!-- PWA Install Prompt -->
     <script>
@@ -741,6 +741,6 @@
     </script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v6/sw-register.js"></script>
+    <script type="module" src="/m/v7/sw-register.js"></script>
 </body>
 </html>

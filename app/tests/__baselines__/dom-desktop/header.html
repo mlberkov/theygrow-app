@@ -19,7 +19,7 @@
                      aria-label и title дословно повторяют видимую подпись.
 
                      DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
-                     канале (m/v6/surfaces/channel.js). В браузере архив не
+                     канале (m/v7/surfaces/channel.js). В браузере архив не
                      собирается вообще — веб-ветки в export/sink.js нет и не было
                      (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
                      происходит. Разметка одна на оба канала: это ветка времени
@@ -43,7 +43,7 @@
                      перезаписью (PDR-026 §4, правило 1).
 
                      Приходит СКРЫТОЙ и раскрывается только на нативном канале
-                     (m/v6/surfaces/channel.js): дневник пишется в устройственное
+                     (m/v7/surfaces/channel.js): дневник пишется в устройственное
                      хранилище, а в браузере его нет вообще — store/bridge.js там
                      инертен по построению (LSC-P1-INV-001). Предлагать действие,
                      которого на этом канале не происходит, — ровно тот дефект,
@@ -76,7 +76,7 @@
 
                      Здесь НЕТ onclick и никакой телеметрии — ни события GA4, ни
                      сигнала (решение владельца 2026-08-16, гейт D). -->
-                <a class="header-action" id="apkBtn" hidden="" target="_blank" rel="noopener noreferrer" title="Скачать APK" aria-label="Скачать APK" href="https://github.com/mlberkov/theygrow-app/releases/latest">
+                <a class="header-action" id="apkBtn" target="_blank" rel="noopener noreferrer" title="Скачать APK" aria-label="Скачать APK" href="https://github.com/mlberkov/theygrow-app/releases/latest">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <rect x="6" y="2" width="12" height="20" rx="2">
 </rect>
