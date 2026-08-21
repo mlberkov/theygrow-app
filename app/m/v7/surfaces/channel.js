@@ -66,7 +66,7 @@ export function shouldOfferApk(releaseState, native) {
  * Раскрывает действия, которые этот канал действительно выполняет.
  *
  * Каждая локальная переменная связана РОВНО с одним id — то же правило, что в
- * surfaces/import.js: угадывать, какой элемент имеет в виду имя, тесты
+ * surfaces/diary.js: угадывать, какой элемент имеет в виду имя, тесты
  * отказываются (EMV-P1-INV-001).
  */
 export function wireChannel({ doc = document } = {}) {

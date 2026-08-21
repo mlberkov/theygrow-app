@@ -27,7 +27,7 @@ import { kbReady, initData, showKbLoadError } from './core/kb-boot.js';
 import { removeOrphanedAgeFilter } from './core/storage.js';
 import { initHistory, wireStoreLifecycle } from './core/state.js';
 import { loadCategoryStates } from './surfaces/accordion.js';
-import { initProfiles, wireProfile } from './surfaces/profile.js';
+import { initProfiles, offerProfileIfNone, wireProfile } from './surfaces/profile.js';
 import { restoreZpdFilter, wireZpdFilter } from './surfaces/zpd-filter.js';
 import { buildTableHeader, buildTableBody, setFixedSkillColumnWidth } from './surfaces/table.js';
 import { checkAndShowOnboarding, wireOnboarding } from './surfaces/onboarding.js';
@@ -37,7 +37,6 @@ import { wireActivities } from './surfaces/activities.js';
 import { wireChannel } from './surfaces/channel.js';
 import { wireDiary } from './surfaces/diary.js';
 import { wireExport } from './surfaces/export.js';
-import { offerImportIfPending, wireImport } from './surfaces/import.js';
 import { initNativeStore } from './store/boot.js';
 
 // Инициализация приложения.
@@ -75,7 +74,6 @@ async function init(storeOutcome) {
     wireDiary();
     wireExport();
     wireSkillCompletion();
-    wireImport();
 
     // FIU-P1: хранилище закрывается, когда страница уходит в фон, и открывается
     // снова по первому обращению. Здесь, а не в initHistory: initHistory
@@ -84,10 +82,16 @@ async function init(storeOutcome) {
     // wire*-функции выше, и её место среди них.
     wireStoreLifecycle();
 
-    // Предложить перенос — последним, когда интерфейс уже собран: модалка
-    // ложится поверх готовой таблицы, а не поверх пустого экрана. Не
-    // ожидается: перенос — решение родителя, а не часть загрузки.
-    offerImportIfPending();
+    // СПРОСИТЬ ПРО РЕБЁНКА — последним, в том же месте и по той же причине, по
+    // которой здесь стояло предложение переноса (FIU-DL-002): окно ложится
+    // поверх собранной таблицы, а не поверх пустого экрана. Предложение
+    // переноса отсюда убрано целиком — оно было первым, что видела семья после
+    // установки, и на этом канале оно было мёртвым с самого начала: истории
+    // семьи в localStorage у https://localhost никогда не было. Теперь на
+    // первом запуске приложение спрашивает единственное, без чего оно не
+    // работает, — о ком вести записи. Не ожидается: создание профиля — решение
+    // родителя, а не часть загрузки.
+    offerProfileIfNone();
 }
 
 // Запуск при загрузке страницы: ждём kb-артефакт, затем строим UI

@@ -152,7 +152,6 @@ const OFFLINE_URLS = [
   // named further down this comment block.)
   '/m/v7/surfaces/diary.js',
   '/m/v7/surfaces/export.js',
-  '/m/v7/surfaces/import.js',
   '/m/v7/export/run.js',
   '/m/v7/export/build.js',
   '/m/v7/export/readout.js',

@@ -31,7 +31,7 @@ const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'u
 // literal would keep guarding bytes nothing runs.
 const STORE_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'store');
 const CORE_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'core');
-const SURFACES_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'surfaces');
+const TRANSFER_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'transfer');
 
 const dynamicImport = new Function('specifier', 'return import(specifier)');
 
@@ -259,8 +259,16 @@ test.describe('property 3 — the import cannot touch localStorage', () => {
         }
     });
 
-    test('the surface that triggers the import reads the legacy keys and writes none', async () => {
-        const source = fs.readFileSync(path.join(SURFACES_DIR, 'import.js'), 'utf8');
+    // RETARGETED AT L3-P2 (FIU-DL-002), NOT DELETED. This leg used to read
+    // `surfaces/import.js` — the in-app offer, which the owner removed
+    // outright. The property it carries is about the LEGACY SOURCE, and that
+    // source now has exactly one reader in the shipped tree: the handoff page,
+    // which still runs in the parent's browser and still hands bytes over. So
+    // the leg follows the property to its new address rather than going out
+    // with the surface. It fails closed on the move: if the mount ever stops
+    // shipping that file, `readFileSync` throws here rather than passing.
+    test('the surface that reads the legacy keys writes none of them', async () => {
+        const source = fs.readFileSync(path.join(TRANSFER_DIR, 'handoff-page.js'), 'utf8');
         expect(source, 'it reads the profiles it is about to carry across').toContain(
             'readProfilesRaw'
         );

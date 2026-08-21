@@ -187,10 +187,25 @@ test.describe('the payload guard refuses what it cannot prove safe', () => {
         ).not.toThrow();
     });
 
-    test('anti-vacuity: the guard is not simply refusing everything', async () => {
+    // SPLIT IN TWO AT L3-P2 (FIU-DL-002), BECAUSE THE TAXONOMY GAINED A SECOND
+    // STATE AND ONE COUNT CANNOT CARRY BOTH. `emittedNow` was true for all nine
+    // kinds until this packet; the transfer offer's removal left
+    // `history.handoff` and `history.import` DECLARED with no producer, and the
+    // honest flag for that is false. `emitSignal` refuses a kind flagged false,
+    // by design — so this leg now asserts the two halves separately rather than
+    // being relaxed into a range, which would have stopped noticing a kind that
+    // silently became unemittable for the WRONG reason.
+    test('anti-vacuity: every EMITTED kind is emittable with its own declared codes', async () => {
         const { emitSignal, SIGNAL_TAXONOMY } = signals;
+        const emittedKinds = Object.entries(SIGNAL_TAXONOMY).filter(
+            ([, descriptor]) => descriptor.emittedNow
+        );
+        expect(
+            emittedKinds.length,
+            'a taxonomy with nothing emitted would pass this leg vacuously'
+        ).toBeGreaterThan(0);
         let accepted = 0;
-        for (const [kind, descriptor] of Object.entries(SIGNAL_TAXONOMY)) {
+        for (const [kind, descriptor] of emittedKinds) {
             const payload = {};
             for (const field of descriptor.fields) {
                 const codes = signals.SIGNAL_CODES[field];
@@ -198,9 +213,35 @@ test.describe('the payload guard refuses what it cannot prove safe', () => {
             }
             if (emitSignal(kind, payload, { sink: () => {} })) accepted += 1;
         }
-        expect(accepted, 'every declared kind must be emittable with its own declared codes').toBe(
-            Object.keys(SIGNAL_TAXONOMY).length
+        expect(accepted, 'every emitted kind must be emittable with its own declared codes').toBe(
+            emittedKinds.length
         );
+    });
+
+    test('a kind declared but NOT emitted is refused, with its own declared codes', async () => {
+        // The other half, and it is the enforcement rather than a note: a kind
+        // whose emitter was removed must not keep emitting from somewhere else.
+        // A perfectly-formed payload is used deliberately — the refusal has to
+        // come from the flag and from nothing else.
+        const { emitSignal, SIGNAL_TAXONOMY, signalRefusals } = signals;
+        const declaredOnly = Object.entries(SIGNAL_TAXONOMY).filter(
+            ([, descriptor]) => !descriptor.emittedNow
+        );
+        for (const [kind, descriptor] of declaredOnly) {
+            const payload = {};
+            for (const field of descriptor.fields) {
+                const codes = signals.SIGNAL_CODES[field];
+                payload[field] = codes ? codes[0] : (descriptor.boolean?.includes(field) ? true : 1);
+            }
+            const before = signalRefusals();
+            expect(
+                emitSignal(kind, payload, { sink: () => {} }),
+                `${kind} is flagged emittedNow: false and was emitted anyway`
+            ).toBe(false);
+            expect(signalRefusals(), 'the refusal was swallowed rather than counted').toBe(
+                before + 1
+            );
+        }
     });
 });
 

@@ -62,9 +62,10 @@ let handle = null;
 /**
  * The store handle, or null when the store was never opened.
  *
- * A PARKED STORE STILL ANSWERS WITH ITS HANDLE, and that is deliberate. Four
- * shipped call sites treat a null handle as "this device has no store" and take
- * a different branch entirely — export/run.js, and three in surfaces/import.js.
+ * A PARKED STORE STILL ANSWERS WITH ITS HANDLE, and that is deliberate. A
+ * shipped call site treats a null handle as "this device has no store" and takes
+ * a different branch entirely — export/run.js. (The other three were in
+ * surfaces/import.js, deleted with the transfer offer at L3-P2, FIU-DL-002.)
  * Nulling the handle on a park would make a backgrounded app look, for a moment
  * after it came back, like an app that had never had a store. What the handle
  * describes is the store this device HAS; whether its connection is open right
@@ -194,12 +195,14 @@ export function onStoreReopened(report) {
 // L1-P4 adds the repository half for the same reason: core/state.js reaches the
 // journal through this one door, so store/ keeps exactly one entrance from core/
 // and the seam scan keeps reaching everything behind it.
-// DIA-P1 adds the transfer seam for the same reason: surfaces/import.js reaches
-// it through this one door, so store/ keeps exactly one entrance from the
-// surfaces layer and the storage-seam scan (LSC-P1-INV-001) keeps reaching
-// everything behind it. The seam itself touches no Web Storage at all — it
-// drains bytes the native side staged — but a module outside the walked graph
-// is a module that guard never reads, and that is the property being kept.
+// DIA-P1 adds the transfer seam for the same reason, and L3-P2 is why the
+// re-export below is now load-bearing rather than convenient: surfaces/import.js
+// reached it through this one door, and that surface is gone (FIU-DL-002). The
+// mechanism stays as insurance, so it hangs HERE — a module reached from nowhere
+// is a module outside the walked graph, and a module outside the walked graph is
+// one the storage-seam scan (LSC-P1-INV-001) and the ship-list guard never read.
+// The seam itself touches no Web Storage at all: it drains bytes the native side
+// staged. Nothing in the app consumes those bytes today.
 // DIA-P3 adds the diary record path on the same terms: surfaces/diary.js reaches
 // createRecord / overwriteRecord / loadRecords through this door and never
 // imports store/records.js itself. DIA-P4 adds searchRecords beside them — the

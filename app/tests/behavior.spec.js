@@ -85,6 +85,49 @@ test.describe('main flow — checkbox -> ZPD recompute -> save', () => {
     const events = await gaEvents(page);
     expect(events.filter((e) => e.name === 'skill_complete')).toHaveLength(0);
   });
+
+  // THE ONE PATH TO A PROFILE, EXECUTED (L3-P2, FIU-DL-002).
+  //
+  // Until this packet nothing anywhere drove this form — not off-device, not on
+  // a device. `#createProfileModal` is offered from three places (the dropdown,
+  // a tick with no child, and since L3-P2 a first launch with an empty store),
+  // and what happens after Создать was covered by no executor at all. That was
+  // survivable while the transfer offer stood beside it; with the offer removed
+  // this IS the path a fresh install takes, so it gets an executor.
+  //
+  // On this channel because the surface is what is under test: `createProfile`
+  // goes through core/repo-local.js here and needs no store, and it is the same
+  // shipped handler the native channel runs. The JOURNAL half — `appendChild`
+  // against a real SQLCipher store — is `DiaryEntryTest` on
+  // `android-instrumented`, and this leg claims nothing about it.
+  test('creating a profile from the form leaves the app with a usable one', async ({ page }) => {
+    await gotoApp(page, { state: STATES.empty });
+
+    // Reached the way a parent reaches it: the header control, then the item.
+    await expect(page.locator('#profileName')).toHaveText('Малыш (выберите дату)');
+    await page.locator('#profileButton').click();
+    await page.locator('#profileDropdown .create-new').click();
+    await expect(page.locator('#createProfileModal')).toHaveCSS('display', 'block');
+
+    await page.locator('#childName').fill('Мила');
+    await page.locator('#childBirthdate').fill('2024-09-15');
+    await page.locator('#createProfileForm button[type="submit"]').click();
+
+    await expect(page.locator('#createProfileModal')).toHaveCSS('display', 'none');
+    await expect(
+      page.locator('#profileName'),
+      'the profile was created but the app did not switch to it, so the parent is still'
+        + ' looking at an app that cannot record anything'
+    ).toContainText('Мила');
+
+    // It is a real profile, not a label: the same tick that was refused above
+    // is now recorded, and it survives a reload.
+    await checkboxFor(page, CHAIN.ready).click();
+    await expect(checkboxFor(page, CHAIN.ready)).toBeChecked();
+    await page.reload();
+    await expect(page.locator('#profileName')).toContainText('Мила');
+    await expect(checkboxFor(page, CHAIN.ready)).toBeChecked();
+  });
 });
 
 test.describe('reload with seeded localStorage state', () => {
@@ -220,13 +263,13 @@ test.describe('the .modal.show rule resolves the surfaces the app opens by class
 
   // THE CLAIM HERE IS NARROW, AND IS WORDED TO MATCH.
   //
-  // These are the three bare-.modal elements opened by classList.add('show'),
-  // and one rule covers all of them. No trigger is reachable on the web branch:
-  // #exportBtn is not revealed off the native channel (DIA-P2),
-  // offerImportIfPending() returns before touching the DOM without a native
-  // store handle, and showStoreUnavailable() sits behind canRecord() === false,
-  // which the web channel never reaches (core/state.js puts it on the
-  // localStorage backend).
+  // These are the bare-.modal elements opened by classList.add('show'), and one
+  // rule covers all of them. No trigger is reachable on the web branch:
+  // #exportBtn is not revealed off the native channel (DIA-P2), and
+  // showStoreUnavailable() sits behind canRecord() === false, which the web
+  // channel never reaches (core/state.js puts it on the localStorage backend).
+  // #importModal left this list at L3-P2 by leaving the product: the transfer
+  // offer and its surface were removed outright (FIU-DL-002).
   //
   // So what is asserted is that THE RULE RESOLVES TO display: block FOR THESE
   // ELEMENTS — a real property of the shipped stylesheet, executed by a real
@@ -239,7 +282,7 @@ test.describe('the .modal.show rule resolves the surfaces the app opens by class
   // is the RULE resolving for it and nothing about the diary being reachable.
   // That the control appears where it should, and that the surface refuses
   // honestly when the store does, is app/tests/diary-surface.spec.js.
-  for (const id of ['importModal', 'storeUnavailableModal', 'exportModal', 'diaryModal']) {
+  for (const id of ['storeUnavailableModal', 'exportModal', 'diaryModal']) {
     test(`the .modal.show rule resolves #${id} to display: block`, async ({ page }) => {
       await gotoApp(page, { state: STATES.seeded });
 

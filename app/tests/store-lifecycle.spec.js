@@ -4,14 +4,24 @@
 //
 // THE DEFECT THIS FILE IS THE EXECUTOR FOR. The owner reported, from the first
 // live install, that coming back to the app after a screen lock "starts over on
-// the same initial screen". It does, and it needs no reload, no process death
-// and no manifest fault to do it: `surfaces/import.js` registers a
-// `visibilitychange` listener that calls `offerImportIfPending()` on every
+// the same initial screen". It did, and it needed no reload, no process death
+// and no manifest fault to do it: `surfaces/import.js` registered a
+// `visibilitychange` listener that called `offerImportIfPending()` on every
 // return to visible, and that function's terminal branch opened `#importModal`
 // unconditionally when nothing was staged. On a phone that modal is
-// `100vw/100dvh`, so it IS a screen — the transfer screen, which is the first
-// screen after an install. `closeImportModal()` records no dismissal and
-// `delivered` lives in module memory, so it came back every single time.
+// `100vw/100dvh`, so it WAS a screen — the transfer screen, which was the first
+// screen after an install.
+//
+// L3-P2 REMOVED THE SCREEN ITSELF (FIU-DL-002), and this file's first leg
+// changed shape with it rather than being deleted. FIU-P1 narrowed the resume
+// call so the offer stopped RE-opening; the owner then removed the offer
+// outright, so `surfaces/import.js`, `#importModal` and that listener are all
+// gone. The claim worth executing is therefore the general one the report was
+// really about — a return from the background puts NOTHING over the parent's
+// work — and it is stronger than the old per-modal assertion, because it holds
+// for whatever a later packet might be tempted to open on that event. The old
+// leg's arm (a refused handoff must still reach the parent) has no subject any
+// more: there is no surface for it to reach.
 //
 // AND THE SECOND CLAIM, on the same event from the other direction: the store
 // now CLOSES when the page goes hidden (`store/boot.js parkNativeStore`), which
@@ -28,9 +38,8 @@
 //
 // So each leg redefines `document.visibilityState` and `document.hidden` — the
 // two properties every handler under test reads — and dispatches a real event on
-// the real document. What executes after that is the WHOLE shipped chain:
-// the listeners in `surfaces/import.js` and `core/state.js`, then
-// `offerImportIfPending` or `parkNativeStore`, then the gate in
+// the real document. What executes after that is the WHOLE shipped chain: the
+// listener in `core/state.js`, then `parkNativeStore`, then the gate in
 // `store/bridge.js`, then `closeStore`, then the bridge, then the seam.
 //
 // WHAT IS THEREFORE NOT EXECUTED HERE, and where it is: Chromium's decision to
@@ -80,18 +89,6 @@ async function bootWithStore(page) {
         selfParticipantId: SELF,
     });
     await gotoApp(page, { state: STATES.empty });
-}
-
-/** Dismisses the boot-time transfer offer the way a parent does. */
-async function dismissTheBootOffer(page) {
-    const offer = page.locator('#importModal');
-    await expect(
-        offer,
-        'the app did not offer the transfer at boot — the leg below would then be asserting'
-            + ' that a modal nothing opens stays closed'
-    ).toBeVisible();
-    await page.locator('#importModalClose').click();
-    await expect(offer).toBeHidden();
 }
 
 /** Drives the page's visibility, and proves the drive took. */
@@ -150,49 +147,35 @@ test.describe('coming back from the background leaves the parent where they were
         await expect(page.locator('#diaryBtn')).toBeVisible();
     });
 
-    test('a return to visibility does not put the transfer screen back over the app', async ({
-        page,
-    }) => {
+    test('a return to visibility puts nothing over the parent\u2019s work', async ({ page }) => {
         await bootWithStore(page);
-        await dismissTheBootOffer(page);
+
+        // The parent is IN something when the phone locks — the state the
+        // owner's report was actually about. A leg that backgrounded an idle
+        // table could not tell "nothing opened" from "nothing was there".
+        await page.locator('#diaryBtn').click();
+        await expect(page.locator('#diaryModal')).toBeVisible();
 
         await goToBackground(page);
         await comeBack(page);
 
-        // The listener has run by now — it runs synchronously off the event and
-        // its first await is a plugin call — so this is not a race with it. The
-        // arm-check below is what proves the listener is nonetheless alive.
+        // Every listener on this event has run by now: each runs synchronously
+        // off the event and only then awaits. The park leg below is what proves
+        // they are alive at all, so a green here cannot come from a page that
+        // stopped listening.
+        const opened = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('.modal.show, .onboarding-modal.show'))
+                .map((element) => element.id)
+                .filter((id) => id !== 'diaryModal')
+        );
+        expect(
+            opened,
+            'unlocking the phone opened something over whatever the parent was doing'
+                + ' (FIU-P1-INV-001, as amended by FIU-DL-002)'
+        ).toEqual([]);
         await expect(
-            page.locator('#importModal'),
-            'unlocking the phone re-opened the transfer screen over whatever the parent was'
-                + ' doing (FIU-P1-INV-001)'
-        ).toBeHidden();
-    });
-
-    test('a return to visibility DOES still take a transfer that arrived', async ({ page }) => {
-        // THE ARM. Without this the leg above could be green because the
-        // listener was removed, the modal never opens, or the visibility never
-        // changed — none of which is the fix. Here the plugin reports that
-        // something arrived and was refused, which is the case the listener was
-        // written for, and the parent must still be told.
-        await bootWithStore(page);
-        await dismissTheBootOffer(page);
-        await page.evaluate(() => {
-            const inner = window.Capacitor.nativePromise;
-            window.Capacitor.nativePromise = async (plugin, method, options) => {
-                if (plugin === 'TheyGrowTransfer' && method === 'pendingTransfer') {
-                    return { present: false, refusal: 'format_version' };
-                }
-                return inner(plugin, method, options);
-            };
-        });
-
-        await goToBackground(page);
-        await comeBack(page);
-
-        await expect(
-            page.locator('#importModal'),
-            'a refused handoff no longer reaches the parent on return — the resume fix went too far'
+            page.locator('#diaryModal'),
+            'the parent came back to a different screen from the one they left'
         ).toBeVisible();
     });
 });
@@ -202,7 +185,6 @@ test.describe('the store closes when the page goes away, and comes back when it 
         page,
     }) => {
         await bootWithStore(page);
-        await dismissTheBootOffer(page);
 
         // The marker is not yet written: the app is running.
         expect(await runStatements(page)).not.toContain(STATEMENTS.markClean);
@@ -259,7 +241,6 @@ test.describe('the store closes when the page goes away, and comes back when it 
         page,
     }) => {
         await bootWithStore(page);
-        await dismissTheBootOffer(page);
 
         await goToBackground(page);
         await page.waitForFunction(() =>
