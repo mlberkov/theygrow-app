@@ -109,6 +109,15 @@ const INLINED_BY_THE_APP = Object.freeze({
         + ' ON CONFLICT (id) DO UPDATE SET opened_at_utc = excluded.opened_at_utc,'
         + ' clean_shutdown = 0',
     projectionContext: 'UPDATE projection_context SET as_of_date = ? WHERE id = 1',
+    // FIU-P1 — the marker `closeStore()` writes on its way out. It is the whole
+    // point of the close: the NEXT open reads it and decides whether a full
+    // `PRAGMA integrity_check` over the family's history is owed. Declared here
+    // because the seam matches by exact equality and throws on a miss, so
+    // without it the first park in any behavior leg would throw the statement's
+    // own text rather than being quietly answered — which is the fail-closed
+    // direction, and also a red in a suite that has nothing to do with parking.
+    markClean:
+        'UPDATE store_lifecycle SET clean_shutdown = 1, opened_at_utc = ? WHERE id = 1',
 });
 
 /** Every statement the seam knows, keyed by name, read where it can be read. */
@@ -146,6 +155,22 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
             // once the index has been rebuilt. Set by the leg, never by the
             // seam: see the RECORD_SEARCH_SQL branch below for why.
             window.__pageBridgeSearch = { answer: [], answerAfterRebuild: null, failWith: null };
+
+            // What the next LIST read is to be answered with — or refused with
+            // (FIU-P2). Same staging idiom, same reason as the search above: the
+            // message is thrown across the boundary the plugin rejects on, so
+            // store/errors.js classifies it exactly as it would classify the
+            // engine's own words. This is what arms the two claims DIA-DL-010
+            // debts 10 and 11 are about — a list that will not load, and a save
+            // the store ACCEPTED whose confirmation refresh then fails.
+            window.__pageBridgeList = { failWith: null };
+
+            // And the same for the WRITE, so the repair of debt 11 can be armed
+            // in the direction it must NOT change: a save the store really
+            // refused has to go on saying «Запись НЕ сохранена». Fixing a false
+            // failure report by making the surface quiet would be the same
+            // defect facing the other way.
+            window.__pageBridgeWrite = { failWith: null };
 
             // The order RECORDS_SQL declares, applied once for both reads so
             // the list and the search cannot disagree about it.
@@ -199,6 +224,13 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                 if (statement === sql.selfParticipant) return [{ value: selfId }];
 
                 if (statement === sql.CHILDREN_SQL) {
+                    // A FRESH INSTALL IS `child: null` (FIU-P2). The store
+                    // opened and holds nobody — the state every first launch is
+                    // in, and the one state in which the journal backend and
+                    // "no profile" are true at once. Nothing else in this seam
+                    // needs to know: the app's own zero-child branches take over
+                    // from here.
+                    if (!family) return [];
                     return [
                         {
                             id: family.id,
@@ -215,7 +247,11 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     // the first-write case the surface has to handle.
                     return records.length > 0 ? [{ id: 'area-page-bridge' }] : [];
                 }
-                if (statement === sql.RECORDS_SQL) return newestFirst(records);
+                if (statement === sql.RECORDS_SQL) {
+                    const stagedList = window.__pageBridgeList;
+                    if (stagedList.failWith) throw new Error(stagedList.failWith);
+                    return newestFirst(records);
+                }
 
                 // THIS SEAM MATCHES NOTHING, AND THAT IS THE POINT (DIA-P4).
                 // There is no FTS5 here, no tokenizer, no index and no MATCH —
@@ -248,8 +284,11 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                 if (statement === sql.AREA_INSERT_SQL) return;
                 if (statement === sql.AREA_CHILD_INSERT_SQL) return;
                 if (statement === sql.markOpen) return;
+                if (statement === sql.markClean) return;
                 if (statement === sql.projectionContext) return;
                 if (statement === sql.RECORD_INSERT_SQL) {
+                    const stagedWrite = window.__pageBridgeWrite;
+                    if (stagedWrite.failWith) throw new Error(stagedWrite.failWith);
                     // Positional, as the shipped statement declares it: id,
                     // area, author, kind, body, event_date_local, entry_at_utc,
                     // entry_utc_offset_min, updated_at_utc.
@@ -293,21 +332,29 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                 nativePromise: async (plugin, method, options) => {
                     calls.push({ plugin, method, options });
 
-                    if (plugin === 'TheyGrowTransfer') {
-                        // Nothing was ever staged for this page. Answered rather
-                        // than left to throw, so the boot-time import offer takes
-                        // its "nothing to offer" branch instead of logging.
-                        if (method === 'pendingTransfer') {
-                            return { present: false, refusal: 'none' };
-                        }
-                        throw new Error(`[page-bridge] no answer for TheyGrowTransfer.${method}`);
-                    }
+                    // NO `TheyGrowTransfer` BRANCH SINCE L3-P2, AND ITS ABSENCE
+                    // IS LOAD-BEARING (FIU-DL-002). It used to answer
+                    // `pendingTransfer` so the boot-time import offer could take
+                    // its "nothing to offer" branch quietly. The offer and its
+                    // surface are gone, so nothing in the shipped page calls
+                    // that plugin any more — and this seam fails closed, so if
+                    // anything ever calls it again the throw below names the
+                    // plugin rather than letting a resurrected offer pass
+                    // unnoticed through a leg about something else.
                     if (plugin !== 'CapacitorSQLite') {
                         throw new Error(`[page-bridge] no answer for plugin ${plugin}`);
                     }
 
                     if (method === 'isSecretStored') return { result: true };
                     if (method === 'createConnection' || method === 'open') return {};
+                    // FIU-P1 — the close path. Answered rather than simulated,
+                    // on the same terms as the transaction envelope below: this
+                    // seam holds rows in an array and has no connection to close.
+                    // What it must not do is REFUSE them, because the app now
+                    // closes its store whenever the page goes hidden, and a
+                    // fail-closed throw there would surface as a store that
+                    // broke on a tab switch.
+                    if (method === 'close' || method === 'closeConnection') return {};
                     // The envelope store/bridge.js issues around a set since
                     // DIA-DL-007. Answered rather than simulated: this seam holds
                     // rows in an array and has no transaction to begin, so

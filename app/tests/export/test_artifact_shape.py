@@ -1,25 +1,33 @@
 """The artifact's declared shape, checked against the artifact it actually writes.
 
 These assertions fix a PUBLIC, long-lived commitment. Once an artifact carrying
-`format_version: 1` is in a family's hands, every one of these properties has to
-keep holding — so they are written here, before the builder, rather than derived
-from whatever the builder happened to produce.
+a given `format_version` is in a family's hands, every one of these properties
+has to keep holding — so they are written here, before the builder, rather than
+derived from whatever the builder happened to produce.
+
+The version is **2** since FIU-P4, and the bump is the reason the number exists:
+v1 scoped diary records through their AREA, so another participant's entry in a
+child-shared area was inside the promise; v2 scopes them by their AUTHOR, so it
+never is. A reader decades from now can tell which rule an archive was written
+under only from this number.
 """
 
 from __future__ import annotations
 
 import io
 import json
+import re
 import sqlite3
 import zipfile
 
-from .harness import SELF, load_declaration
+from .harness import EXPORT_DIR, SELF, load_declaration
+from .pdf_text import pdf_lines
 
 
 def test_the_declaration_names_a_format_and_a_version() -> None:
     declaration = load_declaration()
     assert declaration["format"] == "theygrow-archive"
-    assert declaration["format_version"] == 1
+    assert declaration["format_version"] == 2
     assert declaration["schema_contract"] == "lsc-journal-v1"
     assert declaration["datasets"], "a declaration with no datasets describes nothing"
     assert declaration["files"], "a declaration with no files describes nothing"
@@ -115,7 +123,7 @@ def test_the_manifest_carries_the_versions_that_produced_the_record(artifact: by
         manifest = json.loads(archive.read("MANIFEST.json").decode("utf-8"))
 
     assert manifest["format"] == "theygrow-archive"
-    assert manifest["format_version"] == 1
+    assert manifest["format_version"] == 2
     # Which canon the skill identifiers were written against. Without it a
     # skill id is an opaque string.
     assert manifest["canon_version"] == 1
@@ -172,3 +180,110 @@ def test_no_file_in_the_artifact_is_empty(artifact: bytes) -> None:
     with zipfile.ZipFile(io.BytesIO(artifact)) as archive:
         for info in archive.infolist():
             assert info.file_size > 0, f"{info.filename} is empty"
+
+
+# --- the scope boundary and the page width (FIU-P4) ----------------------
+
+# Every dataset that can carry text a PARTICIPANT wrote, and the predicate that
+# is allowed to be the thing scoping it. The list is exhaustive on purpose: a
+# dataset added later with a free-text column and no entry here fails, which
+# forces the question "whose text is this, and what binds it" to be answered in
+# the declaration rather than in a review comment.
+TEXT_BEARING = {
+    # FIU-P4: the diary. Bound to the AUTHOR of the entry, not to the area it
+    # sits in — see scope.diary.
+    "record": "r.author_participant_id = ?",
+    # The fragment copied out of a record at confirmation time; private by
+    # construction since L1-P2.
+    "assertion_quote": "private_to_participant_id = ?",
+}
+
+# Free-text columns, by the name a participant's own words arrive under. `note`
+# is deliberately absent from TEXT_BEARING above and present here: a note on a
+# SHARED assertion is an act in the shared journal — the archive is supposed to
+# carry the co-parent's «Видел то же самое.» — so its dataset is scoped by
+# visibility, and this list existing is what makes that a decision rather than
+# an oversight.
+FREE_TEXT_COLUMNS = {"body", "quote_text", "note"}
+
+
+def test_the_declaration_binds_diary_text_to_its_author() -> None:
+    """The scope rule, as a property of the published declaration.
+
+    STATIC, and it says so: this reads the declaration's text and executes
+    nothing. The runtime arm — a second participant's entry seeded into the
+    shared area and absent from every layer of a built archive — is
+    `test_artifact_selfdescribing.py::test_another_participants_diary_entry_never_travels`.
+    What this one adds is that the boundary is IN THE QUERY, where it cannot be
+    undone by a renderer, and stated in the artifact's own words.
+    """
+    declaration = load_declaration()
+
+    diary = declaration["scope"]["diary"]
+    assert diary["predicate"] == "record.author_participant_id = self_participant_id"
+    assert "author_participant_id" in diary["statement_ru"]
+    assert diary["statement_en"].strip()
+
+    by_name = {dataset["name"]: dataset for dataset in declaration["datasets"]}
+    record = by_name["record"]
+    assert "r.author_participant_id = ?" in record["query"]
+    # The area-scoped predicates are GONE, not merely joined by a second one: a
+    # filter that still mentions them reads as though they were load-bearing.
+    assert "visibility_class" not in record["query"]
+    assert "owner_participant_id" not in record["query"]
+    assert record["params"] == ["self_participant_id"]
+
+    for dataset in declaration["datasets"]:
+        columns = {column["name"] for column in dataset["columns"]}
+        if not columns & FREE_TEXT_COLUMNS:
+            continue
+        expected = TEXT_BEARING.get(dataset["name"])
+        if expected is None:
+            assert "visibility_class" in dataset["query"], (
+                f'dataset "{dataset["name"]}" carries free text, is not bound to the requesting'
+                " participant, and is not scoped by visibility either"
+            )
+            continue
+        assert expected in dataset["query"], (
+            f'dataset "{dataset["name"]}" carries free text and does not bind {expected}'
+        )
+        assert "self_participant_id" in dataset["params"]
+
+
+def _declared_line_width() -> int:
+    """The shipped knob, read out of the module that owns it.
+
+    Not a second copy of 78: `EXPORT_CONFIG.textLineWidth` is the one place the
+    width is decided, and a test carrying its own literal would keep passing
+    after someone changed it.
+    """
+    source = (EXPORT_DIR / "config.js").read_text(encoding="utf-8")
+    match = re.search(r"textLineWidth: (\d+)", source)
+    assert match, "export/config.js no longer declares textLineWidth"
+    return int(match.group(1))
+
+
+def test_no_line_in_a_text_file_is_wider_than_the_page(artifact: bytes) -> None:
+    """A line nobody can read is a line that is not there (FIU-P4).
+
+    Measured before this packet: one diary entry containing a 300-character
+    unbroken token produced a 300-character line in `text/diary.txt` and a single
+    300-glyph line in the print layer, which runs off an A4 page and is simply
+    gone. The text layer is where the fix lives, and this is the assertion that
+    holds it: `pdf.js` lays out what these files contain and never joins two
+    input lines, so bounding the line here bounds the printed page — which the
+    second half of this test checks rather than assumes.
+    """
+    width = _declared_line_width()
+
+    with zipfile.ZipFile(io.BytesIO(artifact)) as archive:
+        names = [info.filename for info in archive.infolist() if info.filename.endswith(".txt")]
+        for name in names:
+            for number, line in enumerate(archive.read(name).decode("utf-8").split("\n"), 1):
+                assert len(line) <= width, f"{name}:{number} is {len(line)} characters wide"
+        printed = pdf_lines(archive.read("print/archive.pdf"))
+
+    assert names, "no text files in the artifact — this test would pass vacuously"
+    assert printed, "no printed lines — this test would pass vacuously"
+    for line in printed:
+        assert len(line) <= width, f"a printed line is {len(line)} characters wide: {line[:40]}…"

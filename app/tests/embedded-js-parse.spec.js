@@ -141,7 +141,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DeviceLogTest.java',
-        line: 518,
+        line: 645,
         argument: '"window." + slot',
         reason:
             "the same shape as DiaryEntryTest's await(): the async slot name is a Java variable,"
@@ -149,7 +149,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DeviceLogTest.java',
-        line: 526,
+        line: 653,
         argument: 'expression',
         reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
     },
@@ -175,20 +175,38 @@ const DECLARED_SKIPS = Object.freeze([
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
     {
+        file: 'StoreLifecycleTest.java',
+        line: 200,
+        argument: '"window." + slot',
+        reason:
+            "the same shape as DeviceLogTest's await(): the async slot name is a Java variable,"
+            + ' so the chain has a non-literal operand and no correct reconstruction reaches it',
+    },
+    {
+        file: 'StoreLifecycleTest.java',
+        line: 284,
+        argument: 'expression',
+        reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
+    },
+    {
         file: 'ExportTransferTest.java',
-        line: 575,
+        // Moved from 575 by L3-P4, which added the diary-scope case and its
+        // fixture above this method. The line is asserted rather than trusted,
+        // so a drift like this one reds and gets re-read — which is the whole
+        // point of carrying the number.
+        line: 779,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
     {
         file: 'HistoryTransferTest.java',
-        line: 1530,
+        line: 1610,
         argument: 'expression',
         reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
     },
     {
         file: 'HistoryTransferTest.java',
-        line: 1545,
+        line: 1625,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },

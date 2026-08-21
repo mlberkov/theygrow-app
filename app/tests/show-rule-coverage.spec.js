@@ -68,8 +68,17 @@ const SOURCES = jsFiles(MOUNT_DIR).map((abs) => ({
     source: fs.readFileSync(abs, 'utf8'),
 }));
 
-// `document.getElementById('x')` and the `el('x')` alias several surfaces use.
-const DIRECT_TARGET = /(?:document\.getElementById|el)\(\s*['"]([A-Za-z0-9_-]+)['"]\s*\)\s*\.classList\.add\(\s*['"]show['"]\s*\)/;
+// `document.getElementById('x')`, the `el('x')` alias several surfaces use, and
+// `doc.getElementById('x')` — the INJECTED document that surfaces/channel.js
+// takes as a parameter so both channel branches can be driven off-device.
+//
+// The third form was added at L3-P3, when the pre-install window became the
+// first surface opened from a module that never names `document`. Extending the
+// scanner is what this file's own header asks for ("extend the scanner rather
+// than leaving the call site uncovered"), and the extension is deliberately a
+// NAMED alias rather than "any receiver": `x.getElementById` in general could be
+// any object, and resolving it would mean guessing.
+const DIRECT_TARGET = /(?:document\.getElementById|doc\.getElementById|el)\(\s*['"]([A-Za-z0-9_-]+)['"]\s*\)\s*\.classList\.add\(\s*['"]show['"]\s*\)/;
 // `modal.classList.add('show')` — resolved through the variable's binding.
 const VAR_TARGET = /(?:^|[^.\w])([A-Za-z_$][\w$]*)\.classList\.add\(\s*['"]show['"]\s*\)/;
 // Any add('show') at all, so nothing can slip past both patterns unseen.
@@ -80,7 +89,7 @@ const ANY_ADD = /\.classList\.add\(\s*['"]show['"]\s*\)/;
 // scanner cannot know which one a call site meant.
 function bindings(source, where) {
     const found = new Map();
-    const re = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:document\.getElementById|el)\(\s*['"]([A-Za-z0-9_-]+)['"]\s*\)/g;
+    const re = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:document\.getElementById|doc\.getElementById|el)\(\s*['"]([A-Za-z0-9_-]+)['"]\s*\)/g;
     for (const m of source.matchAll(re)) {
         const [, name, id] = m;
         const seen = found.get(name);

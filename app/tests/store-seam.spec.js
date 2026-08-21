@@ -199,3 +199,147 @@ test.describe('the failure that caused the rollback outranks the rollback (ADR-0
         expect(failure.message).toBe('ExecuteSet: no such table: record');
     });
 });
+
+// The park gate (FIU-P1).
+//
+// WHAT IT IS FOR. Since L3-P1 the store is CLOSED when the page goes hidden, so
+// there is a state the seam never had to model: the connection is gone while the
+// page and its handlers are still alive. An ordinary call in that state must
+// wait for a reopen rather than fail, and the calls that PERFORM the reopen must
+// not wait for themselves.
+//
+// WHY THESE LEGS ARE HERE AND NOT IN store-lifecycle.spec.js. That file drives a
+// real page and asserts what a parent sees; these are properties of the seam's
+// control flow — how many reopens N concurrent callers cause, and which entry
+// point consults the gate at all — which need a recorder and no browser. The
+// second one below is also the leg whose failure mode is a HANG rather than a
+// wrong value, and a hang is much easier to read here than behind a page.
+//
+// Nothing here touches SQLite. `store/store.js` is not even loaded: the reopener
+// is a stand-in, because what is under test is the gate's arithmetic and not
+// what an open does.
+test.describe('the park gate', () => {
+    test('a call made while parked reopens the store ONCE, however many callers there are', async () => {
+        const fake = createFakeBridge({});
+        let reopens = 0;
+
+        await withFakeBridge(fake, async () => {
+            const bridge = await load('store/bridge.js');
+            bridge.registerStoreReopener(async () => {
+                reopens += 1;
+                // What a real reopen is made of, reduced to its one observable:
+                // a call that must land BEFORE any of the waiting ones.
+                await bridge.lifecycleBridge.call('open', { database: 'theygrow' });
+            });
+
+            expect(bridge.storeIsParked(), 'the gate starts open').toBe(false);
+            bridge.setStoreParked(true);
+
+            await Promise.all([
+                bridge.query('SELECT 1'),
+                bridge.query('SELECT 2'),
+                bridge.query('SELECT 3'),
+            ]);
+
+            expect(
+                reopens,
+                'three concurrent callers caused more than one reopen — the single-flight'
+                    + ' promise is not being shared, and a second createConnection is answered'
+                    + ' with "Connection theygrow already exists"'
+            ).toBe(1);
+            expect(bridge.storeIsParked(), 'the gate stayed shut after a successful reopen').toBe(
+                false
+            );
+        });
+
+        // The reopen went first. A gate that let a read through before the store
+        // was back would hand the parent a refusal on the first tap after they
+        // unlocked their phone, which is exactly the defect this packet is about.
+        expect(order(fake)).toEqual(['open', 'query', 'query', 'query']);
+    });
+
+    test('a LIFECYCLE call does not consult the gate — an open must not wait for itself', async () => {
+        // THE DEADLOCK LEG. `openStore()` and `closeStore()` are made of bridge
+        // calls, so if those calls went through the gate they would wait for the
+        // very transition they are performing, and the app would hang on its
+        // first background. The failure mode of this leg is therefore a TIMEOUT,
+        // not an assertion — which is why it is written with an explicit
+        // reopener that must never run, so a regression names itself.
+        const fake = createFakeBridge({});
+        let reopens = 0;
+
+        await withFakeBridge(fake, async () => {
+            const bridge = await load('store/bridge.js');
+            bridge.registerStoreReopener(async () => {
+                reopens += 1;
+            });
+            bridge.setStoreParked(true);
+
+            await bridge.lifecycleBridge.query('SELECT 1');
+            await bridge.lifecycleBridge.run('UPDATE store_lifecycle SET clean_shutdown = 1', []);
+            await bridge.lifecycleBridge.call('close', { database: 'theygrow' });
+
+            expect(
+                reopens,
+                'a lifecycle call tripped the gate, so an open would wait for itself'
+            ).toBe(0);
+            expect(
+                bridge.storeIsParked(),
+                'a lifecycle call cleared the parked flag it has no business clearing'
+            ).toBe(true);
+        });
+
+        expect(order(fake)).toEqual(['query', 'run', 'close']);
+    });
+
+    test('a transaction already in flight is waited out before the store is closed', async () => {
+        // `whenBridgeIdle` is what stops a park landing between a BEGIN and its
+        // COMMIT. The wrapper refuses to close a database that is still in a
+        // transaction, and it refuses with a message about the transaction — so
+        // without this the park would fail for a reason that says nothing about
+        // the park.
+        let release = null;
+        const held = new Promise((resolve) => {
+            release = resolve;
+        });
+        const calls = [];
+        const bridgeObject = {
+            isNativePlatform: () => true,
+            nativePromise: async (plugin, method, options) => {
+                calls.push(method);
+                if (method === 'executeSet') await held;
+                void plugin;
+                void options;
+                return { changes: { changes: 1 } };
+            },
+        };
+
+        await withFakeBridge({ bridge: bridgeObject }, async () => {
+            const bridge = await load('store/bridge.js');
+
+            const writing = bridge.executeSet([
+                { statement: 'INSERT INTO record (id) VALUES (?)', values: ['r-1'] },
+            ]);
+
+            let idle = false;
+            const waiting = bridge.whenBridgeIdle().then(() => {
+                idle = true;
+            });
+
+            // Give the idle waiter every chance to resolve early. It must not:
+            // the transaction has begun and has not committed.
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            expect(
+                idle,
+                'the park would have closed the database in the middle of a transaction'
+            ).toBe(false);
+
+            release();
+            await writing;
+            await waiting;
+            expect(idle, 'the park never learned the transaction had finished').toBe(true);
+        });
+
+        expect(calls).toEqual(['beginTransaction', 'executeSet', 'commitTransaction']);
+    });
+});

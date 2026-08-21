@@ -5,6 +5,7 @@ import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -23,10 +24,12 @@ import androidx.test.espresso.intent.Intents;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -119,6 +122,19 @@ public class ExportTransferTest {
     private static final int SEEDED_ENTRIES = 200;
     private static final int NOTE_CHARS = 6144;
     private static final int SEED_BATCH = 20;
+
+    /**
+     * The two diary sentences the scope test turns on (FIU-P4).
+     *
+     * <p>Declared once and interpolated into the seed script, so the sentence
+     * this test looks for in the archive is the sentence that was written into
+     * the store — a Java literal and a JavaScript literal saying nearly the same
+     * thing is how a scope test goes green while looking for the wrong string.
+     */
+    private static final String OWN_DIARY_ENTRY = "Сегодня она сама застегнула куртку.";
+
+    private static final String OTHER_DIARY_ENTRY =
+            "Личный текст второго родителя в общей области.";
 
     /** A DOM fact the app's OWN modules produce — same sentinel as BridgeSmokeTest. */
     private static final String BOOTED =
@@ -345,7 +361,148 @@ public class ExportTransferTest {
         }
     }
 
+    /**
+     * The scope rule, on the engine that actually holds a family's diary (FIU-P4).
+     *
+     * <p>WHAT THIS ADDS TO THE OFF-DEVICE SUITE. {@code pytest app/tests/export}
+     * runs the declared queries against desktop SQLite carrying the same frozen
+     * DDL, which is enough to prove what the SQL means. It is not enough to
+     * prove what the APP does: the query has to be bound with the requesting
+     * participant's id by {@code export/readout.js}, run through the Capacitor
+     * bridge against SQLCipher, and rendered by the builder inside the WebView.
+     * This test presses the button and reads the file that comes out.
+     *
+     * <p>THE SECOND PARTICIPANT IS WRITTEN IN SQL, and that is deliberate rather
+     * than lazy: no surface in this product can create one, which is exactly why
+     * the leak it arms for was never going to be found by using the app. The
+     * exporter's OWN entry is written through the shipped {@code createRecord},
+     * because that half is reachable and a fixture that bypassed it would prove
+     * the fixture.
+     *
+     * <p>The other participant's sentence is looked for in every TEXT entry of
+     * the archive. The print layer is deliberately not searched here — it stores
+     * glyph ids, so a substring scan of it would pass whether the words were on
+     * the page or not; the decoded assertion on the printed page is
+     * {@code app/tests/export/pdf_text.py} and the tests that use it.
+     */
+    @Test
+    public void the_archive_carries_the_exporters_own_diary_and_no_one_elses() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        File target = new File(context.getCacheDir(), "diary-scope-probe.zip");
+        if (target.exists() && !target.delete()) {
+            fail("could not clear the diary probe archive from a previous run");
+        }
+
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            pollFor(scenario, BOOTED, EVALUATE_TIMEOUT_MS);
+            seedTwoDiaries(scenario);
+
+            Intents.init();
+            try {
+                intending(hasAction(Intent.ACTION_CREATE_DOCUMENT))
+                        .respondWithFunction(
+                                intent ->
+                                        new Instrumentation.ActivityResult(
+                                                Activity.RESULT_OK,
+                                                new Intent().setData(Uri.fromFile(target))));
+                String status = pressExport(scenario);
+                assertEquals(
+                        "the export did not report success — the surface said: " + status,
+                        "saved",
+                        status);
+            } finally {
+                Intents.release();
+            }
+        }
+
+        String diary = entryText(target, "text/diary.txt");
+        assertTrue(
+                "the exporter's own diary entry is not in text/diary.txt",
+                diary.contains(OWN_DIARY_ENTRY));
+
+        String carrying = firstTextEntryContaining(target, OTHER_DIARY_ENTRY);
+        assertNull(
+                "another participant's diary text left the device in " + carrying,
+                carrying);
+    }
+
     // --- the fixture ------------------------------------------------------
+
+    /**
+     * Two diary entries by two participants, in the one container they share.
+     *
+     * <p>The exporter's own goes through {@code store/records.js createRecord} —
+     * the same call the diary window makes — so it lands in the private area
+     * that surface always writes to. The other participant's goes in by SQL,
+     * into the CHILD-SHARED area, which is the row an area-scoped filter hands
+     * to the wrong person and an author-scoped one cannot.
+     */
+    private void seedTwoDiaries(ActivityScenario<MainActivity> scenario) {
+        String script =
+                ("(function () {"
+                                + "window.__diarySeedDone = null; window.__diarySeedError = null;"
+                                + "var base = '__BASE__';"
+                                + "var url = function (name) {"
+                                + " return new URL(base + name, document.baseURI).href; };"
+                                + "Promise.all([import(url('store/boot.js')),"
+                                + " import(url('store/records.js')),"
+                                + " import(url('store/bridge.js'))]).then(function (mods) {"
+                                + "var boot = mods[0], records = mods[1], bridge = mods[2];"
+                                + "var handle = boot.storeHandle();"
+                                + "if (!handle) { throw new Error('the store is not open'); }"
+                                + "var childId = 'fiu-diary-child';"
+                                + "var now = Date.now();"
+                                + "return bridge.run('INSERT INTO child (id, created_at_utc)"
+                                + " VALUES (?, ?) ON CONFLICT (id) DO NOTHING', [childId, now])"
+                                + ".then(function () {"
+                                + "return records.createRecord({"
+                                + " authorParticipantId: handle.selfParticipantId,"
+                                + " subjectChildId: childId, body: '__OWN__',"
+                                + " eventDateLocal: '2026-02-01', now: now }); })"
+                                + ".then(function () {"
+                                + "return bridge.executeSet(["
+                                + "{ statement: 'INSERT INTO participant (id, is_self,"
+                                + " created_at_utc) VALUES (?, 0, ?) ON CONFLICT (id) DO NOTHING',"
+                                + " values: ['fiu-other-participant', now] },"
+                                + "{ statement: 'INSERT INTO area (id, title, visibility_class,"
+                                + " owner_participant_id, created_at_utc)"
+                                + " VALUES (?, ?, ?, NULL, ?) ON CONFLICT (id) DO NOTHING',"
+                                + " values: ['fiu-shared-area', 'Общая область',"
+                                + " 'child_shared', now] },"
+                                + "{ statement: 'INSERT INTO area_child (area_id, child_id)"
+                                + " VALUES (?, ?) ON CONFLICT (area_id, child_id) DO NOTHING',"
+                                + " values: ['fiu-shared-area', childId] },"
+                                + "{ statement: 'INSERT INTO record (id, area_id,"
+                                + " author_participant_id, kind, body, media_ref, sensitivity,"
+                                + " event_date_local, event_at_utc, event_utc_offset_min,"
+                                + " entry_at_utc, entry_utc_offset_min, updated_at_utc)"
+                                + " VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, ?, 0, ?)"
+                                + " ON CONFLICT (id) DO NOTHING',"
+                                // `kind` is BOUND rather than written into the SQL as 'text': a
+                                // single-quoted literal inside this single-quoted JavaScript
+                                // string closes it, and the whole seed becomes a syntax error
+                                // that only a device would ever report.
+                                + " values: ['fiu-other-record', 'fiu-shared-area',"
+                                + " 'fiu-other-participant', 'text', '__OTHER__', '2026-02-02',"
+                                + " now, now] }], { transaction: true }); });"
+                                + "}).then(function () { window.__diarySeedDone = 'seeded'; })"
+                                + ".catch(function (e) {"
+                                + " window.__diarySeedError = 'err:' + (e && e.message ? e.message"
+                                + " : e); });"
+                                + "return 'dispatched';"
+                                + "})()")
+                        .replace("__BASE__", MountAddress.prefix())
+                        .replace("__OWN__", OWN_DIARY_ENTRY)
+                        .replace("__OTHER__", OTHER_DIARY_ENTRY);
+
+        assertEquals("the diary seed script never ran", "dispatched", evaluate(scenario, script));
+        String outcome =
+                pollFor(
+                        scenario,
+                        "window.__diarySeedError ? window.__diarySeedError : window.__diarySeedDone",
+                        EXPORT_TIMEOUT_MS);
+        assertEquals("the diary fixture was not written: " + outcome, "seeded", outcome);
+    }
 
     /**
      * Seeds a journal through the SHIPPED write path.
@@ -565,6 +722,53 @@ public class ExportTransferTest {
             }
         }
         return false;
+    }
+
+    /** One entry of the produced archive, as text. */
+    private static String entryText(File archive, String path) throws IOException {
+        try (ZipFile zip = new ZipFile(archive)) {
+            ZipEntry entry = zip.getEntry(path);
+            assertTrue("the archive holds no " + path, entry != null);
+            try (InputStream in = zip.getInputStream(entry)) {
+                return new String(readFully(in), StandardCharsets.UTF_8);
+            }
+        }
+    }
+
+    /**
+     * The first TEXT entry carrying {@code needle}, or null if none does.
+     *
+     * <p>Returns the path rather than a boolean so a failure names the file it
+     * leaked into: "another participant's text is in text/diary.txt" and "…is in
+     * index.json" are different defects with different causes.
+     */
+    private static String firstTextEntryContaining(File archive, String needle) throws IOException {
+        try (ZipFile zip = new ZipFile(archive)) {
+            Enumeration<? extends ZipEntry> it = zip.entries();
+            while (it.hasMoreElements()) {
+                ZipEntry entry = it.nextElement();
+                String name = entry.getName();
+                if (!name.endsWith(".txt") && !name.endsWith(".json")) {
+                    continue;
+                }
+                try (InputStream in = zip.getInputStream(entry)) {
+                    if (new String(readFully(in), StandardCharsets.UTF_8).contains(needle)) {
+                        return name;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static byte[] readFully(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[64 * 1024];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
     }
 
     // --- WebView plumbing, same shape as BridgeSmokeTest -------------------

@@ -35,9 +35,9 @@
          every NON-ENTRY module of this page's graph is named here, and the entry
          itself deliberately is not. core/storage.js is hinted by index.html and
          the guard compares the union across shells, so it is not repeated. -->
-    <link rel="modulepreload" href="/m/v6/transfer/config.js">
-    <link rel="modulepreload" href="/m/v6/transfer/errors.js">
-    <link rel="modulepreload" href="/m/v6/transfer/format.js">
+    <link rel="modulepreload" href="/m/v7/transfer/config.js">
+    <link rel="modulepreload" href="/m/v7/transfer/errors.js">
+    <link rel="modulepreload" href="/m/v7/transfer/format.js">
 
     <style>
         * {
@@ -120,7 +120,17 @@
         <p class="plain">Из браузера ничего не удаляется. Эта страница только читает.</p>
         <p class="plain">Данные никуда не отправляются: они идут отсюда прямо в приложение на этом же устройстве.</p>
 
-        <p>Нажмите кнопку — откроется приложение, и там нужно будет подтвердить перенос.</p>
+        <!-- ЧТО ПРОИСХОДИТ НА САМОМ ДЕЛЕ, ПОСЛЕ L3-P2 (FIU-DL-002). Владелец
+             убрал предложение переноса из приложения целиком; страница,
+             ссылка, файл и приёмник на стороне приложения остались как есть —
+             это страховка, и её судьба решается отдельно. Но принимающей
+             ПОВЕРХНОСТИ в приложении больше нет, а значит, эта страница не
+             имеет права обещать экран подтверждения: отправить родителя искать
+             то, чего нет, — ровно тот класс мёртвого обещания, ради которого
+             в этом продукте кнопку убирают там, где действие не происходит
+             (DIA-P2, кнопка архива на вебе). Поэтому кнопка остаётся, а
+             сказано то, что есть. -->
+        <p>Нажмите кнопку — история уйдёт в приложение на этом устройстве. Забрать её приложение пока не умеет: переноса из браузера в нынешней версии нет, и экран подтверждения там не откроется.</p>
 
         <button type="button" id="handoffBtn">Перенести историю</button>
 
@@ -128,6 +138,6 @@
         <p class="status" id="handoffStatus" hidden></p>
     </div>
 
-    <script type="module" src="/m/v6/transfer/handoff-page.js"></script>
+    <script type="module" src="/m/v7/transfer/handoff-page.js"></script>
 </body>
 </html>

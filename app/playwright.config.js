@@ -143,7 +143,15 @@ module.exports = defineConfig({
       // this repository carries no eslint on purpose, and the class it belongs
       // to is bought by diary-save.spec.js in `behavior`, which EXECUTES the
       // path rather than reading it.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse)\.spec\.js/,
+      // L3-P3 adds one: install-channel, an ABSENCE guard over the shell and the
+      // running mount — no install banner, no `beforeinstallprompt` path, no
+      // rules left dressing a deleted surface, and no `<link rel="manifest">`.
+      // It is here rather than in `behavior` because an absence is a property of
+      // the tree, which is the admissible static kind (AGENTS.md §11), and
+      // because there is nothing for a browser to execute: its subject is a
+      // surface that no longer exists. What DOES exist and ships hidden is swept
+      // at runtime, by behavior.spec.js.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse|install-channel)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -205,7 +213,15 @@ module.exports = defineConfig({
       // serves a different web root, and a leg that also simulates the shell
       // would vary two things at once. What it does NOT claim is anything about
       // SQLite, and its own header says so.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save|diary-search)\.spec\.js/,
+      // FIU-P1 adds store-lifecycle: what a return from the background does, on
+      // both of the things that happen on that one event — the transfer screen
+      // that used to reappear over the parent's work, and the store that now
+      // closes and reopens under it. Here rather than in `contract` because
+      // every leg is a fact about a rendered page, a real visibility change and
+      // a handler that ran; and NOT in `native` below for the reason
+      // diary-save.spec.js records — that project serves a different web root,
+      // and a leg that also simulates the shell would vary two things at once.
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

@@ -63,6 +63,11 @@ repos:
         # terms — standard library only (argparse, re, shutil, subprocess) plus
         # pytest, so the dependency list is unchanged again. app/tests/release
         # carries an __init__.py for the same collision reason.
+        #
+        # FIU-P5 adds the veraPDF failure printer on the same terms once more —
+        # standard library only (argparse, pathlib, xml.etree) — so the
+        # dependency list is unchanged for the third time. Its own suite lives in
+        # app/tests/export, which is already listed.
         args: [
           --config-file=pyproject.toml,
           api,
@@ -70,6 +75,7 @@ repos:
           app/tests/export,
           app/tests/release,
           scripts/verify_release_signature.py,
+          scripts/verapdf_failures.py,
         ]
         pass_filenames: false
         additional_dependencies:

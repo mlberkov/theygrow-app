@@ -163,6 +163,76 @@ public class StoreEngineTest {
         assertEquals("wal", queryScalar("PRAGMA journal_mode = WAL").toLowerCase());
     }
 
+    /**
+     * The marker the whole close-on-background design rests on (FIU-P1).
+     *
+     * <p>WHAT IS ACTUALLY BEING ASKED. {@code store_lifecycle.clean_shutdown} is
+     * one integer, and from it the open path decides whether to spend a full
+     * {@code PRAGMA integrity_check} over the family's history. Between L1-P2 and
+     * L2 nothing ever set it back to 1, so that decision was always "yes" and the
+     * knob that declared otherwise bought nothing (DIA-DL-008 debt 8). L3-P1
+     * makes {@code closeStore()} run, which makes this column load-bearing for
+     * the first time — so what the ENGINE guarantees about it is worth pinning on
+     * the engine rather than assuming it from the DDL text.
+     *
+     * <p>Three properties, and the third is the one a reader would not think to
+     * ask for: the value round-trips as an INTEGER and not as a string, because
+     * the app compares it with {@code Number(...) === 1} — and a column that had
+     * quietly become TEXT would be misread in one direction and not the other.
+     * The CHECK constraint is what keeps it to the two values that comparison
+     * understands, and the single-row CHECK is what keeps "the marker" from
+     * being ambiguous.
+     *
+     * <p>This leg deliberately does NOT retype the two statements the app
+     * issues. Those are asserted by exact equality where they are issued —
+     * {@code app/tests/support/page-bridge.js} throws on a statement it does not
+     * know — and their effect is observed through the shipped modules on a
+     * device by {@code StoreLifecycleTest}. What is claimed here is about the
+     * engine and the frozen DDL, and nothing else.
+     */
+    @Test
+    public void the_clean_shutdown_marker_round_trips_and_refuses_anything_else() {
+        applySchema();
+        database.execSQL(
+                "INSERT INTO store_lifecycle (id, opened_at_utc, clean_shutdown)"
+                        + " VALUES (1, 1, 0)");
+        assertEquals(
+                "a fresh open must leave the marker clear",
+                "0",
+                queryScalar("SELECT clean_shutdown FROM store_lifecycle WHERE id = 1"));
+
+        database.execSQL("UPDATE store_lifecycle SET clean_shutdown = 1 WHERE id = 1");
+        assertEquals(
+                "a clean close must leave the marker set",
+                "1",
+                queryScalar("SELECT clean_shutdown FROM store_lifecycle WHERE id = 1"));
+
+        assertEquals(
+                "clean_shutdown came back as something other than an integer",
+                "integer",
+                queryScalar("SELECT typeof(clean_shutdown) FROM store_lifecycle WHERE id = 1"));
+
+        try {
+            database.execSQL("UPDATE store_lifecycle SET clean_shutdown = 2 WHERE id = 1");
+            fail("store_lifecycle accepted a clean_shutdown outside (0, 1)");
+        } catch (Exception expected) {
+            assertTrue(
+                    "the refusal was not the CHECK constraint: " + expected.getMessage(),
+                    expected.getMessage().toLowerCase().contains("constraint"));
+        }
+
+        try {
+            database.execSQL(
+                    "INSERT INTO store_lifecycle (id, opened_at_utc, clean_shutdown)"
+                            + " VALUES (2, 1, 0)");
+            fail("store_lifecycle accepted a second row");
+        } catch (Exception expected) {
+            assertTrue(
+                    "the refusal was not the CHECK constraint: " + expected.getMessage(),
+                    expected.getMessage().toLowerCase().contains("constraint"));
+        }
+    }
+
     @Test
     public void the_append_only_triggers_fire_on_the_real_engine() {
         applySchema();
@@ -492,7 +562,7 @@ public class StoreEngineTest {
      * one — run 31971968427 red this line with "Queries can be performed using
      * SQLiteDatabase query or rawQuery methods only". The app's own seam draws
      * the same distinction for the same reason, and says so where it draws it
-     * ({@code app/m/v6/store/bridge.js}, {@code pragma()}).
+     * ({@code app/m/v7/store/bridge.js}, {@code pragma()}).
      */
     private void clampPageCount(long pages) {
         queryScalar("PRAGMA max_page_count = " + pages);

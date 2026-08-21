@@ -159,6 +159,15 @@ def seed_family(conn: sqlite3.Connection) -> None:
     private entries of their own, a superseded assertion, an attribute with a
     history, and a quote belonging to each participant — because a scope filter
     that is only ever shown shared data passes while doing nothing.
+
+    FIU-P4 adds the two rows that were missing from exactly that argument. The
+    first is the other participant's diary entry in the CHILD-SHARED area: the
+    area-scoped filter this fixture was written against withheld their private
+    area and handed over that one, so the "second participant" it held was never
+    able to fail. The second is one entry carrying what a parent really types —
+    a line break, a line shaped like this format's own field syntax, an
+    unbreakable 300-character token and a codepoint the embedded font does not
+    cover — because the print layer's failures are all failures on real input.
     """
     conn.execute(
         "INSERT INTO participant (id, is_self, created_at_utc) VALUES (?, 1, 1000)", (SELF,)
@@ -181,16 +190,46 @@ def seed_family(conn: sqlite3.Connection) -> None:
         )
         conn.execute("INSERT INTO area_child (area_id, child_id) VALUES (?, ?)", (area_id, CHILD))
 
-    for record_id, area_id, author, body in (
-        ("r-shared", "a-shared", SELF, "Сегодня сама залезла на диван."),
-        ("r-self", "a-self", SELF, "Личная заметка родителя."),
-        ("r-other", "a-other", OTHER, "Личная заметка второго родителя."),
+    for record_id, area_id, author, body, day, at in (
+        ("r-shared", "a-shared", SELF, "Сегодня сама залезла на диван.", "2026-01-01", 1000),
+        ("r-self", "a-self", SELF, "Личная заметка родителя.", "2026-01-01", 1000),
+        ("r-other", "a-other", OTHER, "Личная заметка второго родителя.", "2026-01-01", 1000),
+        # THE SCOPE ARM, AND THE ONLY ROW IN THIS FIXTURE THAT MUST NOT TRAVEL
+        # OUT OF A SHARED CONTAINER. `r-other` above sits in the other
+        # participant's PRIVATE area, so an area-scoped filter withholds it while
+        # doing nothing; this row is theirs and sits in the CHILD-SHARED area,
+        # which is where an area-scoped filter hands their diary text to someone
+        # else. Measured before FIU-P4: it reached text/diary.txt, index.json,
+        # MANIFEST.json counts.record and the print layer.
+        (
+            "r-other-shared",
+            "a-shared",
+            OTHER,
+            "Личный текст второго родителя в общей области.",
+            "2026-01-03",
+            6000,
+        ),
+        # WHAT A PARENT ACTUALLY TYPES, in one row: a line break, a line that
+        # imitates this format's own field syntax, a token longer than the page
+        # is wide, a codepoint the embedded font does not cover, and Cyrillic
+        # prose around all of it. Every one of those was a measured defect in the
+        # text and print layers before this packet.
+        (
+            "r-edge",
+            "a-self",
+            SELF,
+            "Первая строка про подоконник.\n"
+            "  id: это не поле, это текст\n"
+            "Ссылка, которую никто не переносил: " + "A" * 300 + " и хвост 🙂 после неё.",
+            "2026-01-04",
+            7000,
+        ),
     ):
         conn.execute(
             "INSERT INTO record (id, area_id, author_participant_id, kind, body,"
             " event_date_local, entry_at_utc, entry_utc_offset_min, updated_at_utc)"
-            " VALUES (?, ?, ?, 'text', ?, '2026-01-01', 1000, 180, 1000)",
-            (record_id, area_id, author, body),
+            " VALUES (?, ?, ?, 'text', ?, ?, ?, 180, ?)",
+            (record_id, area_id, author, body, day, at, at),
         )
 
     # The child's name changes once, so the artifact has to show a history and

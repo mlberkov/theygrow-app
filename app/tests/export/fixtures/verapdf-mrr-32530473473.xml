@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FIU-P5 - recorded veraPDF machine-readable report for the .notdef defect.
+
+  PROVENANCE
+    run:          GitHub Actions run 32530473473 (workflow "CI", event
+                  workflow_dispatch, branch feat/l3-first-install-ux, tip f7ee031)
+    job / step:   "android-instrumented" / *Validate the print layer against PDF/A-2b*
+    artifact:     "pdfa-validation", file "verapdf.xml"
+    validator:    veraPDF 1.30.2, built 2026-06-03, read from that same
+                  artifact's own "verapdf-version.txt"
+    subject:      the fixture archive's print/archive.pdf, built in that run by
+                  app/tests/export/emit_fixture.py through the SHIPPED builder
+    recorded:     2026-08-22, downloaded with "gh run download"
+    bytes:        sha256 7392e4163ea89a019adb94c8b666ba94bc64d597b3d8b574d0758de801acde76
+                  (2124 bytes). This file is those bytes with this comment
+                  inserted after the XML declaration and nothing else changed:
+                  not a line trimmed, not a line reflowed.
+
+  OBSERVED, NOT RECONSTRUCTED. Every element, attribute and character below came
+  out of that run. Nothing here was hand authored and no value was filled in from
+  a quotation of it. If a later packet needs a case this report does not contain,
+  synthesise that case in the test: a recorded fixture stops being evidence the
+  moment it is edited.
+
+  WHAT MAY BE PINNED AND WHAT MAY NOT.
+  app/tests/export/test_verapdf_failure_report.py pins the FORM - that a clause,
+  a test number, a description and a check context are extracted, and that the
+  extractor stays inside its bound. It also pins this report's own clause,
+  6.2.11.8, which is the defect it records. It pins NONE of the values this
+  environment generated, and they are named here so that nobody pins one later:
+  the "name" runner path, both "duration" start and finish stamps, the "item"
+  size, and every "releaseDetails" version and buildDate. The validator version
+  has a gate of its own (VERAPDF_EXPECTED_VERSION in .github/workflows/ci.yml);
+  a second copy here would be a second thing to bump and a first to forget.
+-->
+<report>
+  <buildInformation>
+    <releaseDetails id="core" version="1.30.2" buildDate="2026-06-03T10:43:00Z"></releaseDetails>
+    <releaseDetails id="validation-model" version="1.30.2" buildDate="2026-06-03T10:46:00Z"></releaseDetails>
+    <releaseDetails id="apps" version="1.30.2" buildDate="2026-06-03T10:55:00Z"></releaseDetails>
+  </buildInformation>
+  <jobs>
+    <job>
+      <item size="521363">
+        <name>/home/runner/work/_temp/pdfa/archive.pdf</name>
+      </item>
+      <validationReport jobEndStatus="normal" profileName="PDF/A-2b validation profile" statement="PDF file is not compliant with Validation Profile requirements." isCompliant="false">
+        <details passedRules="143" failedRules="1" passedChecks="3098" failedChecks="1">
+          <rule specification="ISO 19005-2:2011" clause="6.2.11.8" testNumber="1" status="failed" failedChecks="1">
+            <description>A PDF/A-2 compliant document shall not contain a reference to the .notdef glyph from any of the text showing operators, regardless of text rendering mode, in any content stream</description>
+            <object>Glyph</object>
+            <test>name != ".notdef"</test>
+            <check status="failed">
+              <context>root/document[0]/pages[8](20 0 obj PDPage)/contentStream[0](29 0 obj PDContentStream)/operators[9]/usedGlyphs[17](PTSans-Regular PTSans-Regular 0 0  0 false)</context>
+              <errorMessage>The document contains a reference to the .notdef glyph</errorMessage>
+            </check>
+          </rule>
+        </details>
+      </validationReport>
+      <duration start="1787349145669" finish="1787349146190">00:00:00.521</duration>
+    </job>
+  </jobs>
+  <batchSummary totalJobs="1" failedToParse="0" encrypted="0" outOfMemory="0" veraExceptions="0">
+    <validationReports compliant="0" nonCompliant="1" failedJobs="0">1</validationReports>
+    <featureReports failedJobs="0">0</featureReports>
+    <repairReports failedJobs="0">0</repairReports>
+    <duration start="1787349145605" finish="1787349146212">00:00:00.607</duration>
+  </batchSummary>
+</report>

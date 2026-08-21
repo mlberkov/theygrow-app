@@ -102,6 +102,39 @@ test.describe('the conformance gate can actually pass', () => {
         expect(WORKFLOW).toContain('VERAPDF_EXPECTED_VERSION');
         expect(WORKFLOW).toMatch(/VERAPDF_EXPECTED_VERSION:\s*'\d+\.\d+\.\d+'/);
     });
+
+    test('a failing verdict prints the rule that failed, and the printer exists', () => {
+        // FIU-P5. Run 32530473473 red the step with `failedRules=1` and nothing
+        // else; the clause, the object and the reason came out of the artifact
+        // by hand. The step now runs an evidence printer first.
+        //
+        // THIS IS A SOURCE SCAN and claims exactly what a source scan can: that
+        // the step names the script and that the script is there to be named. It
+        // does not execute either. What the printer DOES is executed by
+        // app/tests/export/test_verapdf_failure_report.py against a recorded copy
+        // of that run's own report; that the whole step passes on a conformant
+        // file is veraPDF's to say, on `android-instrumented`.
+        const invocation = /python3 scripts\/verapdf_failures\.py/;
+        expect(WORKFLOW).toMatch(invocation);
+        const script = path.join(APP_ROOT, '..', 'scripts', 'verapdf_failures.py');
+        expect(
+            fs.existsSync(script),
+            'the validate step invokes a script that is not in the repository'
+        ).toBeTruthy();
+    });
+
+    test('the evidence printer is not wired into the verdict', () => {
+        // The one permitted change to this workflow was failing-branch printing.
+        // The verdict block must still be the thing that decides, so the printer
+        // is required to sit OUTSIDE it: a `sys.exit` reached through the printer
+        // would be a second gate nobody declared.
+        const step = WORKFLOW.split('- name: Validate the print layer against PDF/A-2b')[1]
+            .split('\n      - name:')[0];
+        const heredoc = step.split("<<'PY'")[1];
+        expect(heredoc, 'the verdict heredoc is gone from the validate step').toBeTruthy();
+        expect(heredoc).not.toContain('verapdf_failures');
+        expect(heredoc).toContain('isCompliant');
+    });
 });
 
 test.describe('the print layer binaries are pinned', () => {
@@ -438,10 +471,16 @@ test.describe('the interface says the two things it must not soften', () => {
 
     test('the download control name is one string in three places', () => {
         // The same rule the export control carries, for the same reason: the
-        // mobile control is this control with the label hidden, so a reworded
-        // label that left the two attributes behind would give the two viewports
-        // different names for the same action.
-        const control = /<a[^>]*id="apkBtn"[\s\S]*?<\/a>/.exec(SHELL);
+        // control is the same at both viewports, so a reworded label that left
+        // the two attributes behind would give the two viewports different names
+        // for the same action. (L3-P3 keeps the label VISIBLE on mobile for this
+        // one control — the web channel offers exactly one action and it must
+        // name itself — so the three strings are now all read by a sighted
+        // parent too, not two of them by assistive technology alone.)
+        //
+        // A <button>, not an <a>, since L3-P3: the control opens the pre-install
+        // window rather than navigating. See the next test.
+        const control = /<button[^>]*id="apkBtn"[\s\S]*?<\/button>/.exec(SHELL);
         expect(control, 'the download control is missing').not.toBeNull();
         const aria = /aria-label\s*=\s*"([^"]*)"/.exec(control[0]);
         const title = /title\s*=\s*"([^"]*)"/.exec(control[0]);
@@ -455,14 +494,20 @@ test.describe('the interface says the two things it must not soften', () => {
 
     test('the download control ships unrevealed and carries no address of its own', () => {
         // TWO PROPERTIES, ONE DEFECT BETWEEN THEM. The control must not be
-        // offered before an asset exists — the repository has no tag and no
-        // release, so a visible link would open an empty page dressed as a
-        // download — and its address must be declared once, in the knob surface,
-        // rather than written into markup where the next reader would find two
-        // of them. STATIC: whether it is actually withheld at runtime, and
-        // whether it appears once the shell declares a published release, is
-        // app/tests/channel-composition.spec.js.
-        const control = /<a[^>]*id="apkBtn"[^>]*>/.exec(SHELL);
+        // offered before an asset exists — a visible offer would open an empty
+        // page dressed as a download — and the address must be declared once, in
+        // the knob surface, rather than written into markup where the next
+        // reader would find two of them. STATIC: whether it is actually withheld
+        // at runtime, and whether it appears once the shell declares a published
+        // release, is app/tests/channel-composition.spec.js.
+        //
+        // THE ADDRESS MOVED ONE ELEMENT INWARDS AT L3-P3, and the assertion
+        // moved with it. The header control is now a <button> that opens the
+        // pre-install window; the thing that actually navigates is the <a
+        // id="installDownloadLink"> inside that window. So "carries no address
+        // of its own" is asserted on BOTH: the button must not have grown an
+        // href back, and the link must still take its address from the knob.
+        const control = /<button[^>]*id="apkBtn"[^>]*>/.exec(SHELL);
         expect(control, 'the download control is missing').not.toBeNull();
         expect(
             /\bhidden\b/.test(control[0]),
@@ -470,9 +515,16 @@ test.describe('the interface says the two things it must not soften', () => {
         ).toBeTruthy();
         expect(
             /\bhref\s*=/.test(control[0]),
-            'the download control carries a hard-coded href — the address is declared in channel/config.js'
+            'the download control carries an href — it opens a window, and the address lives on the link inside it'
         ).toBeFalsy();
         expect(SHELL).toContain('name="theygrow-apk-release"');
+
+        const link = /<a[^>]*id="installDownloadLink"[^>]*>/.exec(SHELL);
+        expect(link, 'the pre-install window carries no download link').not.toBeNull();
+        expect(
+            /\bhref\s*=/.test(link[0]),
+            'the download link carries a hard-coded href — the address is declared in channel/config.js'
+        ).toBeFalsy();
 
         // The address exists exactly once in the shipped tree, in the knob.
         //
@@ -501,6 +553,66 @@ test.describe('the interface says the two things it must not soften', () => {
             elsewhere,
             'the release address appears outside the knob surface — it is declared once or not at all'
         ).toEqual([]);
+    });
+
+    test('the privacy policy is declared once, and the shell declares its state', () => {
+        // FIU-P3-INV-002, STATIC HALF. Same two properties as the download
+        // address above, for the second declaration of the same shape: the
+        // address exists once, in the knob surface, and the shell carries the
+        // <meta> whose content decides whether the link is offered at all.
+        // Whether it is actually withheld while undeclared, and whether it
+        // appears once the shell declares it published, is executed by
+        // app/tests/channel-composition.spec.js — a source scan cannot carry
+        // that (AGENTS.md §11).
+        //
+        // WHY THIS ONE MATTERS MORE THAN THE DOWNLOAD'S. A dead link to a
+        // releases page is a broken distribution channel. A dead link labelled
+        // "privacy policy" is a promise about a family's data with nothing
+        // behind it, and it is worse than no link at all.
+        const declared = fs.readFileSync(
+            path.join(APP_ROOT, 'm', MOUNT.dir, 'channel', 'config.js'),
+            'utf8'
+        );
+        const address = /policyUrl:\s*'([^']+)'/.exec(declared);
+        expect(address, 'the knob surface does not declare the policy address').not.toBeNull();
+
+        const meta = /policyStateMeta:\s*'([^']+)'/.exec(declared);
+        expect(meta, 'the knob surface does not name the policy declaration tag').not.toBeNull();
+        expect(SHELL).toContain(`name="${meta[1]}"`);
+
+        // The address exists exactly once in the shipped tree, in the knob —
+        // with the same "one DECLARATION SITE, not one file on disk" exclusion
+        // the release address carries, and for the same reason: a copy-forward
+        // bump leaves the frozen generation shipped, carrying the same knob.
+        const elsewhere = SHIPPED.filter((rel) => rel.endsWith('.js') || rel.endsWith('.html'))
+            .filter((rel) => !/m\/v\d+\/channel\/config\.js$/.test(rel))
+            .filter((rel) =>
+                fs.readFileSync(path.join(APP_ROOT, rel), 'utf8').includes(address[1])
+            );
+        expect(
+            elsewhere,
+            'the policy address appears outside the knob surface — it is declared once or not at all'
+        ).toEqual([]);
+
+        // AND NOTHING ASKS THE PARENT TO ACCEPT IT. Making the document
+        // reachable is the obligation; collecting acceptance is not, a tick-box
+        // nobody can decline is not consent, and a consent RECORD has nowhere to
+        // live in this milestone (FIU-DL-003). This is the guard that keeps a
+        // later packet from adding one by reflex.
+        const intro = /<a[^>]*id="introPolicyLink"[^>]*>/.exec(SHELL);
+        expect(intro, 'the intro carries no policy link').not.toBeNull();
+        expect(
+            /\bhidden\b/.test(intro[0]),
+            'the policy link ships revealed — until the document is published it must not be offered'
+        ).toBeTruthy();
+        expect(
+            /\bhref\s*=/.test(intro[0]),
+            'the policy link carries a hard-coded href — the address is declared in channel/config.js'
+        ).toBeFalsy();
+        expect(
+            SHELL,
+            'a consent control appeared beside the policy link — reachability is the obligation, acceptance is not'
+        ).not.toMatch(/id="[A-Za-z0-9_-]*(?:[Cc]onsent|[Aa]ccept)[A-Za-z0-9_-]*"/);
     });
 
     test('the web channel still says the copy it holds is the only one', () => {

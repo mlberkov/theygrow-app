@@ -60,11 +60,6 @@ async function bootWithStore(page) {
         selfParticipantId: SELF,
     });
     await gotoApp(page, { state: STATES.empty });
-
-    const offer = page.locator('#importModal');
-    await expect(offer).toBeVisible();
-    await page.locator('#importModalClose').click();
-    await expect(offer).toBeHidden();
 }
 
 /** Writes one entry through the surface, the way DIA-P3 ships it. */

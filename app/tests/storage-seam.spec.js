@@ -57,21 +57,23 @@ const STORAGE_ACCESS = /\b(localStorage|sessionStorage|indexedDB|openDatabase)\s
 // (A1-P4), which is what makes it swappable in one place in L1-P2.
 const STORAGE_MODULE = `${MOUNT.prefix}core/storage.js`;
 
-// The two accesses that are NOT behind the door, declared individually rather
-// than by file. Both predate the module split and both were left inline on
-// purpose (A1-DL-006 (f)): `ga_debug` is read by the inline <head> gtag shim
-// before any module evaluates, and `iosInstallDismissed` belongs to the
-// install-prompt IIFE, which registers `beforeinstallprompt` at parse time —
-// an event no level of the parity suite can observe, so the move could not be
-// proven equivalent.
+// The access that is NOT behind the door, declared individually rather than by
+// file. It predates the module split and was left inline on purpose
+// (A1-DL-006 (f)): `ga_debug` is read by the inline <head> gtag shim before any
+// module evaluates.
 //
-// Neither is family data: one is a debug flag, one is a dismissed-banner flag.
-// Both are losable by definition, so neither is a counter-example to the
-// platform inversion — but both are doors, so both are named.
-const DECLARED_SHELL_ACCESSES = [
-  { file: 'index.html', key: 'ga_debug' },
-  { file: 'index.html', key: 'iosInstallDismissed' },
-];
+// It is not family data — it is a debug flag, losable by definition — so it is
+// not a counter-example to the platform inversion; but it is a door, so it is
+// named.
+//
+// THERE WERE TWO UNTIL L3-P3. `iosInstallDismissed` belonged to the
+// install-prompt IIFE, which registered `beforeinstallprompt` at parse time —
+// an event no level of the parity suite could observe, so the move to a module
+// could not be proven equivalent. L3-P3 removed the offer, the IIFE and the
+// key's only writer (FIU-DL-003), and the mirror assertion at the foot of this
+// file — "every declared shell exception still exists" — is what obliged the
+// declaration to go with them rather than rot into a permission nobody uses.
+const DECLARED_SHELL_ACCESSES = [{ file: 'index.html', key: 'ga_debug' }];
 
 // A declared access, in the exact form the shell uses: a literal string key.
 // A computed key would not match, and would therefore be reported as
