@@ -88,12 +88,21 @@ import org.junit.runner.RunWith;
  * brought 25 of 26 legs green and confirmed the teardown mechanism by
  * measurement — this class fell from 5 m 32.60 s to 2 m 20.77 s — with
  * {@link #the_transfer_writes_nothing_to_web_storage} the single red, again for
- * a fault of its own. {@code app.js} calls {@code offerImportIfPending()} at
+ * a fault of its own. {@code app.js} called {@code offerImportIfPending()} at
  * boot; nothing is staged on a fresh emulator, so {@code surfaces/import.js}
- * hides the run button and shows the modal. A wait that watched only for
+ * hid the run button and showed the modal. A wait that watched only for
  * {@code .show} was therefore answered by that BOOT-TIME invitation, before the
  * delivered profile existed, and the press that followed found a hidden button,
  * declined to click it, and said {@code 'clicked'} anyway (DIA-DL-003).
+ *
+ * <p><b>NEITHER LEG PRESSES ANYTHING ANY MORE (L3-P2, {@code FIU-DL-002}).</b>
+ * The owner removed the in-app transfer offer outright, so that boot-time
+ * invitation, that modal and that button are gone from the product. The two
+ * transfer legs drive {@code pendingTransfer -> drainTransfer -> runImport} out
+ * of the shipped {@code store/boot.js} instead — see {@link #drainAndImport} —
+ * which keeps the retained mechanism executed on a device now that no surface
+ * consumes it. The offer/press instruments stay, fired by the arm at DOM states
+ * it builds itself: the rule they encode outlives the surface.
  *
  * <p>THE PARCEL LEG CARRIES ITS OWN CONTROL, for the reason {@code
  * ExportTransferTest} states: "the saved state is small" would stay green if the
@@ -161,14 +170,20 @@ public class HistoryTransferTest {
             Envelope envelope = buildEnvelopeInApp(scenario, 4);
             deliver(scenario, link(envelope));
 
-            // The surface is driven the way a parent drives it: the modal has to
-            // OFFER the profile, and the button has to be pressed. Both halves
-            // live in offerAndPress() — this leg's shape is where the band's
-            // device leg got its repair from, so it is shared rather than copied
-            // (DIA-DL-003). One profile, this leg's own count.
-            offerAndPress(scenario, 1);
-
-            String status = pollForImportStatus(scenario);
+            // THE MECHANISM IS DRIVEN THROUGH THE SHIPPED MODULES, NOT THROUGH A
+            // SURFACE, AND THAT IS L3-P2 RATHER THAN A WEAKENING (FIU-DL-002).
+            // This leg used to wait for #importModal to list the profile and
+            // then press #importRunBtn. The owner removed the in-app transfer
+            // offer outright, so that surface no longer exists — while the
+            // plugin, the link, the envelope, the drain and the importer all
+            // stay shipped as insurance. Insurance that nothing executes is a
+            // claim, so the leg follows the mechanism down one layer: it calls
+            // pendingTransfer -> drainTransfer -> runImport out of the SHIPPED
+            // store/boot.js, in the app's own document, across the real bridge
+            // to the real plugin. What is no longer covered by anyone, and is
+            // said rather than left to be inferred, is the surface that used to
+            // sit on top of it — because there is none.
+            String status = drainAndImport(scenario, 1);
             assertEquals("the import did not report success: " + status, "imported", status);
 
             // THE MARKS LANDED, asked of the journal rather than of the surface.
@@ -228,19 +243,14 @@ public class HistoryTransferTest {
                     "false",
                     evaluate(scenario, "String(window.__diaPending.present)"));
 
-            // The parent is told, in one line, and offered the file path. No
-            // fork is presented (ADR-048 §3).
-            String fallback =
-                    pollFor(
-                            scenario,
-                            "(function () {"
-                                + "var f = document.getElementById('importFallback');"
-                                + "if (!f || f.hidden || !f.textContent) { return null; }"
-                                + "var p = document.getElementById('importPickBtn');"
-                                + "return (p && !p.hidden) ? 'offered' : 'no-button';"
-                                + "})()",
-                            EVALUATE_TIMEOUT_MS);
-            assertEquals("the file fallback was not offered after a refusal", "offered", fallback);
+            // WHAT THE PARENT IS TOLD IS NO LONGER ASSERTED HERE, AND IT IS NOT
+            // AN OMISSION (L3-P2, FIU-DL-002). This block used to require the
+            // one-line explanation and the file button ADR-048 §3 specifies —
+            // `#importFallback` and `#importPickBtn`, both in the modal the
+            // owner removed. There is no in-app surface for a refused handoff
+            // to reach any more, because there is no in-app handoff. What is
+            // left of this leg is what the PLUGIN does, which is the whole of
+            // what still exists: it refuses, by code, and stages nothing.
         });
     }
 
@@ -378,6 +388,17 @@ public class HistoryTransferTest {
                     "undefined",
                     evaluate(scenario, "typeof window.__diaDrain"));
 
+            // THE DRAIN IS ASKED FOR, RATHER THAN WAITED FOR (L3-P2,
+            // FIU-DL-002). Until this packet the boot-time offer drained
+            // whatever the plugin held, so this leg only had to wait. With the
+            // offer removed nothing drains by itself, and a leg that went on
+            // waiting would time out rather than measure anything. What it
+            // measures is unchanged: the recorder below still watches the REAL
+            // bridge calls the SHIPPED store/transfer.js makes, and the drain
+            // is 40 skills' worth of history, so `chunks >= 1` still has teeth.
+            String status = drainAndImport(scenario, 1);
+            assertEquals("the drain did not complete: " + status, "imported", status);
+
             String drained =
                     pollFor(
                             scenario,
@@ -492,6 +513,10 @@ public class HistoryTransferTest {
      * {@code hidden} and returned {@code 'clicked'} regardless. Both are now
      * {@link #offerAndPress}, which waits for the OFFER and reports
      * {@code 'not-offered'} rather than pressing nothing quietly (DIA-DL-003).
+     * Since L3-P2 this leg presses nothing at all: the surface was removed and
+     * the mechanism is driven through the shipped modules ({@link
+     * #drainAndImport}). The paragraph is kept because the rule it records is
+     * why the replacement reports what it DID rather than that it ran.
      */
     @Test
     public void the_transfer_writes_nothing_to_web_storage() throws Exception {
@@ -529,15 +554,13 @@ public class HistoryTransferTest {
             Envelope envelope = buildEnvelopeInApp(scenario, 3);
             deliver(scenario, link(envelope));
 
-            // THE OFFER, THEN THE PRESS, THROUGH THE STEP THAT CAN SAY IT DID
-            // NEITHER. What stood here waited for `.show` — which the boot-time
-            // handoff invitation had already set — and then reported 'clicked'
-            // for a press it declined to make, so this leg spent 2 m 2.61 s of
-            // run 31954630121 waiting for a status no one was going to write
-            // (DIA-DL-003). One profile, this leg's own count.
-            offerAndPress(scenario, 1);
-
-            String status = pollForImportStatus(scenario);
+            // THE DRAIN AND THE IMPORT, THROUGH THE SHIPPED MODULES (L3-P2,
+            // FIU-DL-002 — see the deep-link leg for why the surface is gone).
+            // The claim this leg makes is unchanged and is if anything sharper:
+            // the recorder below is watching Storage.prototype, and what it must
+            // see nothing from is the transfer path itself, which is exactly
+            // what is being driven here. One profile, this leg's own count.
+            String status = drainAndImport(scenario, 1);
             // Sampled HERE, before the read-back below loads any further module,
             // so what is asserted is the write set of the transfer itself.
             String writes = evaluate(scenario, "JSON.stringify(window.__diaWrites)");
@@ -1137,9 +1160,13 @@ public class HistoryTransferTest {
             this.button = button;
         }
 
-        /** The product's import modal, as {@code index.html} declares it. */
-        static final Surface PRODUCT =
-                new Surface("importModal", "importChoices", "importRunBtn");
+        // THE PRODUCT'S IMPORT MODAL USED TO BE DECLARED HERE, and it is gone
+        // with the modal (L3-P2, FIU-DL-002): the two transfer legs now drive
+        // the shipped modules directly. What is left is the arm's own subtree,
+        // which is what the offer/press instruments still have to be fired at —
+        // the instruments themselves are kept because DIA-DL-003's rule (an
+        // action step reports what it DID) is a property of this harness, not
+        // of the surface that occasioned it.
 
         /** The arm's own subtree — built in-run, asserted gone afterwards. */
         static final Surface PROBE =
@@ -1213,9 +1240,90 @@ public class HistoryTransferTest {
                 .replace("__BTN__", surface.button);
     }
 
-    /** Drives the product's modal: the offer, this leg's count, and the press. */
-    private void offerAndPress(ActivityScenario<MainActivity> scenario, int expectedProfiles) {
-        offerAndPress(scenario, Surface.PRODUCT, expectedProfiles, TRANSFER_TIMEOUT_MS);
+    /**
+     * Drains the staged transfer and imports it, through the shipped modules.
+     *
+     * <p><b>WHY THIS REPLACED A BUTTON PRESS (L3-P2, {@code FIU-DL-002}).</b>
+     * The in-app transfer offer was removed by owner decision, so there is no
+     * modal to wait for and no button to press. Everything under it stays
+     * shipped — {@code HistoryTransferPlugin}, the envelope, {@code
+     * store/transfer.js}, {@code store/import-legacy.js} — and this is what
+     * keeps that insurance executed on a device: the same three calls the
+     * surface used to make, made from the app's own document, across the real
+     * bridge, against the real plugin, out of the mount the APK carries.
+     *
+     * <p>It answers with the same vocabulary the status line used to, so the
+     * legs above are unchanged in what they assert: {@code 'imported'} means the
+     * importer reported children and marks written; anything else comes back
+     * verbatim, because "nothing was staged" and "the import wrote nothing" are
+     * different outcomes and a leg that accepts both cannot tell them apart.
+     *
+     * <p><b>And the answer must come from the document that was asked.</b> The
+     * token {@link #deliver} stamps rides back with the counts, for the reason
+     * {@link #assertImportedMarks} states: otherwise "the import did not happen"
+     * cannot be told from "the world I asked was not the world it happened in".
+     */
+    private String drainAndImport(ActivityScenario<MainActivity> scenario, int expectedProfiles) {
+        String script =
+                ("(function () {"
+                                + "window.__diaImport = null;"
+                                + "var base = '__BASE__';"
+                                + "var u = function (n) {"
+                                + " return new URL(base + n, document.baseURI).href; };"
+                                + "import(u('store/boot.js')).then(function (boot) {"
+                                + "return boot.pendingTransfer().then(function (staged) {"
+                                + "if (!staged.present) {"
+                                + " throw new Error('nothing was staged, refusal='"
+                                + " + staged.refusal); }"
+                                + "return boot.drainTransfer(staged).then(function (drained) {"
+                                + "var ids = drained.profiles.map(function (p) { return p.id; });"
+                                + "var handle = boot.storeHandle();"
+                                + "if (!handle) { throw new Error('the store is not open'); }"
+                                + "return boot.runImport({ profiles: drained.profiles,"
+                                + " selectedProfileIds: ids,"
+                                + " authorParticipantId: handle.selfParticipantId })"
+                                + ".then(function (summary) {"
+                                + "return boot.discardTransfer(staged.transferId)"
+                                + ".then(function () { return {"
+                                + " doc: window.__diaDoc,"
+                                + " profiles: String(ids.length),"
+                                + " children: String(summary.children),"
+                                + " assertions: String(summary.assertions) }; }); }); }); }); })"
+                                + ".then(function (result) {"
+                                + " window.__diaImport = JSON.stringify(result); })"
+                                + ".catch(function (e) {"
+                                + " window.__diaImport = 'err:' + (e && e.message); });"
+                                + "return 'dispatched';"
+                                + "})()")
+                        .replace("__BASE__", MountAddress.prefix());
+
+        assertEquals("the drain-and-import script never ran", "dispatched", evaluate(scenario, script));
+        String raw =
+                pollFor(
+                        scenario,
+                        "window.__diaImport",
+                        TRANSFER_TIMEOUT_MS,
+                        "the drain and the import to finish — neither the shipped modules nor"
+                                + " their failure ever answered");
+        Log.i(TAG, "drain-and-import: " + raw);
+        if (!raw.startsWith("{")) {
+            return "other:" + raw;
+        }
+        assertEquals(
+                "the import was performed by a document other than the one this leg delivered"
+                    + " to — every count below is about some other world: " + raw,
+                documentToken(),
+                jsonString(raw, "doc"));
+        assertEquals(
+                "the transfer carried a number of profiles other than " + expectedProfiles + ": "
+                        + raw,
+                String.valueOf(expectedProfiles),
+                jsonString(raw, "profiles"));
+        if ("0".equals(jsonString(raw, "children"))
+                && "0".equals(jsonString(raw, "assertions"))) {
+            return "other:the importer wrote nothing — " + raw;
+        }
+        return "imported";
     }
 
     /**
@@ -1246,34 +1354,6 @@ public class HistoryTransferTest {
                     + " have started",
                 "pressed",
                 evaluate(scenario, pressScript(surface)));
-    }
-
-    /**
-     * Waits for the import status line to settle, and reports which line it is.
-     *
-     * <p>{@code 'imported'} means the surface said the marks were carried across.
-     * Anything else comes back verbatim: "everything was already transferred" is
-     * a DIFFERENT outcome from a completed import, and a leg that accepts both is
-     * a leg that cannot tell them apart.
-     *
-     * <p><b>THE 120 s BUDGET STANDS; WHAT IT SAYS WHEN IT EXPIRES DOES NOT.</b>
-     * It used to print the polled expression, so the reader of run 31954630121
-     * had to go to the logcat to learn that the surface had never been asked to
-     * import anything. It now names the product fact — no import was reported —
-     * which is the diagnosis, and the press upstream of it now fails first and by
-     * name in the case that produced it (DIA-DL-003).
-     */
-    private String pollForImportStatus(ActivityScenario<MainActivity> scenario) {
-        return pollFor(
-                scenario,
-                "(function () {"
-                    + "var s = document.getElementById('importStatus').textContent;"
-                    + "if (!s || s.indexOf('Переношу') !== -1) { return null; }"
-                    + "return s.indexOf('Перенесено') !== -1 ? 'imported' : 'other:' + s;"
-                    + "})()",
-                TRANSFER_TIMEOUT_MS,
-                "the surface to report an import — #importStatus never left «Переношу…» and"
-                        + " never said «Перенесено»");
     }
 
     /**

@@ -141,7 +141,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DeviceLogTest.java',
-        line: 518,
+        line: 645,
         argument: '"window." + slot',
         reason:
             "the same shape as DiaryEntryTest's await(): the async slot name is a Java variable,"
@@ -149,7 +149,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DeviceLogTest.java',
-        line: 526,
+        line: 653,
         argument: 'expression',
         reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
     },
@@ -196,13 +196,13 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'HistoryTransferTest.java',
-        line: 1530,
+        line: 1610,
         argument: 'expression',
         reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
     },
     {
         file: 'HistoryTransferTest.java',
-        line: 1545,
+        line: 1625,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
