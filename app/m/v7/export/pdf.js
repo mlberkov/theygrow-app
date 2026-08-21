@@ -24,11 +24,26 @@
 // one timestamp are byte-identical — the property app/tests/export/
 // test_artifact_deterministic.py asserts across the whole archive.
 //
-// DECLARED DEGRADATION. A codepoint the font does not cover renders as U+FFFD
-// in the PDF and only there. The text files and index.json always carry the
-// exact characters, and README.txt says which is authoritative. That is the
+// DECLARED DEGRADATION. A codepoint the font does not cover renders as the
+// substitution mark EXPORT_CONFIG.pdfSubstituteCodepoint names — «◊» — in the PDF
+// and only there. The text files and index.json always carry the exact
+// characters, and declaration.json says which is authoritative. That is the
 // ADR-015 shape: degrade visibly and say so, rather than fail the export or
 // pretend the character was something else.
+//
+// AND THE MARK MUST BE ONE THE FONT HAS. This is not a detail; it is where the
+// degradation failed for a whole milestone. The substitute used to be U+FFFD,
+// which PT Sans does not cover, so `font.glyph(0xfffd)` returned 0 and the
+// writer drew .notdef — the one glyph PDF/A-2 forbids from a text-showing
+// operator (ISO 19005-2:2011 clause 6.2.11.8, "shall not contain a reference to
+// the .notdef glyph … in any content stream"). It stayed invisible until a
+// fixture seeded a codepoint the font really lacks, and then it cost a red
+// dispatch: run 32530473473, 143 rules passed and one failed, at
+// pages[8]/contentStream[0]/operators[9]/usedGlyphs[17]. The substitution now
+// resolves through a knob whose own comment carries the constraint, and
+// app/tests/export/test_pdf_structure.py asserts on EVERY PUSH that no
+// text-showing operator in any content stream of a built artifact references
+// glyph 0 — the executor the printed layer did not have.
 
 import { EXPORT_CONFIG } from './config.js';
 import { ExportError } from './errors.js';
@@ -36,7 +51,11 @@ import { readFont } from './ttf.js';
 import { crc32 } from './zip.js';
 
 const ENCODER = new TextEncoder();
-const REPLACEMENT = 0xfffd;
+// The mark drawn in place of a codepoint the embedded font cannot draw. It
+// lives on the config surface because declaration.json quotes it to a reader
+// and the two must not drift; see the knob's own comment for the constraint
+// that it has to be a codepoint the font covers.
+const SUBSTITUTE = EXPORT_CONFIG.pdfSubstituteCodepoint;
 
 // A4 in points, integral so the numbers written into the file are exact.
 const PAGE_WIDTH = 595;
@@ -138,8 +157,11 @@ function toGlyphs(font, text) {
         const cp = ch.codePointAt(0);
         let gid = font.glyph(cp);
         if (gid === 0) {
-            // Declared degradation, not a silent drop.
-            gid = font.glyph(REPLACEMENT);
+            // Declared degradation, not a silent drop — and not .notdef either.
+            // `SUBSTITUTE` is a codepoint the font covers, so this branch can
+            // never hand a 0 back; when it could, it did, and the file stopped
+            // being PDF/A. See DECLARED DEGRADATION at the top of this file.
+            gid = font.glyph(SUBSTITUTE);
         }
         out.push(gid);
     }
@@ -181,7 +203,7 @@ export function renderPdf({ font: fontBytes, icc, sections, title, exportedAtUtc
     }
     if (!pages.length) pages.push([]);
 
-    const used = new Set([font.glyph(REPLACEMENT)]);
+    const used = new Set([font.glyph(SUBSTITUTE)]);
     for (const page of pages) for (const line of page) for (const g of line) used.add(g);
 
     // --- objects ---------------------------------------------------------
@@ -335,12 +357,17 @@ function toUnicodeCMap(font, used) {
     // One entry per used glyph. Built by inverting the cmap over the glyphs
     // actually drawn, so a reader can extract the text — which is what makes
     // the print layer searchable rather than a picture of words.
+    //
+    // The substitution mark needs no special case here: it is a codepoint inside
+    // the scanned range, so the loop below maps it like any other glyph the page
+    // uses. There used to be one, mapping GLYPH 0 to U+FFFD — a bfchar entry for
+    // .notdef, written because the substitution resolved to .notdef. It went out
+    // with the defect that produced it (FIU-DL-005).
     const pairs = [];
     for (let cp = 0x20; cp <= 0x2fff; cp += 1) {
         const gid = font.glyph(cp);
         if (gid && used.has(gid)) pairs.push([gid, cp]);
     }
-    if (used.has(font.glyph(REPLACEMENT))) pairs.push([font.glyph(REPLACEMENT), REPLACEMENT]);
 
     const seen = new Set();
     const unique = pairs.filter(([g]) => (seen.has(g) ? false : seen.add(g)));

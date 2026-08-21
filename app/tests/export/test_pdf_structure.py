@@ -20,6 +20,9 @@ import io
 import re
 import zipfile
 
+from .harness import EXPORT_DIR
+from .pdf_text import content_streams, glyph_runs
+
 PDF_PATH = "print/archive.pdf"
 
 
@@ -173,10 +176,22 @@ def test_the_print_layer_is_declared_and_says_which_copy_is_authoritative(
 
     assert declaration["print_layer"]["path"] == PDF_PATH
     assert declaration["print_layer"]["conformance"] == "PDF/A-2b"
-    # The authority statement must name the replacement character and point at
-    # the text files, or a reader has no way to know the PDF is the lossy copy.
+    # The authority statement must name the substitution mark and point at the
+    # text files, or a reader has no way to know the PDF is the lossy copy — and
+    # it must name the mark the writer REALLY draws. Read out of the shipped
+    # config surface rather than repeated here as a literal (the
+    # `_declared_line_width` idiom in test_artifact_shape.py): the artifact
+    # quotes the knob to a reader, so a knob changed without the sentence being
+    # amended is the artifact telling a family something untrue, and that is what
+    # this leg exists to catch. It was written after the sentence and the writer
+    # disagreed for a whole milestone (FIU-DL-005).
+    codepoint = _declared_substitute()
     authority = declaration["print_layer"]["authority_ru"]
-    assert "U+FFFD" in authority
+    assert chr(codepoint) in authority, (
+        f"the declaration does not show the mark the writer draws ({chr(codepoint)})"
+    )
+    assert f"U+{codepoint:04X}" in authority, "the declaration does not name the mark's codepoint"
+    assert "U+FFFD" not in authority, "the declaration still promises the mark this writer dropped"
     assert "index.json" in authority
     assert "печатный слой" in readme.lower(), "README does not mention the print layer"
 
@@ -195,3 +210,92 @@ def test_a_character_outside_the_font_degrades_only_in_the_pdf(artifact: bytes) 
 
     assert "Мия Александровна" in children
     assert "Мия Александровна" in index
+
+
+def _declared_substitute() -> int:
+    """The shipped substitution mark, read out of the module that owns it."""
+    source = (EXPORT_DIR / "config.js").read_text(encoding="utf-8")
+    match = re.search(r"pdfSubstituteCodepoint: 0x([0-9a-fA-F]+)", source)
+    assert match, "export/config.js no longer declares pdfSubstituteCodepoint"
+    return int(match.group(1), 16)
+
+
+def test_no_text_showing_operator_references_the_notdef_glyph(artifact: bytes) -> None:
+    """The conformance-relevant property the print layer had no local executor for.
+
+    ISO 19005-2:2011 clause 6.2.11.8: a PDF/A-2 file may not reference the
+    .notdef glyph from any text-showing operator, in any content stream,
+    whatever the rendering mode. veraPDF certifies that; this asserts it here,
+    for free, on every push — which is the whole point, because until FIU-P5 the
+    only executor was an owner dispatch, and the class surfaced as a red job at
+    PR time on run 32530473473 rather than as a red test at the keyboard.
+
+    WHAT THIS CAN AND CANNOT PROVE. It proves ONE rule of 144, on the artifact
+    this repository's fixture produces, by reading the bytes. It is not veraPDF
+    and does not become veraPDF: the other 143 rules — colour spaces,
+    transparency, annotations, actions, ICC tag internals — are still certified
+    only by the `Validate the print layer against PDF/A-2b` step in
+    `android-instrumented`, on `pull_request` and `workflow_dispatch`. What it
+    buys is that this particular rule can no longer be broken silently between
+    dispatches.
+    """
+    body = pdf(artifact)
+    streams = content_streams(body)
+    pages = len(re.findall(rb"/Type /Page[ /]", body))
+
+    # Anti-vacuity, three legs. A guard that found no content streams, or no
+    # text in them, would report a clean file about bytes it never read — and
+    # `glyph_runs` itself raises if an operator spelling escapes it.
+    assert pages, "no page objects — this test would pass vacuously"
+    assert len(streams) == pages, f"{pages} pages but {len(streams)} content streams"
+    runs = [run for stream in streams for run in glyph_runs(stream)]
+    assert runs, "no text-showing operators — this test would pass vacuously"
+
+    offences = [(index, at) for index, run in enumerate(runs) for at, g in enumerate(run) if g == 0]
+    assert not offences, (
+        f"{len(offences)} reference(s) to .notdef from a text-showing operator,"
+        f" first at run {offences[0][0]} position {offences[0][1]} —"
+        " the print layer is not PDF/A-2b (clause 6.2.11.8)"
+    )
+
+    # The fourth anti-vacuity leg, and the one that binds this test to the
+    # fixture: `seed_family` seeds a codepoint PT Sans does not cover, so the
+    # substitution must actually have happened. Without this, dropping the
+    # uncovered character from the fixture would leave the test green while
+    # removing everything it was watching.
+    substitute = _glyph_for(body, _declared_substitute())
+    drawn = sum(run.count(substitute) for run in runs)
+    assert drawn, (
+        "no substituted glyph on any page — the fixture no longer seeds a"
+        " codepoint the embedded font lacks, and this test is now watching nothing"
+    )
+
+
+def test_the_notdef_scanner_detects_a_seeded_reference() -> None:
+    """The arm-check, which generates its own failing input in this run.
+
+    The guard above is an ABSENCE assertion over a file this repository writes,
+    and an absence assertion is worth exactly what its detector is worth. So the
+    detector is shown finding a reference to glyph 0 in a content stream built
+    here, rather than by mutating the shipped writer and trusting a human to put
+    it back.
+    """
+    seeded = b"BT\n/F1 9 Tf\n<00030000> Tj T*\nET"
+    runs = glyph_runs(seeded)
+    assert runs == [[3, 0]], runs
+    assert any(0 in run for run in runs), "the scanner does not see a seeded .notdef reference"
+
+    # And it sees one written with a spelling this writer never emits.
+    assert any(0 in run for run in glyph_runs(b"BT\n[<0003> -20 <0000>] TJ\nET"))
+
+
+def _glyph_for(pdf_bytes: bytes, codepoint: int) -> int:
+    """The glyph id a codepoint has in this file, read out of its ToUnicode CMap."""
+    mapping = {
+        int(cp, 16): int(gid, 16)
+        for gid, cp in re.findall(rb"<([0-9A-F]{4})> <([0-9A-F]{4})>", pdf_bytes)
+    }
+    assert codepoint in mapping, (
+        f"U+{codepoint:04X} is not in the file's ToUnicode CMap — it was never drawn"
+    )
+    return mapping[codepoint]

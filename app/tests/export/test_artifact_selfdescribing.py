@@ -10,12 +10,13 @@ takes every structural fact out of the archive's embedded declaration.
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from pathlib import Path
 
 from .blind_reader import Artifact
 from .harness import OTHER, SELF
-from .pdf_text import REPLACEMENT, pdf_text
+from .pdf_text import pdf_text
 
 READER_SOURCE = Path(__file__).resolve().parent / "blind_reader.py"
 
@@ -289,9 +290,17 @@ def test_a_codepoint_the_font_does_not_cover_degrades_only_in_the_print_layer(
     """ADR-015 in the artifact's own words, executed on a real uncovered glyph.
 
     `declaration.print_layer.authority_ru` promises exactly this: the text files
-    and index.json carry the character a parent typed, the PDF carries U+FFFD in
-    its place, and the declaration says which of the two is authoritative. PT
-    Sans covers no emoji, so the fixture's 🙂 is the case.
+    and index.json carry the character a parent typed, the PDF carries the
+    substitution mark in its place, and the declaration says which of the two is
+    authoritative. PT Sans covers no emoji, so the fixture's 🙂 is the case.
+
+    AMENDED AT FIU-P5, and the amendment is the packet. The promise used to name
+    U+FFFD and this leg used to assert it — and both were false of the file: PT
+    Sans does not cover U+FFFD either, so the writer substituted glyph 0 and drew
+    .notdef, which cost the PDF its conformance. The mark is now one the font
+    demonstrably has, the declaration names that one, and this reads it out of
+    the declaration rather than carrying its own copy, so the assertion follows
+    the artifact's promise instead of a literal that can outlive it.
     """
     archive = Artifact(artifact)
     body = next(row["body"] for row in archive.rows("record") if row["id"] == "r-edge")
@@ -299,7 +308,19 @@ def test_a_codepoint_the_font_does_not_cover_degrades_only_in_the_print_layer(
     assert "🙂" in body
     assert "🙂" in archive.text_file("text/diary.txt")
 
+    mark = _declared_substitution_mark(archive)
     printed = pdf_text(archive.raw("print/archive.pdf"))
     assert "🙂" not in printed
-    assert REPLACEMENT in printed
+    assert mark in printed, f"the printed page carries no {mark}"
+    # The mark the writer no longer draws must be gone from the page, not merely
+    # unmentioned: it is the one character this packet removed.
+    assert "\ufffd" not in printed, "the print layer still draws U+FFFD"
     assert "и хвост" in printed, "the surrounding sentence still prints"
+
+
+def _declared_substitution_mark(archive: Artifact) -> str:
+    """The mark the artifact's own declaration says the print layer draws."""
+    authority = archive.declaration["print_layer"]["authority_ru"]
+    match = re.search(r"U\+([0-9A-F]{4,6})", authority)
+    assert match, "the print-layer authority statement names no substitution codepoint"
+    return chr(int(match.group(1), 16))

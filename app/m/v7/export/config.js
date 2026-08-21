@@ -168,6 +168,35 @@ export const EXPORT_CONFIG = Object.freeze({
     // a version string, so it does not drift on every release.
     pdfProducer: 'TheyGrow archive',
 
+    // changed_in: FIU-DL-005 — the character the print layer DRAWS in place of a
+    // codepoint the embedded font cannot draw. It is a knob rather than a literal
+    // in the writer because the artifact's own declaration.json quotes it to a
+    // reader (print_layer.authority_ru), and the two must not be free to drift;
+    // app/tests/export/test_pdf_structure.py reads this value and requires the
+    // declaration to name it.
+    //
+    // THE CONSTRAINT THIS KNOB CARRIES, and it is not a style preference: the
+    // value MUST be a codepoint assets/PTSans-Regular.ttf actually covers.
+    // U+FFFD REPLACEMENT CHARACTER — the obvious choice, and the value this knob
+    // replaces — is NOT in that font, so substituting it yielded glyph 0 and drew
+    // .notdef, which PDF/A-2 forbids from any text-showing operator (ISO
+    // 19005-2:2011 clause 6.2.11.8). Measured on dispatch 32530473473. See the
+    // DECLARED DEGRADATION block in pdf.js for the whole of it.
+    //
+    // U+25CA LOZENGE is covered (glyph 606, a real two-contour outline, advance
+    // 505/1000 em). It was chosen over the other covered candidates because it is
+    // a hollow geometric shape — the nearest thing this font has to the empty box
+    // a reader already reads as "nothing could be drawn here" — because it is
+    // neither a letter nor punctuation, so it cannot be misread as a word or a
+    // sentence boundary in Russian prose, and because it is vanishingly rare in
+    // what a parent types. `?` was rejected as indistinguishable from a question
+    // mark someone typed.
+    //
+    // ONE CODEPOINT, never a marker like `[?]`: pdf.js emits one glyph per input
+    // codepoint and text.js bounds a line by code points, and that one-to-one
+    // relation is what makes FIU-P4-INV-002 true of the printed page.
+    pdfSubstituteCodepoint: 0x25ca,
+
     // --- the transfer to the sink (XPT-P1) --------------------------------
 
     // changed_in: XPT-DL-001 — how many RAW bytes of the archive ride one
