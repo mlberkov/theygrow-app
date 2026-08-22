@@ -30,6 +30,20 @@
 # INSIDE the hooks' reach; only the generated project is excluded. The
 # read-only validators still run over everything.
 
+# PPR-P1 adds two paths, and the second one is why: it was MEASURED, not foreseen.
+# app/privacy.html joins the app/ list on the standing rule above — it is a shipped
+# live-deploy file, so the harness does not churn it. docs/privacy-policy-v* is a
+# different reason entirely. It is the owner's privacy policy, copied into the repo
+# verbatim, and its header block ends two lines with the Markdown HARD LINE BREAK —
+# two trailing spaces. trailing-whitespace stripped them on the first run of this
+# hook over the file, which turns «Продукт / Версия / Дата вступления в силу» from
+# three lines into one run-on paragraph in every renderer. That is the `data/`
+# reason exactly (meaningful whitespace in a frozen artifact), reached from the
+# other direction: here the file is not frozen but AUTHORED ELSEWHERE, and the
+# harness is not its editor. The prefix is version-agnostic on the `m/` precedent,
+# so a later redaction (v1.1, v2.0) inherits the exclusion instead of losing its
+# line breaks on the day it lands.
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.2
@@ -93,9 +107,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|docker-entrypoint\.sh|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild(\.staging)?\.yaml)|native/android/|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|privacy\.html|nginx\.conf|docker-entrypoint\.sh|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild(\.staging)?\.yaml)|native/android/|data/|docs/privacy-policy-v)'
       - id: end-of-file-fixer
-        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|nginx\.conf|docker-entrypoint\.sh|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild(\.staging)?\.yaml)|native/android/|data/)'
+        exclude: '^(app/(index\.html|sw\.js|manifest\.json|offline\.html|privacy\.html|nginx\.conf|docker-entrypoint\.sh|Dockerfile|cloudbuild\.yaml|icons/|kb-v1\.json|m/|tests/__baselines__/)|api/(Dockerfile|cloudbuild(\.staging)?\.yaml)|native/android/|data/|docs/privacy-policy-v)'
       - id: check-yaml     # read-only validator, repo-wide
       - id: check-json     # read-only validator, repo-wide
 
