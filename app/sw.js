@@ -177,10 +177,25 @@ const OFFLINE_URLS = [
 // A navigation to one of these must not be mirrored into the cache entry keyed
 // '/', which is the app shell's offline copy — see the fetch handler for what
 // that costs. Kept as an explicit list rather than a pattern because the set is
-// closed and small: it is exactly the HTML files in app/Dockerfile's COPY list
-// other than index.html, and app/tests/delivery-contract.spec.js asserts that
-// correspondence rather than leaving the two to drift.
-const NON_SHELL_PAGES = ['/offline.html', '/transfer.html'];
+// closed and small: it is the navigable pages app/Dockerfile ships, other than
+// index.html.
+//
+// PPR-P1 ADDS THE POLICY DOCUMENT, AND CORRECTS WHAT THIS COMMENT CLAIMED. It
+// used to say app/tests/delivery-contract.spec.js asserted the correspondence
+// with the COPY list. No such assertion existed — and the omission it was meant
+// to catch is precisely the one this packet found by hand: /privacy is a second
+// real page, so without an entry here one visit would replace the app shell's
+// offline copy with the policy document, permanently, for every client that
+// ever opened the link. The guard now exists ("NON_SHELL_PAGES covers every
+// navigable page this image ships", delivery-contract.spec.js), and it
+// understands both kinds of entry: a shipped .html, and an extension-less route
+// that an exact-match location in app/nginx.conf resolves to one with try_files.
+//
+// BOTH SPELLINGS ARE NAMED on purpose. The fetch handler compares url.pathname,
+// the canonical address is /privacy, and /privacy.html is the same bytes served
+// under the name the file has in the image — a visitor who reaches either one
+// must not poison the shell.
+const NON_SHELL_PAGES = ['/offline.html', '/transfer.html', '/privacy', '/privacy.html'];
 
 // Install: precache offline essentials.
 // NOTE: no skipWaiting() here — the new worker parks in `waiting` until driven

@@ -78,6 +78,18 @@ const HEADER_RULES = [
     },
   },
   {
+    // PPR-P1. Ordered here, ahead of `static` and `root`, for the reason the
+    // comment on resolveHeaders() gives: exact locations are matched before the
+    // prefix one, and `root` matches everything.
+    id: 'privacy',
+    nginxLocation: '= /privacy',
+    test: (p) => p === '/privacy',
+    headers: {
+      'Cache-Control': 'public, max-age=3600, must-revalidate',
+      Vary: 'Accept-Encoding',
+    },
+  },
+  {
     id: 'kb',
     nginxLocation: '~ ^/kb-v[0-9]+\\.json$',
     test: (p) => /^\/kb-v[0-9]+\.json$/.test(p),
@@ -257,6 +269,35 @@ function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
       }
       res.writeHead(200, Object.assign({ 'Content-Type': MIME['.js'] }, headers));
       res.end(body);
+      return;
+    }
+
+    // --- nginx: location = /privacy, location = /privacy/ ------------------
+    // The policy document (PPR-P1), and the only route in this file where the
+    // SERVED path and the FILE differ — /privacy is answered by privacy.html.
+    // That difference is the whole reason nginx needs an exact-match location
+    // and the reason the mirror needs a branch: left to the generic resolution
+    // below, /privacy has no extension, hits the try_files fallback and answers
+    // 200 with the APP SHELL. `=404` is mirrored literally — a missing file is
+    // a 404 here too, never the shell.
+    //
+    // The capacitor profile gets neither branch, like every other nginx rule in
+    // this file: the APK serves no /privacy route and links the policy at its
+    // https address.
+    if (isNginx && pathname === '/privacy/') {
+      res.writeHead(301, { Location: '/privacy' }).end();
+      return;
+    }
+    if (isNginx && pathname === '/privacy') {
+      let doc;
+      try {
+        doc = fs.readFileSync(path.join(root, 'privacy.html'));
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found');
+        return;
+      }
+      res.writeHead(200, Object.assign({ 'Content-Type': MIME['.html'] }, headers));
+      res.end(req.method === 'HEAD' ? undefined : doc);
       return;
     }
 

@@ -38,6 +38,14 @@ COPY offline.html /usr/share/nginx/html/offline.html
 # структурное свойство оболочки, а не обещание. См. ADR-048, PDR-034 §1.
 COPY transfer.html /usr/share/nginx/html/transfer.html
 
+# Политика конфиденциальности (PPR-P1). Статический документ, который отдаётся
+# по адресу /privacy — точное совпадение location в nginx.conf, а не откат
+# try_files на оболочку. Файл ничего не грузит: ни скрипта, ни gtag, ни стилей
+# монтажа /m/v{N}/ — поэтому он не участвует ни в OFFLINE_URLS, ни в графе
+# модулей и переживает любой бамп поколения. Плоская двухаргументная форма
+# COPY — как у transfer.html выше: ship-list-гард разбирает только её.
+COPY privacy.html /usr/share/nginx/html/privacy.html
+
 # Копируем entrypoint (A3-P1): рендерит конфиг, минтит ID-токен для /api-прокси,
 # обновляет его и передаёт управление nginx. Плоская двухаргументная форма COPY —
 # без --chmod/--from, без wildcard: ship-list-гард в app/tests/delivery-contract.spec.js

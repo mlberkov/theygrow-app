@@ -151,7 +151,15 @@ module.exports = defineConfig({
       // because there is nothing for a browser to execute: its subject is a
       // surface that no longer exists. What DOES exist and ships hidden is swept
       // at runtime, by behavior.spec.js.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse|install-channel)\.spec\.js/,
+      // PPR-P1 adds one: privacy-page, the policy document as a property of the
+      // tree — that the image ships it, that it precaches nothing, that it
+      // carries no script and no link, and that it still says what
+      // docs/privacy-policy-v1.0.md says. It is here because all of that is
+      // read from files and boots nothing. What a browser does at the address —
+      // that the shell is not served there, that no third party is reached, and
+      // that the visit leaves the cached shell alone — is privacy-surface.spec.js
+      // in `behavior`, deliberately not this one.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse|install-channel|privacy-page)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -221,7 +229,16 @@ module.exports = defineConfig({
       // a handler that ran; and NOT in `native` below for the reason
       // diary-save.spec.js records — that project serves a different web root,
       // and a leg that also simulates the shell would vary two things at once.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle)\.spec\.js/,
+      // PPR-P1 adds privacy-surface: what a browser meets at /privacy. Three of
+      // its four legs are claims no source scan can carry — that the address
+      // does not answer with the app shell (which is what it did before this
+      // packet, silently, with a 200), that opening it fetches nothing
+      // executable and reaches no third party, and that the visit does not
+      // overwrite the app shell offline copy through the service worker's
+      // navigation mirror. It is NOT in `native` below, for the reason
+      // handoff-transfer.spec.js records about itself: that project serves a
+      // different web root, and the APK offers no /privacy route at all.
+      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

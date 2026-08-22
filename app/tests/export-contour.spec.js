@@ -584,14 +584,55 @@ test.describe('the interface says the two things it must not soften', () => {
         // with the same "one DECLARATION SITE, not one file on disk" exclusion
         // the release address carries, and for the same reason: a copy-forward
         // bump leaves the frozen generation shipped, carrying the same knob.
+        //
+        // PPR-P1 ADDS A SECOND EXCLUSION, AND PAYS FOR IT IMMEDIATELY BELOW.
+        // /privacy.html is the DOCUMENT that lives at the address, and it quotes
+        // its own URL twice — in §1 ("Полный текст размещён на сайте по адресу
+        // …") and in §10 ("Действующая редакция всегда размещена по адресу …").
+        // That is the document telling a reader where it lives, not a second
+        // place the app is told where to point, and the wording is the owner's
+        // and final (PDR-035). Excluding it costs nothing this guard was built
+        // to protect — the defect is the address hardcoded into MARKUP the app
+        // renders or into a module beside the knob, and every other shipped file
+        // is still scanned, frozen generations included. What the exclusion does
+        // give up, the next assertion takes back with something stricter: in
+        // that one file the address may be QUOTED and may never be LINKED.
+        const POLICY_DOCUMENT = '/privacy.html';
         const elsewhere = SHIPPED.filter((rel) => rel.endsWith('.js') || rel.endsWith('.html'))
             .filter((rel) => !/m\/v\d+\/channel\/config\.js$/.test(rel))
+            .filter((rel) => rel !== POLICY_DOCUMENT)
             .filter((rel) =>
                 fs.readFileSync(path.join(APP_ROOT, rel), 'utf8').includes(address[1])
             );
         expect(
             elsewhere,
             'the policy address appears outside the knob surface — it is declared once or not at all'
+        ).toEqual([]);
+
+        // The price of the exclusion above, and it is deliberately narrower than
+        // what it replaces: the document may say where it lives, and it may not
+        // carry a link to anywhere. An href in this file naming the policy
+        // address would be a second link target for the one thing the invariant
+        // is about — which surface offers the parent the policy — and it would
+        // be invisible to the scan above.
+        expect(
+            SHIPPED,
+            'the policy document is not shipped — this leg would pass vacuously'
+        ).toContain(POLICY_DOCUMENT);
+        const documentSource = fs.readFileSync(
+            path.join(APP_ROOT, POLICY_DOCUMENT),
+            'utf8'
+        ).replace(/<!--[\s\S]*?-->/g, '');
+        expect(
+            documentSource,
+            'the policy document quotes its own address, which is expected — but it lost the quotation'
+        ).toContain(address[1]);
+        const hrefs = Array.from(documentSource.matchAll(/href\s*=\s*["']([^"']*)["']/g)).map(
+            (m) => m[1]
+        );
+        expect(
+            hrefs.filter((href) => href.includes(address[1]) || href === '/privacy'),
+            'the policy document links to its own address — it may quote the address, never link it'
         ).toEqual([]);
 
         // AND NOTHING ASKS THE PARENT TO ACCEPT IT. Making the document

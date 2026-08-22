@@ -89,7 +89,14 @@ test.describe('delivery contract — tests/server.js mirrors app/nginx.conf', ()
     // proxy to a live Cloud Run service, which the parity server deliberately does not
     // mirror — there is nothing to proxy to locally. Its own contract is asserted by
     // the config-shape block below instead.
-    const exempt = ['/health', '~ /\\.', '^~ /api/'];
+    // `= /privacy/` (PPR-P1) is exempt on the same footing as /health: it carries
+    // no add_header at all — it is one `return 301` to the canonical address, so
+    // there is no header contract for the mirror to hold. Its behaviour IS
+    // asserted, in the live-response block below and in the mirror branch it
+    // pairs with; what it has no business being is a HEADER_RULES entry with an
+    // empty header set, which would read as "this location sends nothing" rather
+    // than "this location is a redirect".
+    const exempt = ['/health', '~ /\\.', '^~ /api/', '= /privacy/'];
     const unknown = declared.filter((l) => !mirrored.includes(l) && !exempt.includes(l));
     expect(
       unknown,
@@ -178,6 +185,40 @@ test.describe('delivery contract — live responses', () => {
   test('a missing asset 404s instead of falling back to the shell', async ({ request }) => {
     const res = await request.get('/does-not-exist.json');
     expect(res.status()).toBe(404);
+  });
+
+  // PPR-P1. The two legs above are the try_files contract in both directions;
+  // these two are the one address that must escape it. Until this packet
+  // /privacy WAS the first leg — an extension-less unknown route, answered 200
+  // with the app shell — which is a promise about a family's data with a skills
+  // table behind it.
+  test('/privacy serves the policy document, not the app shell', async ({ request }) => {
+    const res = await request.get('/privacy');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('text/html');
+    const body = await res.text();
+    expect(body).toContain('<h1>Политика конфиденциальности TheyGrow</h1>');
+    expect(
+      body,
+      'the shell fallback fired for /privacy — the exact-match location is gone or lost its precedence'
+    ).not.toContain('<table id="mainTable">');
+  });
+
+  test('/privacy is cached as a document, never as immutable', async ({ request }) => {
+    const res = await request.get('/privacy');
+    // The shell's class. Never `immutable`: a new redaction of the policy ships
+    // at the SAME address — the document is versioned by its own text and its
+    // effective date, not by its URL, unlike /kb-v{N}.json or the module mount.
+    expect(res.headers()['cache-control']).toBe('public, max-age=3600, must-revalidate');
+    expect(res.headers()['cache-control']).not.toContain('immutable');
+  });
+
+  test('/privacy/ redirects to the canonical address instead of serving the shell', async ({
+    request,
+  }) => {
+    const res = await request.get('/privacy/', { maxRedirects: 0 });
+    expect(res.status()).toBe(301);
+    expect(res.headers()['location']).toBe('/privacy');
   });
 
   // A JavaScript MIME essence is what makes a module script load at all;
@@ -404,6 +445,102 @@ test.describe('ship list — app/Dockerfile ships everything the shell needs', (
       expect(
         isShipped(url),
         `"${url}" is in OFFLINE_URLS but app/Dockerfile does not COPY it (or it is missing on disk) — cache.addAll is atomic, so the service worker would fail to install entirely`
+      ).toBe(true);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// NON_SHELL_PAGES drift guard (PPR-P1).
+//
+// app/sw.js serves navigations network-first and mirrors the response into the
+// cache keyed '/', which is the app shell's offline copy — UNLESS the pathname
+// is named in NON_SHELL_PAGES. That list is the whole thing standing between a
+// second navigable page and a permanently poisoned shell for every client that
+// ever opens it (DIA-DL-005 (m), which repaired exactly this once already).
+//
+// Until this packet the list's own comment claimed THIS FILE asserted its
+// correspondence with app/Dockerfile's COPY list. It did not — nothing did —
+// and the page PPR-P1 adds is precisely the omission that sentence was written
+// to prevent. So the guard is written rather than the claim deleted, and it
+// understands both kinds of entry a navigable page can have:
+//   * a shipped .html reachable under its own name (/transfer.html);
+//   * an extension-less route that an exact-match nginx location resolves to a
+//     shipped .html with try_files (/privacy -> /privacy.html).
+// Both directions are asserted. An unlisted page is the poisoning defect; a
+// listed page the image does not serve is a stale entry protecting nothing,
+// which after a page is retired is the quiet half of the same drift.
+// ---------------------------------------------------------------------------
+
+// Read textually, like offlineUrls() and for the same reason: app/sw.js
+// registers listeners at load and cannot be require()d. Fails CLOSED — a
+// restructured declaration throws rather than yielding an empty set, which
+// would make every assertion below hold for nothing.
+function nonShellPages(swSource) {
+  const m = /const NON_SHELL_PAGES = \[([^\]]*)\];/.exec(swSource);
+  if (!m) {
+    throw new Error('delivery-contract: NON_SHELL_PAGES declaration not found in app/sw.js');
+  }
+  return new Set(Array.from(m[1].matchAll(/'([^']+)'/g)).map((x) => x[1]));
+}
+
+// Exact-match locations that serve a file under a different name:
+// `location = /privacy { try_files /privacy.html =404; }` yields
+// '/privacy' -> '/privacy.html'. Comments are stripped first, for the reason
+// the unknown-location scan above records.
+function exactFileRoutes(nginxConf) {
+  const directives = nginxConf.replace(/#.*$/gm, '');
+  const out = new Map();
+  for (const m of directives.matchAll(/location\s*=\s*(\S+)\s*\{([^}]*)\}/g)) {
+    const target = /try_files\s+(\S+)\s+=404\s*;/.exec(m[2]);
+    if (target) out.set(m[1], target[1]);
+  }
+  return out;
+}
+
+test.describe('NON_SHELL_PAGES covers every navigable page this image ships', () => {
+  const NON_SHELL = nonShellPages(fs.readFileSync(path.join(APP_ROOT, 'sw.js'), 'utf8'));
+  const ROUTES = exactFileRoutes(conf);
+  const SHIPPED_PAGES = Array.from(SHIP.files).filter(
+    (file) => file.endsWith('.html') && file !== '/index.html'
+  );
+
+  test('the guard is reading real lists, not empty ones', () => {
+    // Anti-vacuity. Every assertion below is a membership test, and all of them
+    // pass trivially against empty inputs — which is how a parser that quietly
+    // stopped matching would present itself.
+    expect(NON_SHELL.size, 'NON_SHELL_PAGES parsed empty').toBeGreaterThan(0);
+    expect(SHIPPED_PAGES.length, 'the image ships no page besides the shell').toBeGreaterThan(0);
+    expect(SHIPPED_PAGES).toContain('/offline.html');
+    expect(ROUTES.size, 'no exact-match file route parsed out of app/nginx.conf').toBeGreaterThan(0);
+  });
+
+  for (const page of SHIPPED_PAGES) {
+    test(`shipped page "${page}" is named in NON_SHELL_PAGES`, () => {
+      expect(
+        NON_SHELL.has(page),
+        `app/Dockerfile ships "${page}" but app/sw.js does not list it in NON_SHELL_PAGES — one navigation there would overwrite the app shell's offline copy, permanently, for every client that opens it`
+      ).toBe(true);
+    });
+  }
+
+  for (const [route, target] of ROUTES) {
+    if (!SHIPPED_PAGES.includes(target)) continue;
+    test(`route "${route}" (served by "${target}") is named in NON_SHELL_PAGES`, () => {
+      expect(
+        NON_SHELL.has(route),
+        `app/nginx.conf serves "${target}" at "${route}", but app/sw.js lists only the file name — the fetch handler compares url.pathname, so a visitor arriving at "${route}" would still poison the shell`
+      ).toBe(true);
+    });
+  }
+
+  for (const entry of NON_SHELL) {
+    test(`NON_SHELL_PAGES entry "${entry}" is a page this image actually serves`, () => {
+      const asFile = SHIPPED_PAGES.includes(entry);
+      const asRoute = ROUTES.has(entry) && SHIPPED_PAGES.includes(ROUTES.get(entry));
+      expect(
+        asFile || asRoute,
+        `app/sw.js lists "${entry}" as a non-shell page, but app/Dockerfile ships no such .html and app/nginx.conf declares no exact-match route resolving to one — the entry protects nothing`
       ).toBe(true);
     });
   }
