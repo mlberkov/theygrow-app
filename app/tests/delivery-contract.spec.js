@@ -96,6 +96,9 @@ test.describe('delivery contract — tests/server.js mirrors app/nginx.conf', ()
     // pairs with; what it has no business being is a HEADER_RULES entry with an
     // empty header set, which would read as "this location sends nothing" rather
     // than "this location is a redirect".
+    // PPR-P4 adds the half this exemption did not cover and did not claim to:
+    // the FORM of the Location that redirect sends. See the redirect-form block
+    // below — static over app/nginx.conf, executed against the mirror.
     const exempt = ['/health', '~ /\\.', '^~ /api/', '= /privacy/'];
     const unknown = declared.filter((l) => !mirrored.includes(l) && !exempt.includes(l));
     expect(
@@ -153,6 +156,161 @@ test.describe('same-origin /api proxy — config shape (A3-P1-INV-001)', () => {
       block,
       'Cloud Run routes by SNI; without proxy_ssl_server_name on, the TLS handshake reaches the wrong service or none'
     ).toMatch(/proxy_ssl_server_name\s+on\s*;/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Redirect form — config shape (PPR-P4).
+//
+// WHAT THIS BLOCK IS FOR. `location = /privacy/` answers `return 301 /privacy;`,
+// and until this packet every leg in this suite was green while production sent
+//
+//     location: http://<the tagged revision's own host>:8080/privacy
+//
+// measured by the owner smoke against the tagged revision (docs/RUNBOOK.md
+// § Promotion + rollback step 3). nginx rewrites ANY Location beginning with `/`
+// into scheme://host[:port] + URI: behind Cloud Run the scheme it knows is `http`
+// — TLS is terminated in front — and the port is its own `listen 8080`, which is
+// not exposed. So the one spelling a visitor is most likely to type by hand
+// landed on an address that does not answer, under the word «конфиденциальность».
+//
+// THE MIRROR WAS NEVER WRONG, which is precisely why nothing reddened:
+// tests/server.js has answered that route with a RELATIVE `Location: '/privacy'`
+// since PPR-P1. The gap was that no leg compared the two in FORM.
+//
+// WHAT THIS HALF IS. A parse of the committed app/nginx.conf — it proves what the
+// config SAYS. It does not run nginx, does not parse the file the way nginx parses
+// it, and observes no response header; nothing in this repository runs the real
+// image (AGENTS.md §11). The EXECUTED half is `the redirect names the address, not
+// the container` in the live-response block below, against the mirror. The only
+// executor of the PRODUCTION behaviour is the owner's curl.
+//
+// It is a CLASS guard rather than a check on one address: a future route that
+// grows a redirect must not be able to repeat this.
+// ---------------------------------------------------------------------------
+
+// The `server { … }` body, comments stripped. Fails CLOSED — a restructured file
+// throws rather than yielding '', which would make every assertion below hold
+// over nothing.
+function serverBlock(nginxConf) {
+  const directives = nginxConf.replace(/#.*$/gm, '');
+  const needle = 'server {';
+  const start = directives.indexOf(needle);
+  if (start === -1) {
+    throw new Error('delivery-contract: no `server {` block found in app/nginx.conf');
+  }
+  let depth = 0;
+  for (let i = start + needle.length - 1; i < directives.length; i += 1) {
+    if (directives[i] === '{') depth += 1;
+    else if (directives[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return directives.slice(start + needle.length, i);
+    }
+  }
+  throw new Error('delivery-contract: the `server` block in app/nginx.conf is unbalanced');
+}
+
+// The server block with every `location { … }` body removed, so what is left is
+// what applies to ALL of them — the present ones and the ones this file has not
+// grown yet. Server scope is the whole point of the directive: a copy inside one
+// location would leave every other location composing absolute URLs.
+function serverScopeDirectives(nginxConf) {
+  let depth = 0;
+  let out = '';
+  for (const ch of serverBlock(nginxConf)) {
+    if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    else if (depth === 0) out += ch;
+  }
+  return out;
+}
+
+function hasServerScopeAbsoluteRedirectOff(nginxConf) {
+  return /absolute_redirect\s+off\s*;/.test(serverScopeDirectives(nginxConf));
+}
+
+// Anywhere in the file — a location that switches it back on re-arms the defect
+// for itself while the server-scope leg stays green.
+function absoluteRedirectReEnablings(nginxConf) {
+  const directives = nginxConf.replace(/#.*$/gm, '');
+  return Array.from(directives.matchAll(/absolute_redirect\s+(on)\s*;/g)).map((m) => m[1]);
+}
+
+// Every `return 30x <target>;` in the file, as its raw target string.
+function redirectTargets(nginxConf) {
+  const directives = nginxConf.replace(/#.*$/gm, '');
+  return Array.from(directives.matchAll(/return\s+30\d\s+([^;]+);/g)).map((m) =>
+    m[1].trim().replace(/^"|"$/g, '')
+  );
+}
+
+// A target is sound when it is origin-relative (which `absolute_redirect off`
+// then keeps relative on the wire) or an absolute https URL (deliberate
+// cross-origin, untouched by the directive because it does not begin with `/`).
+function unsoundRedirectTargets(nginxConf) {
+  return redirectTargets(nginxConf).filter(
+    (target) => !target.startsWith('/') && !target.startsWith('https://')
+  );
+}
+
+test.describe('redirects stay inside the origin — config shape (PPR-P4)', () => {
+  test('the server block turns absolute redirects off, at server scope', () => {
+    expect(
+      hasServerScopeAbsoluteRedirectOff(conf),
+      'app/nginx.conf does not carry `absolute_redirect off;` at server scope — nginx will rewrite every `return 30x /path` into scheme://host:8080/path, which is what production sent for /privacy/ at e68dc2a: `location: http://<the tagged revision host>:8080/privacy`, an address that does not answer'
+    ).toBe(true);
+  });
+
+  test('nothing switches absolute redirects back on', () => {
+    expect(
+      absoluteRedirectReEnablings(conf),
+      'a location re-enables `absolute_redirect` — it would compose an absolute URL with the container listen port again, for that location only, while the server-scope leg above stays green'
+    ).toEqual([]);
+  });
+
+  test('every redirect target is relative or an absolute https URL', () => {
+    expect(
+      unsoundRedirectTargets(conf),
+      'a `return 30x` targets something that is neither origin-relative nor an absolute https URL — an http:// target sends a visitor off TLS, and this file is behind a proxy that terminates it'
+    ).toEqual([]);
+  });
+
+  test('the scan is looking at real redirects, not an empty list', () => {
+    // Anti-vacuity: the class leg above holds trivially over zero targets, which
+    // is how a parser that quietly stopped matching would present itself.
+    expect(redirectTargets(conf).length, 'no `return 30x` parsed out of app/nginx.conf').toBeGreaterThan(0);
+    expect(redirectTargets(conf)).toContain('/privacy');
+  });
+
+  test('the scan is armed, and proves it on inputs it builds in-run', () => {
+    // Self-proving rather than measured by hand: each detector is shown working
+    // against a config written here, so no shipped file is mutated and nobody is
+    // trusted to put one back.
+    const GOOD = 'http { server { listen 8080; absolute_redirect off; location = /a/ { return 301 /a; } } }';
+    const MISSING = 'http { server { listen 8080; location = /a/ { return 301 /a; } } }';
+    const COMMENTED = 'http { server { listen 8080;\n# absolute_redirect off;\nlocation = /a/ { return 301 /a; } } }';
+    const LOCATION_ONLY = 'http { server { listen 8080; location = /a/ { absolute_redirect off; return 301 /a; } } }';
+    const RE_ENABLED = 'http { server { listen 8080; absolute_redirect off; location = /b/ { absolute_redirect on; return 301 /b; } } }';
+    const INSECURE = 'http { server { listen 8080; absolute_redirect off; location = /c/ { return 301 http://elsewhere/c; } } }';
+
+    expect(hasServerScopeAbsoluteRedirectOff(GOOD)).toBe(true);
+    expect(hasServerScopeAbsoluteRedirectOff(MISSING), 'the directive is absent and the scan did not notice').toBe(false);
+    expect(hasServerScopeAbsoluteRedirectOff(COMMENTED), 'the directive is only a comment and the scan counted it').toBe(false);
+    expect(
+      hasServerScopeAbsoluteRedirectOff(LOCATION_ONLY),
+      'the directive sits inside one location and the scan read it as server scope — every other location would still compose an absolute URL'
+    ).toBe(false);
+
+    expect(absoluteRedirectReEnablings(RE_ENABLED)).toEqual(['on']);
+    expect(absoluteRedirectReEnablings(GOOD)).toEqual([]);
+
+    expect(unsoundRedirectTargets(INSECURE)).toEqual(['http://elsewhere/c']);
+    expect(unsoundRedirectTargets(GOOD)).toEqual([]);
+    expect(unsoundRedirectTargets('http { server { listen 8080; location = /d/ { return 301 https://theygrow.app/d; } } }')).toEqual([]);
+
+    // Fails closed rather than yielding an empty string every membership test
+    // would pass against.
+    expect(() => serverBlock('http { }')).toThrow(/no `server \{` block/);
   });
 });
 
@@ -219,6 +377,37 @@ test.describe('delivery contract — live responses', () => {
     const res = await request.get('/privacy/', { maxRedirects: 0 });
     expect(res.status()).toBe(301);
     expect(res.headers()['location']).toBe('/privacy');
+  });
+
+  // PPR-P4 — the EXECUTED half of the redirect-form guard above, and the reason
+  // the two are one property rather than two: the leg immediately above has held
+  // since PPR-P1 while production sent an absolute URL carrying the container's
+  // listen port, because it asserts what the MIRROR emits and the mirror was
+  // never wrong. What this leg adds is that the FORM is the contract — not an
+  // accident of how tests/server.js happens to be written — so the static leg
+  // over app/nginx.conf and this one are asserting the same sentence at the two
+  // layers each can actually reach.
+  test('the redirect names the address, not the container (PPR-P4)', async ({ request }) => {
+    const res = await request.get('/privacy/', { maxRedirects: 0 });
+    const location = res.headers()['location'];
+
+    // Three properties rather than one string comparison, so a red names the
+    // class. Production at e68dc2a sent
+    // `http://<the tagged revision host>:8080/privacy`: nginx composes
+    // an absolute URL from the request Host plus its own listen port unless
+    // `absolute_redirect off` is set, and 8080 is not exposed.
+    expect(
+      location,
+      'the redirect Location carries a scheme — it names an origin rather than the address, and the scheme nginx knows behind a TLS-terminating proxy is http'
+    ).not.toMatch(/^[a-z][a-z0-9+.-]*:\/\//i);
+    expect(
+      location,
+      'the redirect Location is not origin-relative — a visitor following it leaves the origin they are already on'
+    ).toMatch(/^\//);
+    expect(
+      location,
+      "the redirect Location carries a port — nginx put its own `listen` port into it, and the container's port is not exposed"
+    ).not.toMatch(/:\d+/);
   });
 
   // A JavaScript MIME essence is what makes a module script load at all;
