@@ -17,9 +17,10 @@ This file extends `AGENTS.md` with operational rules specific to **Claude Code**
 ## Decision authority in planning
 
 Specifications and decision records for this project live in the owner's
-knowledge vault, **outside this repository**. You cannot read them, and no
-per-milestone spec files exist in the repo. Do not ask the owner to recite
-vault content during planning.
+knowledge vault, **outside this repository**. You read them only through the
+read-only clone (see **Vault clone (read-only)**), pull-first; when that cache
+is unavailable you cannot read them at all. No per-milestone spec files exist
+in the repo. Do not ask the owner to recite vault content during planning.
 
 - Your sources of truth, in order: `AGENTS.md` → this file → the actual
   state of the code → your own engineering judgment.
@@ -85,6 +86,46 @@ Every plan contains exactly these sections:
 - Never run `git commit`, `git push`, `git checkout -b`, `git rebase`, `git reset`, `git stash`, `git tag`, or any history-altering command on your own.
 - Never open, edit, comment on, or close a pull request on your own.
 - Produce an execution report (see below) and let the owner cut the commit and open the PR.
+
+## Vault clone (read-only)
+
+The owner's knowledge vault is cloned locally at `~/vaults/theygrow-vault` as a
+**read-only reading cache** (`ADR-049`). The clone is never a source of truth of
+its own: the vault itself — and its decisions `ADR-049`, `ADR-045` — stays
+authoritative, and clone files are never editable project files.
+
+- **Pull first, then read.** Any session that reads vault documentation begins
+  with `git -C ~/vaults/theygrow-vault pull --ff-only` **before** the first
+  read. Reading without a fresh pull is reading a stale cache.
+- **Never write into the clone.** No edits, no new files, no deletions,
+  anywhere under it.
+- **Never copy vault content into this repository**, whole or in part.
+  Reference it by path instead — `see vault: 04-decisions/adr-049-....md`.
+- **Clean-tree detector**, run by you in every session that used the clone:
+  `git -C ~/vaults/theygrow-vault status --short` must print nothing. Any
+  output means the read-only contract was violated: stop, do **not** "fix" it
+  by committing and do not discard it silently, report to the owner with the
+  output.
+- **Git role split** (`ADR-045` p.3, narrowed by `ADR-049` p.3). `clone` and
+  `pull` inside the vault clone are yours to run. Every other git operation in
+  the vault — `commit`, `push`, anything history-altering — stays owner-only.
+  Your git rights in **this** repository are unchanged: `No autonomous git`
+  above still governs.
+- **Fail closed.** If the pull fails — auth error, expired token, no network —
+  do not work around it: no fallback to remembered vault content, no use of the
+  ambient `GIT_ASKPASS` credential, no switching the remote to SSH, and no
+  credentials entered into any prompt or auth window. A prompt appearing at all
+  is itself the signal that the clone's own local read-only credential helper
+  lost; cancel it and report it. Say plainly that the vault cache is
+  unavailable, continue only on what the handoff itself provides, and flag the
+  gap.
+- **Lock probe**, after the owner renews the token:
+  `env -u GIT_ASKPASS GIT_TERMINAL_PROMPT=0 git -C ~/vaults/theygrow-vault push --dry-run origin HEAD:refs/heads/lock-probe`.
+  Expected: `403`, write access not granted. Exit code `0` means the read-only
+  lock is gone — report that. This is the only push-shaped command you may run,
+  and only with `--dry-run`.
+- **Graph artifacts** (`graph.json`, `graph.html`, `GRAPH_REPORT.md`) are
+  generated, never committed; this repository ignores them (`.gitignore`).
 
 ## Packet discipline
 
