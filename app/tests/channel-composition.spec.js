@@ -58,6 +58,12 @@ const POLICY_META = /policyStateMeta:\s*'([^']+)'/.exec(CONFIG_SOURCE)[1];
 const DECLARED_POLICY_STATE = new RegExp(
     `<meta name="${POLICY_META}" content="([^"]*)"`
 ).exec(SHELL)[1];
+// The withheld token. There is no knob for it and there should not be: the gate
+// is fail-closed, so EVERY value that is not `policyStatePublished` means the
+// same thing, and the truth table below drives seven of them. This one is the
+// value the shell shipped from L3-P3 until the PPR-P3 flip, which makes it the
+// state a rollback returns to — the one worth executing a page against.
+const POLICY_WITHHELD_VALUE = 'none';
 
 /**
  * Rewrites one <meta> declaration before the app boots.
@@ -521,21 +527,41 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
 });
 
 test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)', () => {
-    // BOTH LEGS EXECUTE. The undeclared leg is the state this build ships, and
-    // it is the one that matters most: the document is not published yet, so
-    // nothing may offer it. The declared leg rewrites the shell's <meta> before
-    // boot — the same edit the owner makes, on the same shipped module — so the
-    // reveal path does not ship unobserved.
+    // BOTH LEGS EXECUTE, AND SINCE PPR-P3 BOTH DECLARE THEIR OWN STATE. The
+    // shipped declaration is now `published` (PPR-DL-003), so the withheld leg
+    // can no longer read the withheld state off the shell — it used to skip
+    // itself when the shipped token was the published one, which would have
+    // retired the half of this invariant that matters most on the day of the
+    // flip, silently and green. Both legs now rewrite the shell's <meta> before
+    // boot — the same edit the owner makes, on the same shipped module — and
+    // both assert the mutation took, so neither can pass by re-testing the
+    // other's state.
     //
     // THE ARM: make shouldOfferPolicy default-true, or drop the reveal from
     // wireChannel, and one of the two legs reds either way.
 
+    test('the two legs between them cover the state this build actually ships', () => {
+        // What the self-skip used to give away for free, kept as an assertion:
+        // whichever way the declaration is set, one of the two legs below is
+        // driving the shipped state rather than a state no build has.
+        expect(
+            [POLICY_PUBLISHED_VALUE, POLICY_WITHHELD_VALUE],
+            `the shell declares "${DECLARED_POLICY_STATE}", which neither leg below executes`
+        ).toContain(DECLARED_POLICY_STATE);
+    });
+
     test('while the shell declares nothing, no policy link is offered', async ({ page }) => {
-        test.skip(
-            DECLARED_POLICY_STATE === POLICY_PUBLISHED_VALUE,
-            'this build declares the policy published, so the withheld state cannot be observed here'
-        );
+        await declareBeforeBoot(page, POLICY_META, POLICY_WITHHELD_VALUE);
         await gotoApp(page, { state: STATES.firstRun });
+
+        // The mutation took — otherwise this would pass for the wrong reason,
+        // which after the flip is the only way it could pass at all.
+        expect(
+            await page.evaluate(
+                (meta) => document.querySelector(`meta[name="${meta}"]`).getAttribute('content'),
+                POLICY_META
+            )
+        ).toBe(POLICY_WITHHELD_VALUE);
 
         // In the document — one set of bytes for both channels — and not in view.
         await expect(page.locator('#introPolicyLink')).toHaveCount(1);

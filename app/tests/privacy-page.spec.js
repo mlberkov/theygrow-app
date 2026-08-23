@@ -20,11 +20,14 @@
 // survives the visit — is executed in app/tests/privacy-surface.spec.js, and
 // deliberately not claimed here.
 //
-// The third subject is the ORDER. This packet publishes the document and does
-// not announce it: the shell's declaration stays exactly `none` and nothing
-// links /privacy. The legs at the bottom are what keeps a later packet from
-// flipping half of that by reflex — the flip is an owner act with its own
-// RUNBOOK step, not a side effect of the document existing.
+// The third subject is the ORDER. PPR-P1 published the document and did not
+// announce it; PPR-P3 flipped the declaration, and the two ship in the SAME
+// image, so the gap the order protects against — a declaration ahead of its
+// document — never opened. The legs at the bottom hold the post-flip half of
+// that order: the declaration reads exactly the published token, and the shell
+// STILL links /privacy nowhere in markup, because the address is set at runtime
+// from CHANNEL_CONFIG.policyUrl. A packet that hard-codes it into the markup
+// reds here.
 
 const fs = require('fs');
 const path = require('path');
@@ -184,12 +187,13 @@ test.describe('the page and the source document say the same thing', () => {
   });
 });
 
-test.describe('the document is published and NOT yet announced (PPR-P1)', () => {
+test.describe('the document is published AND announced (PPR-P3)', () => {
   // The fail-closed order from docs/RUNBOOK.md § Privacy policy: document
-  // first, declaration second, and the second is an owner act. These legs are
-  // what makes "not announced" checkable instead of merely intended — a link
-  // added by reflex in a later packet, or a declaration flipped by an agent,
-  // reds here.
+  // first, declaration second. PPR-P1 took the first half and asserted the
+  // second had not happened; PPR-P3 takes the second, and these legs turn over
+  // to the state that now ships. What they still make checkable is the half of
+  // the order that never expires: the declaration is the ONE token that reveals
+  // the link, and the markup names the address nowhere.
   const MOUNT = currentMount(SHELL);
   const CONFIG = fs.readFileSync(
     path.join(APP_ROOT, 'm', MOUNT.dir, 'channel', 'config.js'),
@@ -197,19 +201,23 @@ test.describe('the document is published and NOT yet announced (PPR-P1)', () => 
   );
   const POLICY_URL = /policyUrl:\s*'([^']+)'/.exec(CONFIG)[1];
   const POLICY_META = /policyStateMeta:\s*'([^']+)'/.exec(CONFIG)[1];
+  const POLICY_PUBLISHED = /policyStatePublished:\s*'([^']+)'/.exec(CONFIG)[1];
 
-  test('the shell still declares the document as absent', () => {
+  test('the shell declares the document published, in the exact token', () => {
+    // Read out of the knob source rather than re-typed: a near-miss token in
+    // the shell means "no document" to shouldOfferPolicy, and would leave a
+    // published document unlinked with nothing red.
     expect(
       SHELL,
-      'the policy declaration was flipped — that is an owner act with its own RUNBOOK step, and it belongs to a later packet'
-    ).toContain(`<meta name="${POLICY_META}" content="none">`);
+      'the shell does not declare the policy published — the document is served at /privacy and nothing links it'
+    ).toContain(`<meta name="${POLICY_META}" content="${POLICY_PUBLISHED}">`);
   });
 
   test('nothing in the shell links the policy address', () => {
     const hrefs = Array.from(SHELL.matchAll(/href\s*=\s*["']([^"']*)["']/g)).map((m) => m[1]);
     expect(
       hrefs.filter((href) => href === POLICY_URL || href === ROUTE || href === PAGE_URL),
-      'the shell links /privacy in markup — the link has one home, the intro window, and it is set at runtime from CHANNEL_CONFIG.policyUrl once the declaration says published'
+      'the shell links /privacy in markup — the link has one home, the intro window, and its address is set at runtime from CHANNEL_CONFIG.policyUrl rather than written into the markup'
     ).toEqual([]);
   });
 
