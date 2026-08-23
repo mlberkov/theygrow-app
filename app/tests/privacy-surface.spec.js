@@ -20,8 +20,11 @@
 //      path is named in NON_SHELL_PAGES. /privacy is the second real page this
 //      image has ever shipped, so it re-arms the defect DIA-P1 repaired for
 //      /transfer.html (DIA-DL-005 (m)). The last test here is the executing
-//      half of that repair, built to the same shape as its precedent in
-//      app/tests/handoff-transfer.spec.js.
+//      half of that repair, built to the same shape as its precedent — which
+//      lived in app/tests/handoff-transfer.spec.js until PPR-P2 retired the
+//      transfer. Since that packet this file is the ONLY executor of the
+//      property for any page, which is why it is written out here rather than
+//      referred to.
 //
 // WHAT THIS FILE STILL CANNOT CLAIM. It drives app/tests/server.js, not nginx:
 // the routing rule proved here is the MIRROR of app/nginx.conf, paired to the
@@ -149,9 +152,9 @@ test.describe('visiting the policy page does not overwrite the app shell offline
     // opened it.
     //
     // Asserted on the CACHE rather than on a later offline boot, for the
-    // reason its precedent records (app/tests/handoff-transfer.spec.js): the
-    // poisoning happens at the moment of the visit, and reading it there names
-    // the cause instead of a symptom two steps downstream.
+    // reason the retired precedent recorded (DIA-DL-005 (m)): the poisoning
+    // happens at the moment of the visit, and reading it there names the cause
+    // instead of a symptom two steps downstream.
     await gotoApp(page, { state: STATES.seeded });
     await page.evaluate(() => navigator.serviceWorker.ready);
 

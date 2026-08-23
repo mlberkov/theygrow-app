@@ -124,14 +124,25 @@ module.exports = defineConfig({
       // EMV-P5-INV-001. It reads the tree and boots nothing, which is what it
       // says about itself — a reference left at the frozen generation resolves
       // rather than 404s, so nothing else in this suite would ever notice it.
-      // DIA-P1 checkpoint B adds two: handoff-source (leg (a) of the band
-      // invariant — the handoff page imports no writer and calls none) and
-      // transfer-format (the transitional envelope, imported under Node the same
-      // way store-unit imports the store). Leg (b) of that invariant is NOT
-      // here: it presses the button in a real browser and belongs in `behavior`.
+      // DIA-P1 checkpoint B added two — handoff-source and transfer-format — and
+      // transfer-seam and transfer-drain-unit joined them. PPR-P2 removes all
+      // four with the mechanism they were about: the browser-to-native transfer
+      // is retired, not dormant, and a spec adapted to assert the hole where a
+      // mechanism used to be is a spec that passes for a reason other than the
+      // one it names. The one property they carried that was NOT about the
+      // transfer — a separately-shipped page must not overwrite the app shell's
+      // offline copy — has a second executor since PPR-P1 and survives there,
+      // in privacy-surface.spec.js.
       // DIA-P3 adds one: diary-write, the record path's control flow against the
       // recorder — one transaction for the area and its first entry, an edit
       // that is an UPDATE, a full disk classified rather than swallowed. What
+      // PPR-P2 adds consent-gate: the shell's analytics seam read as source (the
+      // loader is created in exactly one place and that place is behind the
+      // gate), and the consent module's own decision functions imported
+      // off-device the way store-unit imports the store. Its executing twin —
+      // no request reaches the analytics origin until a visitor says yes — is
+      // consent-surface.spec.js in `behavior`, and this file says so in both
+      // places on purpose.
       // those statements MEAN is `pytest app/tests/schema`
       // (test_diary_write_path.py) and whether a parent's entry actually lands
       // is `android-instrumented`; neither claim is made here, and the file's
@@ -159,7 +170,7 @@ module.exports = defineConfig({
       // that the shell is not served there, that no third party is reached, and
       // that the visit leaves the cached shell alone — is privacy-surface.spec.js
       // in `behavior`, deliberately not this one.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|handoff-source|transfer-format|transfer-seam|transfer-drain-unit|undeclared-reference|embedded-js-parse|install-channel|privacy-page)\.spec\.js/,
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|consent-gate)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -187,14 +198,6 @@ module.exports = defineConfig({
       // is here rather than in `contract` because its whole subject is what the
       // shipped config modules COMPUTE when a browser evaluates them at a real
       // origin — a claim no source scan can carry (AGENTS.md §11).
-      // DIA-P1 checkpoint B adds handoff-transfer: leg (b) of the band
-      // invariant, which seeds a real source, presses the button and compares
-      // the whole of localStorage before and after. It is deliberately NOT in
-      // the `native` project below — the handoff page runs in the parent's
-      // BROWSER at the production origin, never inside the Capacitor WebView,
-      // and running it there would assert a web-channel surface against a
-      // channel that never serves it.
-      //
       // DIA-P2 adds channel-composition: what each delivery channel OFFERS,
       // read off a rendered page rather than out of the markup. It is in this
       // project and not in `native` below for the reason its own header gives —
@@ -235,10 +238,14 @@ module.exports = defineConfig({
       // packet, silently, with a 200), that opening it fetches nothing
       // executable and reaches no third party, and that the visit does not
       // overwrite the app shell offline copy through the service worker's
-      // navigation mirror. It is NOT in `native` below, for the reason
-      // handoff-transfer.spec.js records about itself: that project serves a
+      // navigation mirror. It is NOT in `native` below: that project serves a
       // different web root, and the APK offers no /privacy route at all.
-      testMatch: /(behavior|upgrade-path|mount-derivation|handoff-transfer|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface)\.spec\.js/,
+      // PPR-P2 adds consent-surface: whether anything is fetched from the
+      // analytics origin, and when. Every leg of it is a claim about a request a
+      // browser did or did not make, which is the definition of a claim no
+      // source scan can carry; its off-device half — the three-state truth table
+      // and the platform probe — is in `contract` as consent-gate.
+      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|consent-surface)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

@@ -326,10 +326,11 @@ const {
 // HTML files the image ships and the shell boots from. Parameterised rather
 // than hardcoded: offline.html still carries inline <style>/<script> that a
 // later A1 packet will extract, and the guard must already be watching it.
-// DIA-P1 adds transfer.html, the browser-to-native handoff page — a third shell
-// with its own module entry and its own hints, which is why every direction
-// below unions across shells rather than checking one.
-const SHIPPED_HTML = ['index.html', 'offline.html', 'transfer.html'];
+// DIA-P1 added transfer.html as a third shell with its own module entry and its
+// own hints, which is why every direction below unions across shells rather than
+// checking one. PPR-P2 retires that page; the union stays, because the reason
+// for it is structural and a second entry shell can arrive again.
+const SHIPPED_HTML = ['index.html', 'offline.html'];
 
 const APP_ROOT = path.resolve(__dirname, '..');
 const SHIP = shippedPaths(fs.readFileSync(path.join(APP_ROOT, 'Dockerfile'), 'utf8'));
@@ -464,12 +465,15 @@ test.describe('ship list — app/Dockerfile ships everything the shell needs', (
 // and the page PPR-P1 adds is precisely the omission that sentence was written
 // to prevent. So the guard is written rather than the claim deleted, and it
 // understands both kinds of entry a navigable page can have:
-//   * a shipped .html reachable under its own name (/transfer.html);
+//   * a shipped .html reachable under its own name (/offline.html,
+//     /privacy.html);
 //   * an extension-less route that an exact-match nginx location resolves to a
 //     shipped .html with try_files (/privacy -> /privacy.html).
 // Both directions are asserted. An unlisted page is the poisoning defect; a
 // listed page the image does not serve is a stale entry protecting nothing,
-// which after a page is retired is the quiet half of the same drift.
+// which after a page is retired is the quiet half of the same drift — and
+// PPR-P2 is where that half was collected, /transfer.html having been retired
+// one packet after this guard was written to notice it.
 // ---------------------------------------------------------------------------
 
 // Read textually, like offlineUrls() and for the same reason: app/sw.js

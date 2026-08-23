@@ -78,21 +78,31 @@
       // Capacitor bridge is injected before the app boots, so this test is
       // already answerable here in the head.
       //
-      // The loader tag was STATIC until L1-P4 and is injected here instead,
+      // The loader tag was STATIC until L1-P4 and is created at run time instead,
       // because stopping the events while still fetching gtag.js would leave the
       // egress in place: the request itself carries the device address and the
       // user agent, which is the part that had to stop.
+      //
+      // PPR-P2 TURNS THE SAME ARGUMENT ON THE WEB CHANNEL, AND NOTHING HERE
+      // CREATES THE TAG ANY MORE. Until this packet a browser fetched gtag.js on
+      // every load and gtag('config') ran while the head was still parsing, so
+      // the visitor's address had already reached googletagmanager.com before
+      // anyone was asked anything. The whole block below is now a DEFINITION: the
+      // shell says HOW analytics starts and stops, and never decides WHETHER.
+      // That decision is /m/v{N}/surfaces/consent.js, which calls
+      // window.theygrowAnalytics.enable() only when the visitor's stored answer
+      // is exactly CONSENT_CONFIG.stateGranted.
+      //
+      // THIS IS BASIC CONSENT MODE, and it is the mode app/privacy.html §5
+      // states: «До согласия теги Google Analytics не загружаются». There is
+      // deliberately no gtag('consent', 'default', …) call — that is ADVANCED
+      // mode, which loads the tag first and asks it to behave, and shipping it
+      // would make the policy's own sentence false.
       window.IS_NATIVE_SHELL = !!(
         window.Capacitor
         && typeof window.Capacitor.isNativePlatform === 'function'
         && window.Capacitor.isNativePlatform()
       );
-      if (!window.IS_NATIVE_SHELL) {
-        const loader = document.createElement('script');
-        loader.async = true;
-        loader.src = 'https://www.googletagmanager.com/gtag/js?id=G-F5Q0JC691W';
-        document.head.appendChild(loader);
-      }
 
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -110,11 +120,52 @@
       const UI_LOCALE = document.documentElement.lang || 'ru';
       const GA_MEASUREMENT_ID = 'G-F5Q0JC691W';
 
-      // === Init GA ===
-      if (!window.IS_NATIVE_SHELL) {
-        gtag('js', new Date());
-        gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
-      }
+      // === The analytics seam the mount drives (PPR-P2) ===
+      //
+      // Defined, never called from here. The ONLY caller is the consent surface
+      // in the module mount, and the only argument it ever needs is the
+      // visitor's own stored answer. Fail-closed by construction: this flag
+      // starts false, nothing in the head flips it, and every path that could
+      // reach googletagmanager.com is behind it.
+      let analyticsEnabled = false;
+
+      window.theygrowAnalytics = {
+        enable() {
+          // The native channel never enables, whatever calls this. Belt to the
+          // consent surface's own braces: that module returns before it reaches
+          // here on a Capacitor shell, and this line means a future caller
+          // cannot undo L1-P4's decision by accident.
+          if (window.IS_NATIVE_SHELL) return;
+          if (analyticsEnabled) return;
+          analyticsEnabled = true;
+          // Clear Google's own opt-out switch, in case this visitor declined
+          // earlier in the same page life and has now changed their mind.
+          window['ga-disable-' + GA_MEASUREMENT_ID] = false;
+          // The measurement id is written ONCE, here, and the loader URL is
+          // built from it. It used to appear twice — once in this URL as a
+          // literal and once as the constant — which is two things to keep
+          // equal for no gain.
+          const loader = document.createElement('script');
+          loader.async = true;
+          loader.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_MEASUREMENT_ID;
+          document.head.appendChild(loader);
+          gtag('js', new Date());
+          gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
+          if (GA_DEBUG) {
+            trackEvent('app_debug_ping', { timestamp: Date.now() });
+          }
+        },
+        disable() {
+          // WITHDRAWAL, AND AN HONEST ACCOUNT OF WHAT IT CAN DO. A <script> the
+          // document has already fetched cannot be un-fetched, and removing the
+          // element would not unload it. What CAN be done is what Google
+          // documents: ga-disable-<id> stops the loaded tag sending anything.
+          // Together with the flag below, nothing further leaves the page — and
+          // on the next load the gate never creates the tag at all.
+          analyticsEnabled = false;
+          window['ga-disable-' + GA_MEASUREMENT_ID] = true;
+        },
+      };
 
       // === Event helper: безопасная отправка с обогащением ===
       function trackEvent(name, params) {
@@ -124,6 +175,11 @@
         // to leave the app in either, and one early return is easier to reason
         // about than an unreachable one.
         if (window.IS_NATIVE_SHELL) return;
+        // PPR-P2 — the same argument for a visitor who has not consented, or has
+        // withdrawn. dataLayer is created unconditionally above, so without this
+        // line an undecided visitor's session would accumulate a queue of events
+        // waiting for a tag that may never load.
+        if (!analyticsEnabled) return;
         if (typeof gtag !== 'function') return;
         try {
           const p = Object.assign({ ui_locale: UI_LOCALE, app_version: APP_VERSION }, params);
@@ -131,21 +187,18 @@
           gtag('event', name, p);
         } catch (e) { /* GA blocked — ignore */ }
       }
-
-      // === Debug ping: только в debug-режиме для проверки DebugView ===
-      if (GA_DEBUG) {
-        trackEvent('app_debug_ping', { timestamp: Date.now() });
-      }
     </script>
 
     <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v7/app.css">
+    <link rel="stylesheet" href="/m/v8/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v7/ graph — FORTY-FIVE today. The count is written here as a series
+         /m/v8/ graph — FORTY-THREE today. The count is written here as a series
          because the series is the point: fifteen at A1-P6, twenty-one once
          L1-P2 added the native store, forty-six once DIA-P3 added the diary,
-         and forty-five since L3-P2 deleted the transfer offer's surface. It had
+         forty-five once L3-P2 deleted the transfer offer's surface, and
+         and forty-three since PPR-P2 retired the transfer mechanism (four out)
+         and added the consent gate (two in). It had
          been left at twenty-one through four packets, which read as a claim
          about the list below rather than as the history it is; the number is
          only worth carrying if it is the current one, so it is corrected in
@@ -160,7 +213,7 @@
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v7/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v8/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -173,51 +226,49 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v7/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v7/core/state.js">
-    <link rel="modulepreload" href="/m/v7/core/storage.js">
-    <link rel="modulepreload" href="/m/v7/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v7/core/signals.js">
-    <link rel="modulepreload" href="/m/v7/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v7/core/format.js">
-    <link rel="modulepreload" href="/m/v7/core/zpd.js">
-    <link rel="modulepreload" href="/m/v7/core/urgency.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v7/store/boot.js">
-    <link rel="modulepreload" href="/m/v7/store/store.js">
-    <link rel="modulepreload" href="/m/v7/store/journal.js">
-    <link rel="modulepreload" href="/m/v7/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v7/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v7/store/records.js">
-    <link rel="modulepreload" href="/m/v7/store/bridge.js">
-    <link rel="modulepreload" href="/m/v7/store/transfer.js">
-    <link rel="modulepreload" href="/m/v7/transfer/config.js">
-    <link rel="modulepreload" href="/m/v7/transfer/errors.js">
-    <link rel="modulepreload" href="/m/v7/transfer/format.js">
-    <link rel="modulepreload" href="/m/v7/store/config.js">
-    <link rel="modulepreload" href="/m/v7/store/errors.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/channel.js">
-    <link rel="modulepreload" href="/m/v7/channel/config.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/diary.js">
-    <link rel="modulepreload" href="/m/v7/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v7/export/run.js">
-    <link rel="modulepreload" href="/m/v7/export/build.js">
-    <link rel="modulepreload" href="/m/v7/export/readout.js">
-    <link rel="modulepreload" href="/m/v7/export/sink.js">
-    <link rel="modulepreload" href="/m/v7/export/text.js">
-    <link rel="modulepreload" href="/m/v7/export/readme.js">
-    <link rel="modulepreload" href="/m/v7/export/zip.js">
-    <link rel="modulepreload" href="/m/v7/export/pdf.js">
-    <link rel="modulepreload" href="/m/v7/export/ttf.js">
-    <link rel="modulepreload" href="/m/v7/export/config.js">
-    <link rel="modulepreload" href="/m/v7/export/errors.js">
+    <link rel="modulepreload" href="/m/v8/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v8/core/state.js">
+    <link rel="modulepreload" href="/m/v8/core/storage.js">
+    <link rel="modulepreload" href="/m/v8/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v8/core/signals.js">
+    <link rel="modulepreload" href="/m/v8/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v8/core/format.js">
+    <link rel="modulepreload" href="/m/v8/core/zpd.js">
+    <link rel="modulepreload" href="/m/v8/core/urgency.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v8/store/boot.js">
+    <link rel="modulepreload" href="/m/v8/store/store.js">
+    <link rel="modulepreload" href="/m/v8/store/journal.js">
+    <link rel="modulepreload" href="/m/v8/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v8/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v8/store/records.js">
+    <link rel="modulepreload" href="/m/v8/store/bridge.js">
+    <link rel="modulepreload" href="/m/v8/store/config.js">
+    <link rel="modulepreload" href="/m/v8/store/errors.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v8/channel/config.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/consent.js">
+    <link rel="modulepreload" href="/m/v8/consent/config.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/diary.js">
+    <link rel="modulepreload" href="/m/v8/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v8/export/run.js">
+    <link rel="modulepreload" href="/m/v8/export/build.js">
+    <link rel="modulepreload" href="/m/v8/export/readout.js">
+    <link rel="modulepreload" href="/m/v8/export/sink.js">
+    <link rel="modulepreload" href="/m/v8/export/text.js">
+    <link rel="modulepreload" href="/m/v8/export/readme.js">
+    <link rel="modulepreload" href="/m/v8/export/zip.js">
+    <link rel="modulepreload" href="/m/v8/export/pdf.js">
+    <link rel="modulepreload" href="/m/v8/export/ttf.js">
+    <link rel="modulepreload" href="/m/v8/export/config.js">
+    <link rel="modulepreload" href="/m/v8/export/errors.js">
 </head>
 <body>
     <!-- PWA Update Available Banner -->
@@ -242,6 +293,36 @@
     <div id="exportDoneBanner" class="app-banner" role="status">
         <span id="exportDoneText"></span>
         <button type="button" id="exportDoneDismiss" aria-label="Закрыть">&times;</button>
+    </div>
+
+    <!-- СОГЛАСИЕ НА АНАЛИТИКУ, ВЕБ-КАНАЛ (PPR-P2, PDR-035 §5).
+         Разметка одна на оба канала (LSC-P1-INV-002); показывает её
+         surfaces/consent.js и только в браузере — на нативном канале аналитики
+         нет вообще (L1-P4), поэтому спрашивать не о чем.
+
+         ДВА ДЕЙСТВИЯ РАВНОГО ВЕСА, И ТРЕТЬЕГО ВЫХОДА НЕТ. Обе кнопки — <button>
+         с одним и тем же классом: не ссылка против кнопки, не серое против
+         цветного, не мелкое против крупного. Крестика здесь нет намеренно:
+         «закрыть — не значит согласиться» тогда выполняется по построению, а не
+         обещанием, потому что закрыть баннер, не ответив, нельзя. Цена — баннер
+         стоит, пока не ответят; вернуться к вопросу можно потом ссылкой
+         «Cookie» в подвале, поэтому ответ ничего не запирает.
+
+         role="region", а не dialog: баннер ничего не перекрывает и фокус не
+         держит. Окно, из которого нельзя выйти, — это и есть тёмный паттерн,
+         которого здесь не должно быть. Класс .app-banner нужен правилу
+         .app-banner.show (EMV-P1-INV-001, app/tests/show-rule-coverage.spec.js).
+
+         tabindex="-1" — чтобы фокус можно было перевести на сам баннер, когда
+         его открывают из подвала. На первый показ фокус не переводится: отнимать
+         фокус во время загрузки страницы — отдельный дефект. -->
+    <div id="cookieBanner" class="app-banner cookie-banner" role="region"
+         aria-label="Cookie" tabindex="-1">
+        <span>Мы считаем посещения страниц, чтобы понимать, что читают. Включить статистику?</span>
+        <div class="cookie-banner-actions">
+            <button type="button" class="cookie-banner-btn" id="cookieEnableBtn">Включить</button>
+            <button type="button" class="cookie-banner-btn" id="cookieDeclineBtn">Не включать</button>
+        </div>
     </div>
 
     <!-- Новый заголовок с профилем -->
@@ -301,7 +382,7 @@
                      aria-label и title дословно повторяют видимую подпись.
 
                      DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
-                     канале (m/v7/surfaces/channel.js). В браузере архив не
+                     канале (surfaces/channel.js). В браузере архив не
                      собирается вообще — веб-ветки в export/sink.js нет и не было
                      (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
                      происходит. Разметка одна на оба канала: это ветка времени
@@ -330,7 +411,7 @@
                      перезаписью (PDR-026 §4, правило 1).
 
                      Приходит СКРЫТОЙ и раскрывается только на нативном канале
-                     (m/v7/surfaces/channel.js): дневник пишется в устройственное
+                     (surfaces/channel.js): дневник пишется в устройственное
                      хранилище, а в браузере его нет вообще — store/bridge.js там
                      инертен по построению (LSC-P1-INV-001). Предлагать действие,
                      которого на этом канале не происходит, — ровно тот дефект,
@@ -431,6 +512,22 @@
         <button class="filter-toggle-btn" id="activitiesBtn">
             Подходящие активности
         </button>
+        <!-- ОТЗЫВ СОГЛАСИЯ, В ПОДВАЛЕ САЙТА (PPR-P2). app/privacy.html §5
+             обещает ровно это: «Отозвать согласие можно в любое время по ссылке
+             «Cookie» в подвале сайта; это действие доступно так же просто, как
+             согласие». Один клик открывает тот же баннер с теми же двумя
+             кнопками — столько же действий, сколько стоило согласиться.
+
+             Приходит СКРЫТОЙ и раскрывается только в браузере
+             (surfaces/consent.js): на нативном канале отзывать нечего.
+
+             Третья кнопка в этом футере — первая с L1-P3. Позиционного правила
+             `footer button:nth-child(3)` она НЕ возвращает: у неё свой класс,
+             см. комментарий в app.css о том, почему позиционную форму сюда не
+             пускают. -->
+        <button type="button" class="footer-legal-btn" id="cookieSettingsBtn" hidden>
+            Cookie
+        </button>
     </footer>
 
     <!-- Модальное окно создания профиля -->
@@ -490,7 +587,7 @@
          2026-08-16 (DIA-DL-004) была про подтверждение внутри окна, которое
          вот-вот исчезнет; это окно не исчезает.
 
-         Текст записи ставится только через textContent (m/v7/surfaces/diary.js).
+         Текст записи ставится только через textContent (surfaces/diary.js).
          Это семейный текст: он не проходит через innerHTML нигде. -->
     <div id="diaryModal" class="modal">
         <div class="modal-content">
@@ -505,7 +602,7 @@
                      ФОРМА ПОКАЗЫВАЕТСЯ, ТОЛЬКО ЕСЛИ ЕСТЬ ЧТО ИСКАТЬ. Пустому
                      дневнику предлагать поиск незачем: родитель искал бы в том,
                      чего нет, и «ничего не нашлось» прочиталось бы как поломка.
-                     Решает это m/v7/surfaces/diary.js по числу записей. -->
+                     Решает это surfaces/diary.js по числу записей. -->
                 <form id="diarySearchForm" class="diary-search" hidden>
                     <label for="diarySearchInput">Найти:</label>
                     <input type="search" id="diarySearchInput" name="diarySearchInput" autocomplete="off">
@@ -527,10 +624,10 @@
                      это значило бы сказать родителю, что он чего-то не писал,
                      когда на самом деле мы не смогли посмотреть. Каждая строка
                      здесь говорит, что поиск не выполнен и что записи на месте
-                     (m/v7/surfaces/diary.js, SEARCH_REFUSAL). -->
+                     (surfaces/diary.js, SEARCH_REFUSAL). -->
                 <p id="diarySearchStatus" class="export-status" hidden></p>
                 <!-- Две причины, по которым писать некуда, и они лечатся
-                     разным. Показывается ровно одна (m/v7/surfaces/diary.js). -->
+                     разным. Показывается ровно одна (surfaces/diary.js). -->
                 <p id="diaryNoStore" class="export-status" hidden>Дневник хранится в приложении на этом устройстве, а хранилище сейчас не открылось. Записать пока некуда — закройте и откройте приложение. Уже записанное не потеряно.</p>
                 <p id="diaryNoChild" class="export-status" hidden>Сначала создайте профиль ребёнка — запись дневника ведётся о ком-то, и без профиля её некуда отнести. Нажмите «Создать профиль» — это займёт полминуты, и дневник откроется снова.</p>
                 <!-- ЧЕТВЁРТЫЙ СЛУЧАЙ, И ОН ПРО ЧТЕНИЕ, А НЕ ПРО ЗАПИСЬ
@@ -539,7 +636,7 @@
                      уже был очищен, и родитель видел пустой дневник, то есть
                      утверждение «вы ничего не писали» о хранилище, которое
                      просто не ответило. Строки здесь того же устройства, что и
-                     у поиска (m/v7/surfaces/diary.js, LIST_REFUSAL): список НЕ
+                     у поиска (surfaces/diary.js, LIST_REFUSAL): список НЕ
                      прочитан, записи на месте, вот что сделать. -->
                 <p id="diaryListStatus" class="export-status" hidden></p>
                 <ul id="diaryList" class="diary-list"></ul>
@@ -562,7 +659,7 @@
                  одним голосом с остальными отказами: что записи НЕТ, что текст
                  на месте, что делать дальше. Семантика поля при этом не
                  теряется — aria-required сообщает её вспомогательным
-                 технологиям, — а проверку выполняет m/v7/surfaces/diary.js,
+                 технологиям, — а проверку выполняет surfaces/diary.js,
                  который её и объясняет. -->
             <form id="diaryForm" hidden>
                 <div class="modal-form-group">
@@ -658,7 +755,15 @@
                 <a class="modal-button modal-button-primary"
                    id="installDownloadLink"
                    target="_blank"
-                   rel="noopener noreferrer">Скачать APK</a>
+                   rel="noopener noreferrer"
+                   hidden>Скачать APK</a>
+                <!-- ЧЕСТНЫЙ ОТВЕТ ТАМ, ГДЕ ПРЕДЛОЖЕНИЕ НЕВЫПОЛНИМО (PPR-P2,
+                     PDR-034 §1). Продукт — приложение для Android; ссылка выше
+                     раскрывается только тому, кто может ей воспользоваться, а
+                     всем остальным в том же месте достаётся это предложение.
+                     Направление отказа задано явно: платформа, которую не
+                     удалось распознать, получает текст, а не ссылку. -->
+                <p class="modal-platform-note" id="installPlatformNote" hidden>Приложение работает на Android. Откройте эту страницу на телефоне с Android, чтобы установить.</p>
             </div>
         </div>
     </div>
@@ -743,14 +848,14 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v7/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v8/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v7/app.js for boot order, and the modulepreload block in the head
+         m/v8/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v7/app.js"></script>
+    <script type="module" src="/m/v8/app.js"></script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v7/sw-register.js"></script>
+    <script type="module" src="/m/v8/sw-register.js"></script>
 </body>
 </html>

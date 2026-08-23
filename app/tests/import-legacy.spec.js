@@ -31,7 +31,7 @@ const MOUNT = currentMount(fs.readFileSync(path.join(APP_ROOT, 'index.html'), 'u
 // literal would keep guarding bytes nothing runs.
 const STORE_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'store');
 const CORE_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'core');
-const TRANSFER_DIR = path.join(APP_ROOT, 'm', MOUNT.dir, 'transfer');
+const MOUNT_DIR = path.join(APP_ROOT, 'm', MOUNT.dir);
 
 const dynamicImport = new Function('specifier', 'return import(specifier)');
 
@@ -259,24 +259,70 @@ test.describe('property 3 — the import cannot touch localStorage', () => {
         }
     });
 
-    // RETARGETED AT L3-P2 (FIU-DL-002), NOT DELETED. This leg used to read
-    // `surfaces/import.js` — the in-app offer, which the owner removed
-    // outright. The property it carries is about the LEGACY SOURCE, and that
-    // source now has exactly one reader in the shipped tree: the handoff page,
-    // which still runs in the parent's browser and still hands bytes over. So
-    // the leg follows the property to its new address rather than going out
-    // with the surface. It fails closed on the move: if the mount ever stops
-    // shipping that file, `readFileSync` throws here rather than passing.
-    test('the surface that reads the legacy keys writes none of them', async () => {
-        const source = fs.readFileSync(path.join(TRANSFER_DIR, 'handoff-page.js'), 'utf8');
-        expect(source, 'it reads the profiles it is about to carry across').toContain(
-            'readProfilesRaw'
-        );
-        for (const writer of ['writeProfilesJson', 'writeCurrentProfileId', 'setItem', 'removeItem']) {
-            expect(source, 'clearing the source is a separate owner act, not this one').not.toContain(
-                writer
+    // RETARGETED TWICE, AND THE SECOND TIME THE SUBJECT CHANGED — say so rather
+    // than let the name go on describing something else.
+    //
+    // At L3-P2 (FIU-DL-002) this leg moved off `surfaces/import.js`, the in-app
+    // offer the owner removed, onto the handoff page: the legacy source's one
+    // remaining READ-ONLY consumer, whose whole structural claim was that it read
+    // the browser and never wrote to it. PPR-P2 retires that page too, and there
+    // is no third address of that kind — the only consumer left is
+    // `core/repo-local.js`, which is the web channel's repository and writes the
+    // profiles key by design. Repointing the old assertion there would assert a
+    // property that file deliberately does not have.
+    //
+    // So the property is restated on the surviving fact instead of being deleted
+    // or faked: the legacy source has exactly ONE consumer in the shipped mount,
+    // it is the declared repository, and a second one appearing anywhere in the
+    // mount reds this. That is the thing the old leg was really protecting — that
+    // nobody quietly grows a second reader of the family's oldest key — and it is
+    // now checked across the whole mount rather than in one file.
+    test('the legacy source has exactly one consumer, and it is the declared repository', async () => {
+        const READERS = ['readLegacyCompletedRaw', 'readProfilesRaw'];
+        const DOOR = path.join(CORE_DIR, 'storage.js');
+        const REPOSITORY = path.join(CORE_DIR, 'repo-local.js');
+
+        // Anti-vacuity: the door still declares the readers, and the repository
+        // still uses both. Without this, a rename would empty the scan below and
+        // leave it green about nothing.
+        const door = fs.readFileSync(DOOR, 'utf8');
+        const repository = fs.readFileSync(REPOSITORY, 'utf8');
+        for (const reader of READERS) {
+            expect(door, `core/storage.js no longer declares ${reader}`).toContain(
+                `export function ${reader}(`
+            );
+            expect(repository, `core/repo-local.js no longer calls ${reader}`).toContain(
+                `${reader}()`
             );
         }
+
+        const offenders = [];
+        const walk = (dir) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(full);
+                    continue;
+                }
+                if (!entry.name.endsWith('.js')) continue;
+                if (full === DOOR || full === REPOSITORY) continue;
+                const source = fs.readFileSync(full, 'utf8');
+                for (const reader of READERS) {
+                    if (source.includes(reader)) {
+                        offenders.push(`${path.relative(APP_ROOT, full)} reads ${reader}`);
+                    }
+                }
+            }
+        };
+        walk(MOUNT_DIR);
+
+        expect(
+            offenders,
+            'a second consumer of the legacy localStorage source appeared. There was one'
+                + ' read-only consumer besides the repository until PPR-P2 — the handoff page —'
+                + ' and it went out with the transfer. Anything reading these keys now is a new'
+                + ' surface with a new claim to make about what it does with them.'
+        ).toEqual([]);
     });
 });
 

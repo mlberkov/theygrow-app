@@ -87,8 +87,10 @@ async function declareBeforeBoot(page, meta, value) {
  * Installs the smallest thing the channel probe accepts as the native shell.
  *
  * Registered as an init script so it is in place before the head shim computes
- * window.IS_NATIVE_SHELL — the same ordering handoff-transfer.spec.js relies on
- * for its storage recorder.
+ * window.IS_NATIVE_SHELL. The ordering is the point: an init script registered
+ * after the fact would leave the page on the web branch and this block would
+ * test it twice, which is why every describe using this helper opens with a
+ * premise leg reading IS_NATIVE_SHELL back.
  */
 async function simulateNativeShell(page) {
     await page.addInitScript(() => {
@@ -149,6 +151,137 @@ test.describe('the web channel offers what it can deliver, and nothing else', ()
         }
     });
 
+    // WHICH PLATFORM IS LOOKING, AND WHAT IT IS OFFERED (PPR-P2, debt 21).
+    //
+    // Two ways to say "this is an Android phone", because there are two in the
+    // wild: Chromium answers navigator.userAgentData.platform, and everything
+    // else leaves the token in the user-agent string. Playwright sets a real
+    // user-agent header and navigator.userAgent from test.use(); userAgentData is
+    // defined by an init script, because no browser lets a test set it.
+    //
+    // The header control is NOT branched on platform and that is the decision,
+    // recorded here where the reader will ask: it opens a window that explains
+    // what the app is and where the family's data lives, which is worth reading
+    // on any device. What is withheld is the OFFER — the link that hands over a
+    // package — because that is the thing a non-Android visitor cannot act on.
+    const declarePlatform = async (page, platform) => {
+        await page.addInitScript((value) => {
+            Object.defineProperty(navigator, 'userAgentData', {
+                configurable: true,
+                get: () => ({ platform: value }),
+            });
+        }, platform);
+    };
+
+    const ANDROID_UA =
+        'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko)'
+        + ' Chrome/126.0.0.0 Mobile Safari/537.36';
+    const IPHONE_UA =
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15'
+        + ' (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+
+    const PLATFORM_SENTENCE =
+        'Приложение работает на Android. Откройте эту страницу на телефоне с Android,'
+        + ' чтобы установить.';
+
+    const openInstallWindow = async (page) => {
+        await gotoApp(page, { state: STATES.seeded });
+        await expect(
+            page.locator('#apkBtn'),
+            'the header control is withheld, so this leg would prove nothing about the window'
+        ).toBeVisible();
+        await page.locator('#apkBtn').click();
+        await expect(page.locator('#installModal')).toHaveCSS('display', 'block');
+    };
+
+    test('an Android visitor is offered the file', async ({ page }) => {
+        test.skip(DECLARED_STATE !== PUBLISHED_VALUE, 'no release is declared published');
+        await declarePlatform(page, 'Android');
+        await openInstallWindow(page);
+
+        await expect(page.locator('#installDownloadLink')).toBeVisible();
+        await expect(page.locator('#installDownloadLink')).toHaveAttribute('href', RELEASE_URL);
+        await expect(
+            page.locator('#installPlatformNote'),
+            'the visitor who can install is told to go somewhere else as well'
+        ).toBeHidden();
+    });
+
+    // A REAL USER-AGENT, SET WHERE PLAYWRIGHT ALLOWS IT. test.use() is a describe-
+    // level fixture and throws inside a test body, so the two string-driven legs
+    // sit in their own blocks. They are worth the two extra describes: Firefox and
+    // Safari on Android expose no userAgentData at all, so the string is the only
+    // source there, and a probe that read only the declared value would pass every
+    // Chromium test in this file and still offer a real Android visitor nothing.
+    test.describe('driven by the user-agent string, with nothing declared', () => {
+        test.use({ userAgent: ANDROID_UA });
+
+        test('an Android string alone is enough to be offered the file', async ({ page }) => {
+            test.skip(DECLARED_STATE !== PUBLISHED_VALUE, 'no release is declared published');
+            await openInstallWindow(page);
+            await expect(page.locator('#installDownloadLink')).toBeVisible();
+            await expect(page.locator('#installPlatformNote')).toBeHidden();
+        });
+    });
+
+    test.describe('driven by an iPhone user-agent string', () => {
+        test.use({ userAgent: IPHONE_UA });
+
+        test('an iPhone is offered the sentence, from its own user-agent', async ({ page }) => {
+            test.skip(DECLARED_STATE !== PUBLISHED_VALUE, 'no release is declared published');
+            await openInstallWindow(page);
+            await expect(page.locator('#installDownloadLink')).toBeHidden();
+            await expect(page.locator('#installPlatformNote')).toHaveText(PLATFORM_SENTENCE);
+        });
+    });
+
+    test('a visitor who cannot install it is told so, in the same slot', async ({ page }) => {
+        test.skip(DECLARED_STATE !== PUBLISHED_VALUE, 'no release is declared published');
+        await declarePlatform(page, 'macOS');
+        await openInstallWindow(page);
+
+        await expect(
+            page.locator('#installDownloadLink'),
+            'an iPhone or a desktop is offered an Android package — the defect PDR-034 §1 names'
+        ).toBeHidden();
+        const note = page.locator('#installPlatformNote');
+        await expect(note).toBeVisible();
+        await expect(note).toHaveText(PLATFORM_SENTENCE);
+    });
+
+    test('an unreadable platform gets the sentence, never the offer', async ({ page }) => {
+        // THE FAILURE DIRECTION, EXECUTED. Platform detection is a heuristic; what
+        // is not a heuristic is which way it falls when it cannot tell.
+        test.skip(DECLARED_STATE !== PUBLISHED_VALUE, 'no release is declared published');
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, 'userAgentData', {
+                configurable: true,
+                get: () => undefined,
+            });
+            Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => '' });
+        });
+        await openInstallWindow(page);
+
+        await expect(page.locator('#installDownloadLink')).toBeHidden();
+        await expect(page.locator('#installPlatformNote')).toBeVisible();
+    });
+
+    test('an undeclared release offers neither the file nor the sentence', async ({ page }) => {
+        // The declaration stays in front of everything: withheld means nothing is
+        // offered at all, not "offered with an explanation". Driven by mutating
+        // the meta before boot, so this leg runs whatever the shell ships today.
+        await declareBeforeBoot(page, STATE_META, 'none');
+        await declarePlatform(page, 'Android');
+        await gotoApp(page, { state: STATES.seeded });
+
+        await expect(page.locator('#apkBtn')).toBeHidden();
+        await expect(page.locator('#installDownloadLink')).toBeHidden();
+        await expect(
+            page.locator('#installPlatformNote'),
+            'the window is unreachable, and its slot is explaining an offer that is not being made'
+        ).toBeHidden();
+    });
+
     test('pressing the download control opens the pre-install window, and it closes again', async ({
         page,
     }) => {
@@ -172,9 +305,22 @@ test.describe('the web channel offers what it can deliver, and nothing else', ()
 
         await expect(page.locator('#installModal')).toBeVisible();
         await expect(page.locator('#installModal')).toHaveCSS('display', 'block');
-        // The parent can actually read it, and the download is inside it.
+        // The parent can actually read it, and the offer slot is filled.
+        //
+        // EITHER-OR SINCE PPR-P2, and deliberately not "the link is visible": on
+        // this runner the browser is a desktop Chromium, which is exactly the
+        // visitor the packet stopped offering an Android package to. What the
+        // window must never be is a button row with nothing in it, so the leg
+        // asserts the slot is occupied and leaves WHICH of the two to the legs
+        // above, whose subject that is.
         await expect(page.locator('#installModal h2')).toBeVisible();
-        await expect(page.locator('#installDownloadLink')).toBeVisible();
+        const linkShown = await page.locator('#installDownloadLink').isVisible();
+        const noteShown = await page.locator('#installPlatformNote').isVisible();
+        expect(
+            linkShown !== noteShown,
+            `the offer slot shows ${linkShown && noteShown ? 'both' : 'neither'} the download link`
+                + ' and the platform sentence — it holds exactly one of them'
+        ).toBe(true);
 
         await page.locator('#installModalClose').click();
         await expect(page.locator('#installModal')).toBeHidden();

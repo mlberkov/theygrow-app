@@ -141,7 +141,10 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DeviceLogTest.java',
-        line: 645,
+        // Moved from 645 by PPR-P2, which removed this suite's transfer leg and
+        // the refuseTwice() helper above these lines. The line is asserted rather
+        // than trusted, so a drift like this one reds and gets re-read.
+        line: 520,
         argument: '"window." + slot',
         reason:
             "the same shape as DiaryEntryTest's await(): the async slot name is a Java variable,"
@@ -149,7 +152,8 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DeviceLogTest.java',
-        line: 653,
+        // Moved from 653 by PPR-P2, for the same reason as the entry above.
+        line: 528,
         argument: 'expression',
         reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
     },
@@ -195,18 +199,6 @@ const DECLARED_SKIPS = Object.freeze([
         // so a drift like this one reds and gets re-read — which is the whole
         // point of carrying the number.
         line: 779,
-        argument: 'expression',
-        reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
-    },
-    {
-        file: 'HistoryTransferTest.java',
-        line: 1610,
-        argument: 'expression',
-        reason: "the suite's own pollFor() plumbing, same as BridgeSmokeTest's",
-    },
-    {
-        file: 'HistoryTransferTest.java',
-        line: 1625,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
@@ -412,10 +404,12 @@ function reconstruct(expression) {
  * `String name = <expr>;` — the one NEAREST ABOVE the call site, or null.
  *
  * Nearest, not first, and the difference is a coverage hole rather than a
- * nicety: `HistoryTransferTest` builds six different scripts into locals all
+ * nicety: `HistoryTransferTest` built six different scripts into locals all
  * called `script`, so taking the first match in the file resolved five call
  * sites to the wrong snippet and left their real ones unread. The census leg
- * found that; this is what closed it.
+ * found that; this is what closed it. That suite is retired (PPR-P2) and the
+ * rule is not: any suite that reuses a local name has the same shape, and
+ * `nearest` is what keeps this reader honest about which snippet it read.
  */
 function initialiserOf(stripped, name, before) {
     const declaration = new RegExp(`(?:^|[^.\\w])(?:String\\s+)?${name}\\s*=\\s*`, 'gm');

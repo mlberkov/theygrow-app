@@ -63,9 +63,11 @@ public class SignalConsoleClient extends BridgeWebChromeClient {
     /**
      * The tag the owner greps.
      *
-     * <p>Named like `HistoryTransferPlugin`'s, and deliberately not Capacitor's:
-     * a line under this tag is one this app decided to write, which is a
-     * different claim from one the framework happened to emit.
+     * <p>A first-party `TheyGrow`-prefixed tag, deliberately not Capacitor's: a
+     * line under this tag is one this app decided to write, which is a different
+     * claim from one the framework happened to emit. The convention was set by
+     * `HistoryTransferPlugin`'s `TheyGrowTransfer`, retired at PPR-P2; this is
+     * the only such tag the app still writes.
      */
     public static final String TAG = "TheyGrowSignal";
 

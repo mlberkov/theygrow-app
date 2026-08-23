@@ -637,9 +637,34 @@ test.describe('the interface says the two things it must not soften', () => {
 
         // AND NOTHING ASKS THE PARENT TO ACCEPT IT. Making the document
         // reachable is the obligation; collecting acceptance is not, a tick-box
-        // nobody can decline is not consent, and a consent RECORD has nowhere to
-        // live in this milestone (FIU-DL-003). This is the guard that keeps a
-        // later packet from adding one by reflex.
+        // nobody can decline is not consent, and a consent RECORD for the POLICY
+        // has nowhere to live (FIU-DL-003). This is the guard that keeps a later
+        // packet from adding one by reflex.
+        //
+        // NARROWED AT PPR-P2, AND PAID FOR IN THE SAME BREATH — this is the same
+        // move PPR-DL-001 (d) made on this file's other leg, and it needs saying
+        // out loud because the sentence below used to be written to stop the very
+        // packet that narrowed it.
+        //
+        // The subject was, and still is, POLICY ACCEPTANCE. The scan was
+        // shell-wide, which was free while the shell contained no consent control
+        // of any kind. PPR-P2 adds one — for ANALYTICS, which is a different
+        // question with a different answer and a storage home of its own
+        // (PDR-035 §5) — so a shell-wide scan for /consent|accept/ would now be
+        // measuring the wrong thing. It happens that the analytics control is
+        // named after its surface (#cookieBanner, #cookieEnableBtn,
+        // #cookieDeclineBtn, #cookieSettingsBtn) and would slip through the old
+        // pattern untouched. That is exactly why the pattern is narrowed rather
+        // than left standing: a guard that passes because nobody happened to use
+        // a word is a guard that has stopped meaning what its message says, and
+        // the next packet naming a control #analyticsConsentBtn would have gone
+        // red for a reason unrelated to the policy.
+        //
+        // So the scan is scoped to the intro window — the policy link's one home
+        // (FIU-DL-003) — and the leg gains something STRICTER on that scope in
+        // exchange: the link is gated on the DECLARATION ALONE. Nothing stored,
+        // nothing consented to, nothing remembered stands between a parent and
+        // the document. That is a property the old wide scan never asserted.
         const intro = /<a[^>]*id="introPolicyLink"[^>]*>/.exec(SHELL);
         expect(intro, 'the intro carries no policy link').not.toBeNull();
         expect(
@@ -650,10 +675,42 @@ test.describe('the interface says the two things it must not soften', () => {
             /\bhref\s*=/.test(intro[0]),
             'the policy link carries a hard-coded href — the address is declared in channel/config.js'
         ).toBeFalsy();
+
+        const window_ = /<div id="onboardingModal"[\s\S]*?\n    <\/div>/.exec(SHELL);
         expect(
-            SHELL,
+            window_,
+            'the intro window could not be sliced out of the shell — this leg would scan nothing'
+        ).not.toBeNull();
+        expect(
+            window_[0].includes('id="introPolicyLink"'),
+            'the slice does not contain the policy link, so scoping the scan to it proves nothing'
+        ).toBe(true);
+        expect(
+            window_[0],
             'a consent control appeared beside the policy link — reachability is the obligation, acceptance is not'
         ).not.toMatch(/id="[A-Za-z0-9_-]*(?:[Cc]onsent|[Aa]ccept)[A-Za-z0-9_-]*"/);
+
+        // THE STRICTER HALF, AND THE PRICE OF THE NARROWING. The policy link is
+        // revealed by the declaration and by nothing else: shouldOfferPolicy()
+        // takes one argument, reads no storage and asks no other module. A future
+        // packet that gated the document on a stored answer — "accept to read" —
+        // would have to widen that signature, and this reds when it does.
+        const CHANNEL_SURFACE = fs.readFileSync(
+            path.join(APP_ROOT, 'm', MOUNT.dir, 'surfaces', 'channel.js'),
+            'utf8'
+        );
+        const decision = /export function shouldOfferPolicy\(([^)]*)\)/.exec(CHANNEL_SURFACE);
+        expect(decision, 'shouldOfferPolicy is gone or was renamed').not.toBeNull();
+        expect(
+            decision[1].split(',').filter((part) => part.trim().length > 0),
+            'shouldOfferPolicy grew an argument — the policy link is gated on the declaration alone'
+        ).toHaveLength(1);
+        for (const reader of ['readAnalyticsConsent', 'localStorage', 'consentState']) {
+            expect(
+                CHANNEL_SURFACE,
+                `surfaces/channel.js reads ${reader} — the policy link must not depend on any stored answer`
+            ).not.toContain(reader);
+        }
     });
 
     test('the web channel still says the copy it holds is the only one', () => {
