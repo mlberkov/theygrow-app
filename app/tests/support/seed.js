@@ -45,28 +45,50 @@ const STORAGE_KEYS = {
   accordion: 'milestones_accordion_states',
   filterZpd: 'milestones_filter_zpd',
   onboardingDismissed: 'onboarding_dismissed',
+  // PPR-P2 — the analytics-consent answer. Declared here for the same reason as
+  // the six above: this fixture writes raw keys, so every key it writes is named
+  // in one place.
+  analyticsConsent: 'analytics_consent',
 };
 
 // Storage states the suite boots from.
+//
+// WHY THE SEEDED STATES CARRY CONSENT (PPR-P2). Until that packet the web channel
+// loaded GA4 unconditionally, so `trackEvent` always ran and fourteen call sites
+// across this suite are asserted through `window.dataLayer` (see gaEvents below).
+// The gate makes `trackEvent` a no-op for anyone who has not consented, so a
+// fixture with no answer stored would silently empty every one of those
+// assertions — the suite would go green about nothing. The seeded states
+// therefore answer the question, which is also what the visitor these states
+// describe has by definition already done. It does not weaken the hermetic
+// property: the page fixture still routes the analytics hosts to an empty stub,
+// so no request leaves the browser either way.
+//
+// `firstRun` deliberately carries NO answer: a visitor with nothing stored is
+// exactly what it means, and the consent surface's own spec seeds its states.
 const STATES = {
   // No profile at all: the honest-degradation path (A1-P0) lives here.
   empty: {
     [STORAGE_KEYS.onboardingDismissed]: 'true',
+    [STORAGE_KEYS.analyticsConsent]: 'granted',
   },
   // The standard seeded family: one profile with a birthdate and four skills done.
   seeded: {
     [STORAGE_KEYS.profiles]: JSON.stringify([PROFILE]),
     [STORAGE_KEYS.current]: PROFILE.id,
     [STORAGE_KEYS.onboardingDismissed]: 'true',
+    [STORAGE_KEYS.analyticsConsent]: 'granted',
   },
   // Same, with the ZPD filter already on — exercises restore-from-storage.
   seededFiltered: {
     [STORAGE_KEYS.profiles]: JSON.stringify([PROFILE]),
     [STORAGE_KEYS.current]: PROFILE.id,
     [STORAGE_KEYS.onboardingDismissed]: 'true',
+    [STORAGE_KEYS.analyticsConsent]: 'granted',
     [STORAGE_KEYS.filterZpd]: 'true',
   },
-  // Onboarding not yet dismissed: the modal must appear on boot.
+  // Onboarding not yet dismissed, and the cookie question not yet answered: the
+  // two things a first visit actually is.
   firstRun: {},
 };
 
@@ -154,7 +176,10 @@ function readStorage(page, key) {
   return page.evaluate((k) => window.localStorage.getItem(k), key);
 }
 
-// Reads the GA surface without touching it. gtag is an inline shim
+// Reads the GA surface without touching it. Since PPR-P2 an event only reaches
+// dataLayer for a visitor who has consented, which every seeded state above is —
+// so a suddenly empty result here means the gate, not a lost event. gtag is an
+// inline shim
 // (app/index.html:37) that pushes into window.dataLayer, so events are
 // observable even though the external googletagmanager script is blocked.
 // This only OBSERVES — production emission is unchanged by this suite.

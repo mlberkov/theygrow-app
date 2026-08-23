@@ -51,7 +51,20 @@
 // the delivery mechanism and not a formality — though only the native channel
 // has a store to close. The cost is a SEVENTH generation shipped and served
 // immutable; retiring the early ones stays an owner cleanup (DIA-DL-008 debt 7).
-const CACHE_VERSION = 'v17';
+//
+// changed_in: PPR-DL-002 — v17 -> v18 with the /m/v8/ mount bump, which carries
+// three changes at once and exists BECAUSE it carries three: the web channel's
+// analytics-consent gate, the retirement of the browser-to-native transfer, and
+// the platform-aware download offer. Each of them changes bytes under the mount
+// and each would otherwise have cost a generation of its own — bytes at a
+// published mount URL are never rewritten (A1-DL-004), so the only question a
+// mount change ever asks is how many changes ride one bump. The cost is an
+// EIGHTH generation shipped and served immutable; retiring the early ones stays
+// an owner cleanup (DIA-DL-008 debt 7). /m/v8/ is also the first generation that
+// is SMALLER than the one before it: it ships no transfer/ directory and no
+// store/transfer.js, because a copy-forward that omits a file deletes it without
+// touching a frozen byte.
+const CACHE_VERSION = 'v18';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -59,25 +72,17 @@ const OFFLINE_URLS = [
   '/offline.html',
   '/manifest.json',
   '/kb-v1.json',
-  // DIA-P1 — the browser-to-native handoff page and its module graph. It is
-  // precached because the handoff needs no network at all: it reads the
-  // localStorage of this same origin and hands the result to the app on the
-  // same device, so a parent on a bad connection can still move their history.
-  // Its entry is named here because the shell references it; the three modules
-  // it imports are named for the same reason index.html names its graph.
-  //
-  // (No apostrophe in this block, deliberately — see the trap named below.)
-  '/transfer.html',
-  '/m/v7/transfer/handoff-page.js',
-  '/m/v7/transfer/config.js',
-  '/m/v7/transfer/errors.js',
-  '/m/v7/transfer/format.js',
+  // PPR-P2 — /transfer.html and its four modules are GONE from this list,
+  // because they are gone from the image. cache.addAll is atomic, so a stale
+  // entry here does not degrade quietly: it fails the install outright and the
+  // client keeps the previous worker. That is the reason the deletion has to be
+  // done in both directions in one packet rather than swept up later.
   // Versioned module mount (A1-DL-004): the shell references these by URL, so
   // they are precached by name. Content changes ship as a NEW mount version
-  // (/m/v7/...), never as new bytes at these URLs — inside the 30-day immutable
+  // (/m/v8/...), never as new bytes at these URLs — inside the 30-day immutable
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
-  '/m/v7/app.css',
-  '/m/v7/sw-register.js',
+  '/m/v8/app.css',
+  '/m/v8/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
   // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
@@ -87,62 +92,68 @@ const OFFLINE_URLS = [
   // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
   // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
-  '/m/v7/app.js',
-  '/m/v7/core/kb-boot.js',
-  '/m/v7/core/state.js',
-  '/m/v7/core/storage.js',
-  '/m/v7/core/repo-local.js',
-  '/m/v7/core/signals.js',
-  '/m/v7/core/dom-utils.js',
-  '/m/v7/core/format.js',
-  '/m/v7/core/zpd.js',
-  '/m/v7/core/urgency.js',
-  '/m/v7/surfaces/table.js',
-  '/m/v7/surfaces/skill-completion.js',
-  '/m/v7/surfaces/zpd-filter.js',
-  '/m/v7/surfaces/skill-modal.js',
-  '/m/v7/surfaces/profile.js',
-  '/m/v7/surfaces/activities.js',
-  '/m/v7/surfaces/onboarding.js',
-  '/m/v7/surfaces/accordion.js',
+  '/m/v8/app.js',
+  '/m/v8/core/kb-boot.js',
+  '/m/v8/core/state.js',
+  '/m/v8/core/storage.js',
+  '/m/v8/core/repo-local.js',
+  '/m/v8/core/signals.js',
+  '/m/v8/core/dom-utils.js',
+  '/m/v8/core/format.js',
+  '/m/v8/core/zpd.js',
+  '/m/v8/core/urgency.js',
+  '/m/v8/surfaces/table.js',
+  '/m/v8/surfaces/skill-completion.js',
+  '/m/v8/surfaces/zpd-filter.js',
+  '/m/v8/surfaces/skill-modal.js',
+  '/m/v8/surfaces/profile.js',
+  '/m/v8/surfaces/activities.js',
+  '/m/v8/surfaces/onboarding.js',
+  '/m/v8/surfaces/accordion.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the
   // import graph reaches them, and an installed client must not boot offline
   // with a broken graph. The DDL artifact they read
-  // (/m/v7/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // (/m/v8/store/schema/001-core.sql) is deliberately NOT here: only the native
   // channel ever fetches it, and that channel does not use this worker.
   //
   // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
   // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
   // quotes — an apostrophe swallows every entry after it and the guard then
   // reports the icons as unprecached.
-  '/m/v7/store/boot.js',
-  '/m/v7/store/store.js',
-  '/m/v7/store/journal.js',
-  '/m/v7/store/repo-journal.js',
-  '/m/v7/store/import-legacy.js',
+  '/m/v8/store/boot.js',
+  '/m/v8/store/store.js',
+  '/m/v8/store/journal.js',
+  '/m/v8/store/repo-journal.js',
+  '/m/v8/store/import-legacy.js',
   // DIA-P3 — the diary record path. Precached with the rest of the store
   // because the diary is the app shell now, not an extra: a parent who opens
   // the app offline must still be able to write down what happened today.
-  '/m/v7/store/records.js',
-  '/m/v7/store/bridge.js',
-  // DIA-P1 — the transfer seam. The three transfer/ modules it imports are
-  // already precached above, for the handoff page; this is the app-side door
-  // to them, and it is inert on the web exactly as store/bridge.js is.
-  '/m/v7/store/transfer.js',
-  '/m/v7/store/config.js',
-  '/m/v7/store/errors.js',
+  '/m/v8/store/records.js',
+  '/m/v8/store/bridge.js',
+  '/m/v8/store/config.js',
+  '/m/v8/store/errors.js',
   // DIA-P2 — the channel composition: which of the two header actions this
   // channel offers, and the knobs that decide it.
-  '/m/v7/surfaces/channel.js',
-  '/m/v7/channel/config.js',
+  '/m/v8/surfaces/channel.js',
+  '/m/v8/channel/config.js',
+  // PPR-P2 — the analytics-consent gate: the decision and its vocabulary. Both
+  // are precached with the rest of the graph and neither reaches the network:
+  // the module reads one localStorage key through the door and, only for a
+  // visitor who has said yes, calls the seam defined in the shell. The tag it may
+  // then create is NOT precached and never could be — a third-party script is
+  // something this worker deliberately never sees.
+  //
+  // (No apostrophe in this block either — see the trap named below.)
+  '/m/v8/surfaces/consent.js',
+  '/m/v8/consent/config.js',
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
   // FETCH at runtime are deliberately NOT here: the declaration
-  // (/m/v7/export/declaration.json) plus the two print-layer binaries, the
-  // embedded font and the ICC profile under /m/v7/export/assets/. Only the
+  // (/m/v8/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v8/export/assets/. Only the
   // native channel ever reads them, that channel does not use this worker, and
   // the web channel cannot export at all — so precaching them would spend
   // roughly 443 KB of an installed web client cache budget on bytes it can
@@ -150,19 +161,19 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
-  '/m/v7/surfaces/diary.js',
-  '/m/v7/surfaces/export.js',
-  '/m/v7/export/run.js',
-  '/m/v7/export/build.js',
-  '/m/v7/export/readout.js',
-  '/m/v7/export/sink.js',
-  '/m/v7/export/text.js',
-  '/m/v7/export/readme.js',
-  '/m/v7/export/zip.js',
-  '/m/v7/export/pdf.js',
-  '/m/v7/export/ttf.js',
-  '/m/v7/export/config.js',
-  '/m/v7/export/errors.js',
+  '/m/v8/surfaces/diary.js',
+  '/m/v8/surfaces/export.js',
+  '/m/v8/export/run.js',
+  '/m/v8/export/build.js',
+  '/m/v8/export/readout.js',
+  '/m/v8/export/sink.js',
+  '/m/v8/export/text.js',
+  '/m/v8/export/readme.js',
+  '/m/v8/export/zip.js',
+  '/m/v8/export/pdf.js',
+  '/m/v8/export/ttf.js',
+  '/m/v8/export/config.js',
+  '/m/v8/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',
@@ -177,10 +188,30 @@ const OFFLINE_URLS = [
 // A navigation to one of these must not be mirrored into the cache entry keyed
 // '/', which is the app shell's offline copy — see the fetch handler for what
 // that costs. Kept as an explicit list rather than a pattern because the set is
-// closed and small: it is exactly the HTML files in app/Dockerfile's COPY list
-// other than index.html, and app/tests/delivery-contract.spec.js asserts that
-// correspondence rather than leaving the two to drift.
-const NON_SHELL_PAGES = ['/offline.html', '/transfer.html'];
+// closed and small: it is the navigable pages app/Dockerfile ships, other than
+// index.html.
+//
+// PPR-P1 ADDS THE POLICY DOCUMENT, AND CORRECTS WHAT THIS COMMENT CLAIMED. It
+// used to say app/tests/delivery-contract.spec.js asserted the correspondence
+// with the COPY list. No such assertion existed — and the omission it was meant
+// to catch is precisely the one this packet found by hand: /privacy is a second
+// real page, so without an entry here one visit would replace the app shell's
+// offline copy with the policy document, permanently, for every client that
+// ever opened the link. The guard now exists ("NON_SHELL_PAGES covers every
+// navigable page this image ships", delivery-contract.spec.js), and it
+// understands both kinds of entry: a shipped .html, and an extension-less route
+// that an exact-match location in app/nginx.conf resolves to one with try_files.
+//
+// BOTH SPELLINGS ARE NAMED on purpose. The fetch handler compares url.pathname,
+// the canonical address is /privacy, and /privacy.html is the same bytes served
+// under the name the file has in the image — a visitor who reaches either one
+// must not poison the shell.
+//
+// PPR-P2 DROPS /transfer.html, which was the entry this list was created for.
+// The page is retired with the mechanism behind it, and the guard above catches
+// the other half of that drift by name: an entry naming a page the image no
+// longer serves protects nothing and reads as protection.
+const NON_SHELL_PAGES = ['/offline.html', '/privacy', '/privacy.html'];
 
 // Install: precache offline essentials.
 // NOTE: no skipWaiting() here — the new worker parks in `waiting` until driven
@@ -238,18 +269,20 @@ self.addEventListener('fetch', (event) => {
   // The successful response is mirrored into the cache keyed to '/' so the
   // offline fallback copy stays current.
   //
-  // DIA-P1 — THE MIRROR IS NOW CONDITIONAL, AND THE CONDITION IS LOAD-BEARING.
-  // Until this packet every navigation was mirrored to '/', on the premise that
+  // THE MIRROR IS CONDITIONAL, AND THE CONDITION IS LOAD-BEARING (DIA-P1).
+  // Before that packet every navigation was mirrored to '/', on the premise that
   // every navigable path IS the app shell: nginx's `try_files $uri $uri/
   // /index.html` makes any unknown path serve index.html, and /offline.html was
-  // reached from the cache rather than navigated to. /transfer.html breaks that
-  // premise — it is a real, separately-shipped page a parent navigates to on
-  // purpose — and mirroring it would overwrite the app shell's offline copy
-  // with the handoff page. The next offline boot of '/' would then show the
-  // handoff page instead of the app, permanently, for every client that had
-  // ever opened the transfer link. Named rather than pattern-matched: the set of
-  // HTML pages this image ships is small, closed, and asserted against
-  // app/Dockerfile's COPY list by app/tests/delivery-contract.spec.js.
+  // reached from the cache rather than navigated to. /transfer.html broke that
+  // premise first and /privacy — a real, separately-shipped page a parent
+  // navigates to on purpose — carries it now: mirroring one would overwrite the
+  // app shell's offline copy with the policy document, and the next offline boot
+  // of '/' would show that document instead of the app, permanently, for every
+  // client that had ever opened the link. (/transfer.html is retired at PPR-P2;
+  // the defect it introduced is not, which is why this branch stays.) Named
+  // rather than pattern-matched: the set of HTML pages this image ships is
+  // small, closed, and asserted against app/Dockerfile's COPY list in both
+  // directions by app/tests/delivery-contract.spec.js.
   if (request.mode === 'navigate') {
     const mirrorsTheShell = !NON_SHELL_PAGES.includes(url.pathname);
     event.respondWith(

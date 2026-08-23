@@ -62,8 +62,13 @@ Three places in this file, and the header comment of all three build-configs, us
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
-   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v7/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v7/app.js"` and `curl -fsSI "$TAG_URL/m/v7/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v7/sw-register.js` carries the same headers. Repeat for the current mount version after a bump.
+   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v8/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v8/app.js"` and `curl -fsSI "$TAG_URL/m/v8/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v8/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at three closes now (`/m/v6/` → `/m/v7/` → `/m/v8/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18).
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
+   - **The privacy policy is served, and served as a document** (added at PPR-P3, `PPR-DL-001` (k)). Nothing in this repository runs the real nginx image — the parity suite drives `app/tests/server.js`, a hand-written mirror — so this is the only place the production response for `/privacy` is ever observed, and the in-app link is not to be trusted until it has been:
+     - `curl -sI "$TAG_URL/privacy"` → `200`, `content-type: text/html`, `cache-control: public, max-age=3600, must-revalidate`, and **not** `immutable`. The document is versioned by its own text and effective date, at one address; an immutable cache class would strand a redaction.
+     - `curl -s "$TAG_URL/privacy" | grep -c '<script'` → `0`.
+     - `curl -s "$TAG_URL/privacy" | grep -q 'mainTable'` → **no match**. A hit means the catch-all `location /` answered and a parent is reading the skills table under the word «конфиденциальность» — the failure this address had for as long as it was declared and undocumented.
+     - `curl -sI "$TAG_URL/privacy/"` → `301` to `/privacy`.
 4. **Promote.** Shift 100% traffic to the just-smoked revision:
    `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
 5. **Check an actually-installed client — not the tagged URL in a fresh browser.** Steps 3–4 smoke a revision from a browser with nothing cached. That is the wrong client for the question this step asks: the people the deploy is *for* already have the app installed, holding a previous generation's shell behind `public, immutable, max-age=2592000`, and whether the new bytes reach them is a property of the update path rather than of the revision. `app/tests/upgrade-path.spec.js` (`EMV-P3-INV-001`) executes that path on every push, but against a **staged** generation assembled from the repo's own bytes — it cannot see which generation a real device is on, or how much of its immutable window has elapsed. This step is the only evidence about those bytes. Perform it at every promotion that ships a new mount version or a new `CACHE_VERSION`.
@@ -302,14 +307,25 @@ The app links a privacy policy from inside itself, and the link is **withheld un
 exists**. Same mechanism as the APK download offer above, same fail-closed rule, and one difference that
 decides the order you do things in.
 
-1. **Publish the document first.** The address is fixed and declared once, in
+> **Steps 1 and 2 are DONE, in the repository, as of PPR-P3 (`PPR-DL-003`).** The document is
+> `app/privacy.html`, served at `/privacy` since PPR-P1; the declaration reads `content="published"` since
+> PPR-P3. They ship in the **same image**, which is what makes the ordering below safe here rather than
+> merely observed: there is no moment at which a declaration exists without its document. What is still
+> owner-run, and is where this section is now read from, is steps 3 to 7 — the promotion that carries both
+> to a parent, the check, the effective-date re-check, and the withdrawal rule.
+
+1. **Publish the document first. — DONE at PPR-P1.** The address is fixed and declared once, in
    `app/m/v{N}/channel/config.js` as `CHANNEL_CONFIG.policyUrl` — today `https://theygrow.app/privacy`.
    It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
    geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
-   download and a pinch-zoom rather than a document.
-2. **Then declare it.** In `app/index.html`, set `<meta name="theygrow-privacy-policy" content="published">`
-   (it ships as `content="none"`). Anything that is not exactly `published` — a missing tag, an empty value,
-   a typo, a stale `none` — means "no document", and no link is offered anywhere.
+   download and a pinch-zoom rather than a document. The page is a hand conversion of
+   `docs/privacy-policy-v1.0.md`, and the two are paired by `app/tests/privacy-page.spec.js` heading by
+   heading so a drift is a red test rather than a discovery months later.
+2. **Then declare it. — DONE at PPR-P3.** In `app/index.html`,
+   `<meta name="theygrow-privacy-policy" content="published">`. Anything that is not exactly `published` — a
+   missing tag, an empty value, a typo, a stale `none` — means "no document", and no link is offered
+   anywhere. **Before flipping it back on for any future redaction, re-check the effective date** — see
+   step 6.
 3. **The two channels pick that flip up differently, and this is the step people forget.** The shell is
    served `max-age=3600, must-revalidate` and network-first, so on the **web** the flip costs a deploy and
    reaches installed clients on their next navigation — merge, deploy and promote per **Promotion +
@@ -325,10 +341,26 @@ decides the order you do things in.
    with nothing behind it. Nothing in CI can catch that: the token is a statement by you, and
    `FIU-P3-INV-002` checks only that the code obeys it. **If the document is ever withdrawn or moved, set
    this back to `none`** before anything else.
-6. **What this does NOT do.** It does not build the web channel's analytics-consent surface, and it asks
-   the parent to accept nothing — no checkbox, no blocked close. Making the document reachable is the
-   obligation; collecting acceptance is separate work with its own storage question, and it is still owed
-   (`A3-DL-003` debt 2, PDR-035 §5).
+6. **Re-check the effective date against the day you actually promote, and edit four places if it slipped.**
+   The document states the date it comes into force, and a policy whose stated effective date precedes the
+   day it became readable was never in force when it said it was (`PPR-DL-001` (f)). The literal lives in
+   **four** places and they must agree — the pairing test requires it:
+   - `docs/privacy-policy-v1.0.md:5` — the header block, «Дата вступления в силу:»
+   - `docs/privacy-policy-v1.0.md:145` — the `1.0` row of the change-history table
+   - `app/privacy.html:103` — the same header block in the page
+   - `app/privacy.html:263` — the same `1.0` row in the page
+
+   One token each; change nothing else, and **do not let an editor strip the trailing double-spaces** at
+   `docs/privacy-policy-v1.0.md:3-4` — they are Markdown hard line breaks, which is why that path is
+   excluded from the hygiene hooks. `app/tests/privacy-page.spec.js::the effective date is resolved, and is
+   the same date in both files` reds on a mismatch, but **nothing compares the date to the wall clock** —
+   that judgement is yours, and this step is where it is made. PPR-P3 set it to `23.08.2026`.
+7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
+   the document reachable is the obligation; collecting acceptance to the POLICY is not, and is
+   deliberately absent. *(Rewritten at PPR-P3: this step also said it "does not build the web channel's
+   analytics-consent surface", which stopped being true at PPR-P2 — the banner, the gate and the «Cookie»
+   footer control shipped there, `PPR-P2-INV-001`. What survives of `A3-DL-003` debt 2 is the storage
+   question for the recorded answer, not the surface.)*
 
 ## Module mount (owner-run version bump)
 
@@ -424,7 +456,7 @@ SHA-256: <строка из файла .sha256>
 **The release APK is signed by a different key than the debug build that is installed today, so Android will not update over it** (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). The install is **uninstall-then-install**, and the uninstall takes the **app sandbox** with it: the SQLCipher-encrypted store, the key held in `EncryptedSharedPreferences`, and everything written on that phone since L1-P4. Android Auto Backup is off by design (`LSC-P1-INV-002`), so there is no cloud copy anywhere. **(first execution)** — no release build has been installed on any device, so the failure mode described here is the documented Android behaviour for a signature change, not something observed on this app.
 
 - **Precondition.** If the sandbox holds anything worth keeping, **export first** — *The export archive — L1-P3* below — and copy the archive **off the device** before uninstalling. An archive still on the phone is deleted with the app.
-- **The app-side export does NOT protect the family's real history, and must not be treated as if it did.** That history lives in the **browser's `localStorage` under the production origin**. It is untouched by any uninstall, it is the only real copy, and **it must not be cleared** — not before this install, not after a successful one — until the browser→app transfer path exists. The migration bridge reads the WebView's own storage, so nothing on the phone can stand in for the browser copy (ADR-043 §3 and its 2026-08-15 annotation; the one-way import in *The write path and the legacy import — L1-P4* is not reconciliation).
+- **The app-side export does NOT protect the family's real history, and must not be treated as if it did.** That history lives in the **browser's `localStorage` under the production origin**. It is untouched by any uninstall, it is the only real copy, and **it must not be cleared** — not before this install, not after a successful one. *(Rewritten at PPR-P3. This sentence used to end "until the browser→app transfer path exists", and added that the migration bridge reads the WebView's own storage. That path was built at DIA-P1 and **retired at PPR-P2 without ever having been run against a family's real history**, so the condition it named can no longer be met and the rule is now unconditional: there is nothing on the phone that can stand in for the browser copy, and no procedure in this runbook that moves it.)* ADR-043 §3 and its 2026-08-15 annotation; the one-way import in *The write path and the legacy import — L1-P4* was never reconciliation and now has no source at all.
 - **Why now.** The first release build costs a reinstall on every family device, and this is the cheapest moment it will ever cost that: the window closes with the first diary packet, after which a reinstall starts destroying records that exist nowhere else (ADR-047 consequences).
 
 ### When the run goes red
@@ -608,12 +640,18 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
      forget). Force-stop the app and open it again: the greeting must **not** appear. Then press the round
      **«?»** in the header: the same window must open, and it must open again every time you press it. That
      pair is `FIU-DL-001` debt 14 as a parent's phone performs it — a text read once, reachable always.
-   - **since L3-P3, check that there is NO privacy-policy link yet, and that this is the correct state.**
-     Open the greeting with «?» and scroll to the bottom. Until the document is published and the shell
-     declares it (see "Privacy policy" below), there must be **no** link there. A link under that word with
-     nothing behind it is worse than no link, which is why the declaration fails closed. After you publish
-     the document and ship a build carrying `content="published"`, the same place must show
-     «Политика конфиденциальности» and it must open the real page.
+   - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** Open the
+     greeting with «?» and scroll to the bottom: «Политика конфиденциальности» must be there, and pressing
+     it must open the document — the real page, in a new tab, not a 404 and not the skills table. *(Rewritten
+     at PPR-P3. This step used to say the opposite — that there must be **no** link there yet, because the
+     document was not published and the declaration fails closed. Both halves have happened: PPR-P1 put the
+     document at `/privacy` and PPR-P3 set `content="published"`.)* **On a phone this checks the build in
+     your hand, not the repository:** the shell rides inside the APK, so a handset shows the link only from
+     the first release build produced after PPR-P3 — on an older APK its absence is correct and is not a
+     finding. The web channel's half of the same reveal runs on every push
+     (`FIU-P3-INV-002`, `app/tests/channel-composition.spec.js`, both channels), so what this step adds is
+     the one thing no test reaches: that the address answers with the document in production, which the
+     `curl` smoke in **Promotion + rollback** step 3 checks before you promote.
    - **`chrome://inspect` finds nothing since L3-P1, and no test can tell you so.** `android.webkit.WebView` has a static setter and no getter, so `FIU-P1-INV-002` asserts the value handed to it and stops there. If you want the effect itself, this is the only place it can be looked at: with the device attached, open `chrome://inspect/#devices` in a desktop Chrome and confirm the app's WebView is **not** listed. Record what you saw — that observation exists nowhere else in this repository (`FIU-DL-001` debt 16).
 
 **Building locally instead (only on a machine with the full toolchain).**
@@ -711,7 +749,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 7. **What this smoke cannot reach, and nobody should pretend otherwise:** a phone that is actually out of storage. The disk-full refusal is exercised on the emulator by making the ENGINE refuse (`DiaryEntryTest`), which is a real `SQLITE_FULL` and not a real full phone — a device with no space left also fails in ways SQLite never sees. If you ever meet one for real, the sentence you should see says the entry was NOT saved, that your text is still in the field, and to free space — not to restart the app.
 8. **One thing to know before this smoke and not after it: the archive DOES contain your diary text, and it has since the diary shipped.** Write an entry, export, and it is in `text/diary.txt`, in `index.json` and on the printed page — the parent's own entries only, never another participant's, selected by the entry's author (`FIU-DL-004`). *(Rewritten at L3-P4, and the previous wording is worth keeping in view rather than deleting quietly: it said the archive did NOT contain diary text. That was false the day it was written. The `record` dataset carries the `body` column in `export/declaration.json` since L1-P3 — declared ahead of the table having rows — so from DIA-P3 onward every export carried the entries. The same false sentence stood in the app itself, in the diary's corrupt-store message, where a parent reads it while deciding whether to copy their text out by hand; it was corrected in the same packet. What L3-P4 actually changed is the SCOPE and the READABILITY: the entries are now selected by author rather than by area, and `text/diary.txt` is written to be read rather than parsed. The earlier note that the 2026-08-17 gate had addressed this work to L3 stands — that work is this packet.)*
 
-**Note for the web channel (rewritten in DIA-P2).** In a browser there is **no archive control at all**. Until that packet the control opened a modal that explained why it could not act; the browser cannot produce an archive under any circumstances — there is no web branch in the export sink and there never was — so the action is no longer offered where it does not happen (PDR-034 §1). What the browser says instead is a line above the table: everything marked there lives only in that browser, it has no backup, and the archive is something the phone app makes. That statement is true until a transfer is confirmed (ADR-048 §5), and it is on screen without anything being opened.
+**Note for the web channel (rewritten in DIA-P2).** In a browser there is **no archive control at all**. Until that packet the control opened a modal that explained why it could not act; the browser cannot produce an archive under any circumstances — there is no web branch in the export sink and there never was — so the action is no longer offered where it does not happen (PDR-034 §1). What the browser says instead is a line above the table: everything marked there lives only in that browser, it has no backup, and the archive is something the phone app makes. That statement is true until a transfer is confirmed (ADR-048 §5), and it is on screen without anything being opened. *(Annotated at PPR-P3: the shipped sentence is unchanged and still true, but its condition can no longer be met — PPR-P2 retired the transfer, so no confirmation is reachable and the line stands unconditionally for as long as the web channel does.)*
 
 
 ### The write path and the legacy import — L1-P4
@@ -719,14 +757,18 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 > **READ THIS FIRST, SINCE L3-P2 (`FIU-DL-002`): STEPS 3–7 BELOW CANNOT BE PERFORMED ANY MORE, AND
 > THE SECTION IS KEPT RATHER THAN DELETED BECAUSE STEPS 1, 2 AND 8 STILL CAN.** The owner removed
 > the in-app transfer offer outright on 2026-08-21. There is no import modal, no profile list and no
-> *Перенести* button in the app: `surfaces/import.js` and `#importModal` are deleted. What remains
-> shipped is the MECHANISM — the plugin, the deep link, the envelope, the drain and the importer —
-> as insurance, plus the standalone handoff page at `/transfer.html`, which still emits the link and
-> still saves the file and now says plainly that the app does not pick either up. Whether any of that
-> is retired is an open owner question this packet deliberately did not answer. **The one path a
-> fresh install has to a profile is to create one in the app** — see the first-launch step in *§4
-> verification* above. Everything below is left standing as the record of what L1-P4 shipped and how
-> it was verified; the steps that drove the removed surface are marked where they stand.
+> *Перенести* button in the app: `surfaces/import.js` and `#importModal` are deleted. **Updated at
+> PPR-P3: the open owner question this paragraph left has been answered, and the answer was to
+> retire.** This paragraph used to say the MECHANISM remained shipped as insurance — the plugin, the
+> deep link, the envelope, the drain and the standalone handoff page at `/transfer.html`. None of
+> that is left: PPR-P2 (`PPR-DL-002`) deleted `HistoryTransferPlugin.java`, the `theygrow://transfer`
+> intent-filter, `onNewIntent` and `stageHandoff` from `MainActivity`, `app/transfer.html`, and five
+> spec files with it. **What DOES remain shipped is the IMPORTER** — the L1-P4 write path this
+> section is actually about, still complete, still idempotent, still reachable from `store/boot.js` —
+> and it now has no source on any channel. **The one path a fresh install has to a profile is to
+> create one in the app** — see the first-launch step in *§4 verification* above. Everything below is
+> left standing as the record of what L1-P4 shipped and how it was verified; the steps that drove the
+> removed surface are marked where they stand.
 
 From L1-P4 the app **writes**. A tick is an attributed assertion in the encrypted journal, not a
 string in a browser array, and the family's existing history moved across by an explicit act. Two
@@ -768,9 +810,12 @@ if you want to see the service-worker purge do anything; from step 3 on, any L1-
    and that evidence is what would close it.
 3. **Run the import. — NOT PERFORMABLE SINCE L3-P2; steps 3 to 7 drove the removed surface.** What
    they verified about the IMPORTER (idempotence, completion after an interruption, a revocation
-   surviving a re-run) is executed on every push by `app/tests/import-legacy.spec.js` and on a device
-   by `HistoryTransferTest`, which since L3-P2 drives `pendingTransfer → drainTransfer → runImport`
-   out of the shipped modules rather than through a modal. Left as written, below.
+   surviving a re-run) is executed on every push by `app/tests/import-legacy.spec.js`. *(Corrected at
+   PPR-P3: this sentence also named `HistoryTransferTest` as the device executor, driving
+   `pendingTransfer → drainTransfer → runImport` out of the shipped modules. That test was deleted
+   with the plugin at PPR-P2, so the importer now has **no device-side executor at all** — its
+   coverage is the browser leg named above and nothing else. That is a real narrowing and is written
+   down rather than absorbed.)* Left as written, below.
    With browser history present in `localStorage`, the import modal appears after
    the table is built. It lists each profile by name with its mark count, everything ticked. Read the
    modal — the divergence paragraph is the point of it — then press *Перенести*. Confirm the table
@@ -786,7 +831,11 @@ if you want to see the service-worker purge do anything; from step 3 on, any L1-
    is re-asserted and the later revocation still wins the projection.
 7. **Confirm the browser is untouched.** Open the PWA in a browser on the same account/device. Every
    profile and every mark is still there, exactly as before the import.
-8. **Export, and read the archive.** Save the archive and open it on a computer. For the first time it
+8. **Export, and read the archive. — the ARCHIVE half is performable; the IMPORTED-MARK half is not
+   (PPR-P3).** No path in the shipped app produces a mark with `origin: migrated_legacy` any more, so
+   what this step can still be run for is the archive itself; read *The export archive* above for the
+   current procedure. Left as written for the record. Save the archive and open it on a computer. For
+   the first time it
    is **not empty**. In `text/skills.txt`, an imported mark carries `origin: migrated_legacy` and
    `event_date_basis: import_date_unknown` beside its date, and `README.txt` has a section explaining
    that those dates are import dates and not observations. Confirm that section is present — it is the
@@ -799,8 +848,26 @@ journal backend does on a real device is covered by `android-instrumented` — w
 `pull_request` / `workflow_dispatch` job, not a per-push gate — and by this sequence. If you change
 the write path and only the parity suite is green, you have not tested the write path.
 
-### The browser-to-native history transfer — DIA-P1 (owner-run)
+### The browser-to-native history transfer — DIA-P1 (owner-run) — RETIRED, KEPT AS RECORD (PPR-P3)
 
+> **READ THIS FIRST: NOT ONE STEP IN THIS SECTION CAN BE PERFORMED, AND THE SECTION IS KEPT RATHER
+> THAN DELETED BECAUSE OF WHAT IT RECORDS.** PPR-P2 (`PPR-DL-002`) retired the browser-to-native
+> history transfer outright — `HistoryTransferPlugin.java`, `HistoryTransferTest.java`,
+> `app/transfer.html`, the `theygrow://transfer` intent-filter, `onNewIntent` and `stageHandoff` in
+> `MainActivity`, and five spec files are deleted. There is no handoff page to open, no link to
+> press, no plugin to receive one and no modal to complete it. The in-app OFFER had already gone at
+> L3-P2 (`FIU-DL-002`); this is the mechanism beneath it following. **A fresh install reaches a
+> profile by creating one in the app** — see the first-launch step in *Android shell (Capacitor)*
+> above, which is the step that now asserts the opposite of step 3 below.
+>
+> **Why it is kept.** Three things are recorded here and nowhere else: the **band invariant** at
+> step 8 (the browser's `localStorage` under the production origin is the only copy of a family's
+> history, and nothing this project shipped ever wrote to it), the **open premise** at step 4.3 (that
+> an installed WebAPK and an ordinary Chrome tab share one `localStorage` partition for an origin —
+> almost certainly true, verified nowhere, and never measured before the mechanism was retired), and
+> the owner gate on clearing the browser, restated at the end. `DIA-P1-INV-001` and `DIA-P1-INV-002`
+> are retired in `docs/INVARIANTS.md` on the same ground and keep their own evidence.
+>
 > **Owner device action.** Every step below is performed by the owner on a real handset with a real
 > browser. Claude Code does not run any of it, and nothing in CI can: `android-instrumented` boots an
 > emulator that has never held the family's browser storage, and the parity suite drives a
@@ -809,8 +876,12 @@ the write path and only the parity suite is green, you have not tested the write
 **Why this sequence exists at all.** Until DIA-P1 the app's import offer was dead code. The family's
 history lives in `localStorage` under the **production origin**, in the parent's browser; the
 Capacitor WebView's origin is `https://localhost`, a different storage partition, so the L1-P4
-importer — complete and idempotent since then — had never had a source. This transfer is the source,
-and the sequence below is the only place the whole path is ever exercised end to end.
+importer — complete and idempotent since then — had never had a source. This transfer **was** the
+source, and the sequence below **was** the only place the whole path was ever exercised end to end.
+*(Tense corrected at PPR-P3: it was never exercised. The mechanism was retired before any owner ran
+this sequence against a family's real history, so the importer has now been complete, idempotent and
+sourceless for its entire life. That is the finding this paragraph carries forward, and it is why the
+paragraph is kept.)*
 
 **Read this before starting: the reinstall is expected, and it costs nothing.** The CI debug signing
 key is **minted per run** — there is no keystore restore in `ci.yml` — so every CI-built APK installs
@@ -819,19 +890,19 @@ premise: the transfer source is in the browser, not in the app sandbox, so it su
 untouched. The device currently holds a debug APK whose sandbox was recreated on 2026-08-16 and
 contains a test profile only. Losing it costs nothing.
 
-1. **Get an APK that carries this branch.** GitHub → **Actions** → **CI** → **Run workflow**, pick
+1. **Get an APK that carries this branch. — NOT PERFORMABLE SINCE PPR-P2 (`HistoryTransferTest` no longer exists).** GitHub → **Actions** → **CI** → **Run workflow**, pick
    `feat/l2-local-diary`. On the dispatch path the `android` job is skipped and
    `android-instrumented` uploads `theygrow-debug-apk` itself, so one dispatch yields both the
    instrumented verdict and the installable build. **Read the instrumented result before installing
    anything** — if `HistoryTransferTest` is red, the device smoke will not tell you anything the job
    has not already told you better.
-2. **Install it.** `adb install -r app-debug.apk`, or transfer the file and allow installation from
+2. **Install it. — the install itself still works; nothing below it does.** `adb install -r app-debug.apk`, or transfer the file and allow installation from
    unknown sources. The previous sandbox is gone; that is step 0 of this procedure working, not a
    fault.
-3. **Confirm the app is empty and says so.** Launch it. The skills table renders and no marks are
+3. **Confirm the app is empty and says so. — NOT PERFORMABLE, AND THE CURRENT CHECK IS ITS EXACT OPPOSITE.** The transfer offer was removed at L3-P2; *Android shell (Capacitor)* above now instructs the owner to confirm that **there must be no offer to move anything from a browser, at any point** (`FIU-P2-INV-001`). Read that step, not this one. Launch it. The skills table renders and no marks are
    ticked. The transfer offer appears — «История лежит в браузере…» — with an **Открыть браузер**
    button. If it does not appear, stop: nothing below will work and the fault is before the browser.
-4. **Open the handoff page from BOTH browser entry points, and record what each one saw.** This is the
+4. **Open the handoff page from BOTH browser entry points, and record what each one saw. — NOT PERFORMABLE SINCE PPR-P2 (`app/transfer.html` is deleted). Sub-step 3 is the open premise this section is kept for.** This is the
    step that turns an assumption into an observation, so do not collapse it into one:
    1. **From the installed PWA.** Open the tracker the way the family normally does — the installed
       icon — and navigate to `/transfer.html` on that origin. Record whether the page reports profiles
@@ -843,41 +914,47 @@ contains a test profile only. Losing it costs nothing.
       almost certainly true and it is **not verified anywhere in this repository**; this step is where
       it becomes a fact with a date on it. If the two disagree, the transfer must be run from
       whichever entry point sees the history, and that divergence is a finding worth its own entry.
-5. **Press the button on the page.** Expect the app to come to the front. If instead the page tells
+5. **Press the button on the page. — NOT PERFORMABLE SINCE PPR-P2.** Expect the app to come to the front. If instead the page tells
    you a file was saved to downloads, the link had no handler — that is the automatic fallback
    working (`browser_fallback_url`), not a failure. Continue at step 6b.
-6. **Complete the transfer in the app.**
+6. **Complete the transfer in the app. — NOT PERFORMABLE SINCE L3-P2.**
    1. **Link path:** the transfer modal lists the child profile with its mark count and a
       **Перенести** button. Press it.
    2. **File path:** the modal shows one line of instruction and a **Выбрать файл** button. Press it,
       pick the file the browser saved, and then press **Перенести**.
    Either way the status line ends with «Перенесено: детей 1, отметок N».
-7. **Verify the marks actually landed — in the journal, not in the status line.** Close the modal.
+7. **Verify the marks actually landed — in the journal, not in the status line. — NOT PERFORMABLE (depends on 6).** Close the modal.
    The skills table now shows the ticked skills the browser held. Force-stop the app, relaunch it,
    and confirm they are **still** ticked: that is the difference between a surface that rendered and a
    journal that was written. Then save the archive (**Сохранить архив**) and open it on a computer:
    in `text/skills.txt` the imported marks carry `origin: migrated_legacy` and
    `event_date_basis: import_date_unknown`.
-8. **Confirm the browser is UNCHANGED.** Go back to the browser, open the tracker, and check that
+8. **Confirm the browser is UNCHANGED. — NOT PERFORMABLE as a step, but READ IT: this is the band invariant, and it survives the retirement as a standing owner rule.** Go back to the browser, open the tracker, and check that
    every profile and every mark is still there, exactly as in step 4. **This is the band invariant of
    the whole milestone and the reason half its tests exist**: that `localStorage` is the only copy of
    this family's history, and nothing in this milestone clears or mutates it. The handoff page reads
    and does not write; the importer does not touch its source (`LSC-P4-INV-002`).
-9. **Record the result** in the smoke note: which entry points saw the history at step 4, which path
+9. **Record the result** — NOT PERFORMABLE (depends on 4-8) — in the smoke note: which entry points saw the history at step 4, which path
    the transfer took (link or file), how many marks arrived, whether they survived the restart, and
    that the browser was unchanged. Never a child's name or anything that points at a person.
 
 **Clearing the browser is a separate, explicit owner action, taken AFTER a confirmed transfer — and
 no packet in this milestone performs it.** Nothing in the code removes, rewrites or marks the source
-consumed; the decision and the moment are the owner's alone.
+consumed; the decision and the moment are the owner's alone. *(Since PPR-P3 there is no transfer to
+confirm, so the precondition in that sentence can never be met. The live form of this rule is
+**Closing a milestone** step 11, which states it without the condition: the browser copy is the only
+copy and the honest default is not to clear it. Left here as written, because it is the sentence the
+band invariant at step 8 was written to protect.)*
 
 **What no step above can show.** Whether a real browser truncates a URI between the fixture size and
 the 16 KiB `linkMaxBytes` ceiling. Nothing measures that: the instrumented leg fires a synthetic
 Intent rather than driving Chrome, and a real history is about 2.5 KB, so this smoke runs far below
-the ceiling. It is bounded rather than open — a shortened URI fails the declared byte count or the
-digest, the receiver refuses it before staging, and the app falls to the file path — and
-`HistoryTransferTest.the_receiver_refuses_a_truncated_link` executes exactly that refusal on an input
-it builds itself.
+the ceiling. It was bounded rather than open — a shortened URI failed the declared byte count or the
+digest, the receiver refused it before staging, and the app fell to the file path — and
+`HistoryTransferTest.the_receiver_refuses_a_truncated_link` executed exactly that refusal on an input
+it built itself. *(Tense corrected at PPR-P3, and the test named here was deleted with the plugin at
+PPR-P2. The question this paragraph poses — what a real browser does to a URI between the fixture
+size and the 16 KiB ceiling — was never answered and now never will be by this mechanism.)*
 
 ### The diary and its search — DIA-P3 / DIA-P4 (owner-run)
 
@@ -885,8 +962,13 @@ it builds itself.
 > job in CI can: the emulator has never held this family's history, and the parity suite drives a
 > synthetic origin with no store behind it.
 
-**Run this after the transfer smoke above, on the same install.** The diary needs a child profile, and the
-transfer is what puts one there.
+**Run this on a fresh install, before the export-archive smoke.** The diary needs a child profile, and since
+L3-P2 the app asks for one itself on a first native launch — the create-profile window, in the slot the
+removed transfer offer vacated. *(Rewritten at PPR-P3. This paragraph used to read "run this after the
+transfer smoke above … the transfer is what puts one there", which was the ordering *Closing a
+milestone* step 10 withdrew at L3-P4 and which PPR-P2 made impossible outright by retiring the
+mechanism. The current order is: the diary and its search, then the export archive, whose step 9 reads
+the diary entry back out of the archive.)*
 
 1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. Press **Новая запись**,
    pick a day that is NOT today — deliberately, because the event day and the moment of writing are
@@ -967,9 +1049,10 @@ not a case the parent can fix and not one this procedure has a command for.
      `fts rebuild: records=5 ms=…`, and — recorded rather than required —
      `fts integrity-check over an emptied index: bare=… | rank=1=…`.
    - **`DIA` — the search waits**, `DiaryEntryTest`'s:
-     `search wait as the parent experiences it: repairing=… ms, ordinary=… ms`. **`DIA` is not unique to
-     that suite** (`HistoryTransferTest` logs under it too), so scope the read to the leg rather than to
-     the tag alone.
+     `search wait as the parent experiences it: repairing=… ms, ordinary=… ms`. **`DIA` was not unique to
+     that suite** — `HistoryTransferTest` logged under it too until PPR-P2 deleted it — so scope the
+     read to the leg rather than to the tag alone. The habit is worth keeping now that the collision is
+     gone: the next suite to reuse the tag reintroduces it silently.
 
    Read the numbers **with the corpus attached**: five short sentences and two short entries on an
    emulator, which does not predict a diary with three years in it.
@@ -1019,18 +1102,33 @@ not a case the parent can fix and not one this procedure has a command for.
    ```
 
    The docker daemon needs a real terminal with `sudo`; the run stages the Capacitor web root itself.
-   **There are 20 PNGs, 10 per project.** For L3 the expected movement is the header and everything
-   carrying it — `header`, `shell-seeded`, `shell-no-profile`, `shell-zpd-filtered`,
-   `shell-zpd-empty-state` — plus `modal-onboarding` (the intro window gained the policy link and a way
-   back) and `modal-create-profile`. On mobile the header also grew 57 px → 61 px, because the download
-   offer became a `<button>` and met the 44 px tap-target rule the old `<a>` escaped.
+   **There are 20 PNGs, 10 per project.** That count is a property of the suite and does not move with a
+   milestone; what follows it does, so read the expectation for the milestone you are closing and not for
+   the one before it.
+
+   **For PPR the expected movement is the FOOTER band, on 16 of the 20**, and it was measured rather than
+   assumed at PPR-P2 by decoding each `-diff.png` and taking the bounding box of the marked pixels: on
+   desktop every changed region is rows **760-790 of 800**, on mobile rows **712-737 of 760**, and nothing
+   else on any page. The cause is the new «Cookie» control in the footer (`#cookieSettingsBtn`). The four
+   modal shots move for the same reason and not because a modal changed — a `rgba(0, 0, 0, 0.5)` overlay
+   lets the footer show through. PPR-P3's declaration flip adds the policy link to the intro window, which
+   moves `modal-onboarding` in both projects; both are already in the red set, so the count stays 16.
+
+   The 16, named so the run can be checked against them rather than eyeballed —
+   `visual-desktop/`: `control-footer`, `modal-activities`, `modal-create-profile`, `modal-onboarding`,
+   `modal-skill`, `shell-no-profile`, `shell-seeded`, `shell-zpd-empty-state`, `shell-zpd-filtered`;
+   `visual-mobile/`: `control-footer`, `modal-activities`, `modal-onboarding`, `shell-no-profile`,
+   `shell-seeded`, `shell-zpd-empty-state`, `shell-zpd-filtered`.
+   Expected to come back GREEN, all four: `visual-desktop/header.png`, `visual-mobile/header.png`,
+   `visual-mobile/modal-create-profile.png`, `visual-mobile/modal-skill.png`.
 
    **What is a FINDING rather than a re-bless**, i.e. stop and report instead of committing the PNG:
-   movement in `modal-skill`, `modal-activities` or `control-footer` — this milestone did not touch those
-   surfaces; any red outside the two visual projects; or a screenshot that fails to render at all. The
-   baselines have been inherited-red since `a8b2ec2` (the APK button losing `hidden=""`), so this run is
-   expected to absorb that too rather than to show it as a separate diff — if the header PNGs come back
-   unchanged, something did not run.
+   movement in any of those four expected-green shots; movement in a region other than the footer band and
+   the intro window's new link; a 17th PNG moving; any red outside the two visual projects; or a screenshot
+   that fails to render at all. *(Rewritten at PPR-P3. The list above used to be L3's — the header band —
+   and it named `control-footer`, `modal-skill` and `modal-activities` as findings, which for THIS
+   milestone is exactly backwards: the footer is what changed. The "inherited-red since `a8b2ec2`" note is
+   superseded too; PPR-P2 measured the current red set directly and it is the one written above.)*
 
 5. **Open the milestone PR** (the milestone branch → `main`; `feat/l3-first-install-ux` at L3). The PR event runs `android-instrumented`
    again, plus the PDF/A validation leg, plus `quality` and `parity` — the full gate.
@@ -1043,7 +1141,8 @@ not a case the parent can fix and not one this procedure has a command for.
    in place, so through that milestone `CACHE_VERSION` stayed **v16** and the mount checks addressed `/m/v6/`.
    *(Corrected at L3-P1, `FIU-DL-001`: that sentence was written while `/m/v6/` was still unpublished, and it
    stopped describing the tree the moment L2 merged. L3-P1 bumped the mount to `/m/v7/` with `CACHE_VERSION`
-   **v17**, so the checks in step 3 address `/m/v7/` — as the corrected lines there now do. The rule the L2
+   **v17**, and PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, so the checks in step 3 address `/m/v8/` — as the corrected
+   lines there now do, corrected a second time at PPR-P3. The rule the L2
    note is an instance of, and the one to apply at every future close, is `Module mount` item 1: read the
    current values out of `app/index.html` and `app/sw.js` rather than out of this sentence.)*
 9. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
@@ -1055,21 +1154,40 @@ not a case the parent can fix and not one this procedure has a command for.
    (`FIU-DL-002`) and a fresh install now asks for the child itself, so the diary no longer depends on it. The
    order at L3 is: **the diary and its search** (the section above — write an entry, that is what the next one
    needs), then **the export archive** (*The export archive*, steps 1-9, whose step 9 reads that entry back out
-   of the archive and off the printed page). The transfer section is kept for the mechanism still shipped as
-   insurance; its steps 3-7 cannot be performed any more and it says so at its head. Read the instrumented
+   of the archive and off the printed page). *(Corrected again at PPR-P3, and the correction is about which
+   section says what.) The clause "the transfer section is kept for the mechanism still shipped as
+   insurance; its steps 3-7 cannot be performed any more and it says so at its head" was wrong in both
+   halves. The head note it described belongs to **The write path and the legacy import — L1-P4**, whose
+   steps 3-7 are the fenced ones; **The browser-to-native history transfer — DIA-P1** carried no head note
+   at all. Both sections have one now. And the mechanism is no longer shipped as insurance either — PPR-P2
+   deleted the plugin, the intent-filter, the handoff page and the instrumented test — so the transfer
+   section is kept purely as a record and **not one of its steps can be performed**.* Read the instrumented
    result before installing anything either way — which step 2 above has already done.
 11. **The still-gated owner items, none of which this milestone performs.** Clearing the browser's
-    `localStorage` after a confirmed transfer (nothing in the code removes, rewrites or marks the source
-    consumed — the decision and the moment are the owner's). Removing the install prompt (PDR-034 §3, gated
-    on this smoke). The GA4 surface, which stays until authentication appears at L4. Retiring `m/v1`–`m/v5`.
-    The **analytics-consent surface for the web channel**, which is still owed and is separate work
-    (`A3-DL-003` debt 2; PDR-035 §5 assigns it to the web channel only). *(Rewritten at L3-P3. This line
+    `localStorage` — **and since PPR-P3 that is no longer "after a confirmed transfer" but simply not to be
+    done**: nothing in the code removes, rewrites or marks the source consumed, no transfer exists to
+    confirm, and the browser copy is therefore the only copy of a family's history with no path off it. The
+    decision and the moment stay the owner's, and the honest default is *not yet*. Removing the install
+    prompt (PDR-034 §3, gated on this smoke). The GA4 surface, which stays until authentication appears at
+    L4. Retiring `m/v1`–`m/v7`. *(Rewritten at PPR-P3, in three places. The mount item read `m/v1`–`m/v5`
+    and had been carried forward unrevised through two bumps; `/m/v8/` is the running generation since
+    PPR-P2, so `/m/v6/` and `/m/v7/` join the list, and retiring any of them stays an owner-level decision.
+    The clearing item lost the precondition that made it conditional. And this line listed the
+    **analytics-consent surface for the web channel** as still owed and separate work — PPR-P2 built it:
+    the banner, the gate that fetches nothing from an analytics origin before an explicit yes, and the
+    «Cookie» footer control that withdraws, enforced by `PPR-P2-INV-001`. What survives of `A3-DL-003`
+    debt 2 is the storage question for the recorded answer, not the surface.)* *(Rewritten at L3-P3. This line
     used to say "the privacy-policy and consent surface, whose address is a separate owner decision" —
     half of that is settled: the address is fixed at `https://theygrow.app/privacy`, declared once in
     `CHANNEL_CONFIG.policyUrl`, and the app links it from the intro window as soon as the shell declares
     the document published. What is still owed is the DOCUMENT — see "Privacy policy" below — and the
     consent surface, which this milestone deliberately does not build: making the policy reachable is the
-    obligation, collecting acceptance is not.)* *(The artefact work the
+    obligation, collecting acceptance is not.)* *(Both halves of that are settled as of PPR-P3, and the L3
+    note above is kept as the record of what that milestone handed on rather than rewritten. The DOCUMENT
+    is `app/privacy.html`, served at `/privacy` since PPR-P1 and declared `published` since PPR-P3
+    (`PPR-P1-INV-001`, `FIU-P3-INV-002`). The ANALYTICS-consent surface shipped at PPR-P2
+    (`PPR-P2-INV-001`). Acceptance of the POLICY is still collected nowhere, and that is still the
+    decision rather than an omission.)* *(The artefact work the
     2026-08-17 gate addressed to **L3** is no longer on this list: it shipped in L3-P4. The archive carries
     the exporting participant's own diary text, in the data layer and in the print layer, under format
     version 2 — see **The export archive** above. The sentence that used to stand here, and the diary's

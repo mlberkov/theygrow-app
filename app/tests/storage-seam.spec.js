@@ -81,11 +81,15 @@ const DECLARED_SHELL_ACCESSES = [{ file: 'index.html', key: 'ga_debug' }];
 const KEYED_ACCESS =
   /\b(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem)\s*\(\s*'([^']+)'/g;
 
-// DIA-P1 adds transfer.html. It is the shell with the most at stake for this
-// invariant: it runs on the production origin, where localStorage holds the only
-// copy of the family's history, so its whole module graph belongs inside the
-// scanned surface rather than beside it.
-const SHIPPED_HTML = ['index.html', 'offline.html', 'transfer.html'];
+// DIA-P1 added transfer.html — the shell with the most at stake for this
+// invariant, since it ran on the production origin where localStorage holds the
+// only copy of the family's history — and PPR-P2 removes it with the whole
+// transfer mechanism. The scanned surface shrinks by one shell and the seam is
+// unchanged: what this guard is about is that every Web Storage access in any
+// shipped graph goes through one door, and the door did not move. The page's own
+// property, that it read the browser and never wrote to it, is not weakened here
+// — it is gone, along with the page that had to have it.
+const SHIPPED_HTML = ['index.html', 'offline.html'];
 
 const HTML_SOURCES = SHIPPED_HTML.map((file) => ({
   where: file,

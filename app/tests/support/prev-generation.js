@@ -26,9 +26,11 @@
 //            generation actually published (verified byte-for-byte at EMV-P3
 //            against 711b5bc). It also said, in as many words, that a later
 //            packet editing index.html for any other reason turns this into
-//            "the current shell repointed at the previous mount". DIA-P1 is
+//            "the current shell repointed at the previous mount". DIA-P1 was
 //            that packet: it added four delivery hints and the handoff controls
-//            in #importModal. So the fixture is now the WEAKER of the two
+//            in #importModal — and PPR-P2 has since removed both, added the
+//            cookie banner and the footer control, and changed the head's
+//            analytics block. So the fixture is now the WEAKER of the two
 //            things, deliberately and on the record — still the right fixture
 //            for the MECHANISM, no longer the historical bytes, and the spec
 //            states that bound too.
@@ -41,16 +43,26 @@
 //            installed client only discovers an update because the fetched
 //            /sw.js differs from the one it registered.
 //
-//            ONE RESIDUAL UNFAITHFULNESS, NAMED RATHER THAN LEFT TO BE FOUND:
-//            the pruning key is "does this path exist on disk", so a non-mount
-//            page the current generation added — /transfer.html at DIA-P1 —
-//            DOES exist and is therefore still precached by the staged worker,
-//            though the previous generation never listed it. It costs the
-//            fixture nothing: cache.addAll succeeds, and every property the
-//            upgrade-path spec asserts is about getting OFF the previous mount,
-//            which this does not touch. Reconstructing the previous list
-//            exactly would mean re-deriving it from the staged shell, i.e.
-//            reimplementing the worker instead of rewriting it.
+//            ONE RESIDUAL UNFAITHFULNESS RETIRED, AND ITS SHAPE KEPT ON THE
+//            RECORD, because the next non-mount page brings it back. The pruning
+//            key is "does this path exist on disk", so a non-mount page the
+//            current generation added stays precached by the staged worker even
+//            though the previous generation never listed it. /transfer.html was
+//            that page from DIA-P1 until PPR-P2 retired it, and it is now out of
+//            OFFLINE_URLS entirely, so there is nothing to over-carry today. It
+//            cost the fixture nothing then and would cost nothing again:
+//            cache.addAll succeeds, and every property the upgrade-path spec
+//            asserts is about getting OFF the previous mount, which this does
+//            not touch. Reconstructing the previous list exactly would mean
+//            re-deriving it from the staged shell, i.e. reimplementing the
+//            worker instead of rewriting it.
+//
+//            THE OPPOSITE CASE ARRIVES WITH PPR-P2 AND IS HARMLESS BY
+//            CONSTRUCTION: /m/v8/ ships FEWER modules than /m/v7/, and this
+//            fixture builds the previous worker from the CURRENT list, so a file
+//            the previous generation had and the current one does not is simply
+//            never named. The fixture can under-represent the previous
+//            generation; it cannot invent it.
 //
 // WHAT IT IS NOT. It is not the bytes any PARTICULAR live client holds. A live
 // client holds whatever generation was current when it last updated, and its
@@ -142,7 +154,10 @@ function previousGeneration(appRoot) {
   // what happened: DIA-P1 added the handoff page and its three modules, and the
   // rewrite produced a previous-generation worker precaching /m/v{prev}/transfer/…
   // — paths that generation never carried and never listed. It threw with the
-  // path, as designed, and the mystery was avoided.
+  // path, as designed, and the mystery was avoided. PPR-P2 is the same shape
+  // again from the other side of the same list: /m/v8/ adds consent/config.js
+  // and surfaces/consent.js, which /m/v7/ never had, and they are dropped here
+  // for the same reason.
   //
   // The right repair is to make the fixture FAITHFUL rather than to relax it: the
   // previous generation's worker did not precache what the previous generation

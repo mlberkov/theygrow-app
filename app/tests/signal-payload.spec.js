@@ -70,6 +70,37 @@ const FAMILY_TEXT = [
 
 let signals = null;
 
+// The taxonomy OF THE GENERATION A MODULE BELONGS TO, keyed by mount directory.
+//
+// PPR-P2, AND THE SAME LESSON export-contour.spec.js LEARNED AT DIA-P2: a frozen
+// generation is not a second declaration, and it is not a vote on the current
+// one either. This scan walks EVERY shipped .js, which is right — an emitter is
+// an emitter wherever it lives — but it used to check all of them against the
+// RUNNING mount's taxonomy. That held only while the taxonomy could grow and
+// never shrink. PPR-P2 removes `history.handoff` with the transfer mechanism it
+// described, and /m/v4/surfaces/import.js — deleted from the product at L3-P2,
+// still on disk at its frozen generation and still shipped — went red for a
+// declaration that was correct when those bytes were published. A guard that
+// makes a frozen generation veto the current one has stopped being about the
+// property it names.
+//
+// So each module is read against the taxonomy of its OWN generation. The running
+// mount is still checked against the running taxonomy, which is the leg that
+// matters; the frozen ones are still checked, against what they were written to.
+const taxonomies = new Map();
+
+const taxonomyFor = (urlPath) => {
+    const generation = /^\/m\/(v\d+)\//.exec(urlPath);
+    if (!generation) {
+        throw new Error(`${urlPath}: a shipped module outside the mount emits a signal`);
+    }
+    const loaded = taxonomies.get(generation[1]);
+    if (!loaded) {
+        throw new Error(`${urlPath}: no taxonomy was loaded for ${generation[1]}`);
+    }
+    return loaded;
+};
+
 test.beforeAll(async () => {
     // Node decides ESM-or-CommonJS from the nearest package.json, and
     // app/package.json cannot say "type":"module" without breaking every
@@ -87,6 +118,26 @@ test.beforeAll(async () => {
         'signals.js was not copied verbatim — this spec would test a different file'
     ).toBeTruthy();
     signals = await dynamicImport(pathToFileURL(copy).href);
+
+    // Every generation that ships an emitter, loaded the same verified-copy way.
+    const generations = new Set(
+        SHIPPED_JS.map((urlPath) => /^\/m\/(v\d+)\//.exec(urlPath))
+            .filter(Boolean)
+            .map((m) => m[1])
+    );
+    expect(generations.size, 'the ship list carries no mount generation at all').toBeGreaterThan(0);
+    expect(generations.has(MOUNT.dir), 'the running generation is not shipped').toBe(true);
+    for (const dir of generations) {
+        const original = path.join(APP_ROOT, 'm', dir, 'core', 'signals.js');
+        if (!fs.existsSync(original)) continue;
+        const target = path.join(loadRoot, `signals-${dir}.js`);
+        fs.copyFileSync(original, target);
+        expect(
+            fs.readFileSync(target).equals(fs.readFileSync(original)),
+            `m/${dir}/core/signals.js was not copied verbatim — this spec would test a different file`
+        ).toBeTruthy();
+        taxonomies.set(dir, await dynamicImport(pathToFileURL(target).href));
+    }
 });
 
 test.afterAll(() => {
@@ -189,12 +240,18 @@ test.describe('the payload guard refuses what it cannot prove safe', () => {
 
     // SPLIT IN TWO AT L3-P2 (FIU-DL-002), BECAUSE THE TAXONOMY GAINED A SECOND
     // STATE AND ONE COUNT CANNOT CARRY BOTH. `emittedNow` was true for all nine
-    // kinds until this packet; the transfer offer's removal left
+    // kinds until that packet; the transfer offer's removal left
     // `history.handoff` and `history.import` DECLARED with no producer, and the
     // honest flag for that is false. `emitSignal` refuses a kind flagged false,
-    // by design — so this leg now asserts the two halves separately rather than
+    // by design — so this leg asserts the two halves separately rather than
     // being relaxed into a range, which would have stopped noticing a kind that
     // silently became unemittable for the WRONG reason.
+    //
+    // PPR-P2 REMOVES `history.handoff` OUTRIGHT, and the remaining declared-not-
+    // emitted kind is `history.import` alone. A kind flagged false is a kind
+    // waiting for its emitter to come back; the handoff's cannot, because the
+    // mechanism it described is retired, and a taxonomy entry for a thing that
+    // does not exist is a false statement in a machine-readable surface.
     test('anti-vacuity: every EMITTED kind is emittable with its own declared codes', async () => {
         const { emitSignal, SIGNAL_TAXONOMY } = signals;
         const emittedKinds = Object.entries(SIGNAL_TAXONOMY).filter(
@@ -313,17 +370,29 @@ test.describe('every emitter in the shipped surface is provably payload-safe', (
     });
 
     test('every call names a declared kind with a string literal', () => {
-        const declared = Object.keys(signals.SIGNAL_TAXONOMY);
+        // Anti-vacuity for the per-generation lookup: the running mount's
+        // taxonomy must be one of the loaded ones and must be non-empty, or
+        // "declared" below could be an empty list that contains nothing and
+        // fails loudly, or a stale one that contains everything.
+        expect(
+            Object.keys(taxonomyFor(`${MOUNT.prefix}core/signals.js`).SIGNAL_TAXONOMY).length,
+            'the running generation loaded an empty taxonomy'
+        ).toBeGreaterThan(0);
+
         for (const { urlPath, argument } of callSites()) {
+            const declared = Object.keys(taxonomyFor(urlPath).SIGNAL_TAXONOMY);
             const kind = argument.match(/^'([^']+)'/);
             expect(kind, `${urlPath}: emitSignal is called with a non-literal kind`).not.toBe(null);
-            expect(declared, `${urlPath}: "${kind[1]}" is not in the taxonomy`).toContain(kind[1]);
+            expect(
+                declared,
+                `${urlPath}: "${kind[1]}" is not in the taxonomy of the generation it ships in`
+            ).toContain(kind[1]);
         }
     });
 
     test('every payload key is a literal, and declared for that kind', () => {
-        const { SIGNAL_TAXONOMY } = signals;
         for (const { urlPath, argument } of callSites()) {
+            const { SIGNAL_TAXONOMY } = taxonomyFor(urlPath);
             const kind = argument.match(/^'([^']+)'/)[1];
             const payload = argument.slice(argument.indexOf(',') + 1).trim();
             if (!payload.startsWith('{')) {

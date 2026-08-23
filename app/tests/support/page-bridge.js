@@ -335,12 +335,12 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     // NO `TheyGrowTransfer` BRANCH SINCE L3-P2, AND ITS ABSENCE
                     // IS LOAD-BEARING (FIU-DL-002). It used to answer
                     // `pendingTransfer` so the boot-time import offer could take
-                    // its "nothing to offer" branch quietly. The offer and its
-                    // surface are gone, so nothing in the shipped page calls
-                    // that plugin any more — and this seam fails closed, so if
-                    // anything ever calls it again the throw below names the
-                    // plugin rather than letting a resurrected offer pass
-                    // unnoticed through a leg about something else.
+                    // its "nothing to offer" branch quietly. The offer went at
+                    // L3-P2 and the plugin itself at PPR-P2, so there is no such
+                    // plugin on any device now — and this seam fails closed, so
+                    // a call to any plugin but the store names the plugin in the
+                    // throw below rather than passing unnoticed through a leg
+                    // about something else.
                     if (plugin !== 'CapacitorSQLite') {
                         throw new Error(`[page-bridge] no answer for plugin ${plugin}`);
                     }

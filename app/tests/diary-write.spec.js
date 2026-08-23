@@ -391,10 +391,12 @@ test.describe('a store failure is classified, not swallowed and not retried', ()
 });
 
 test.describe('the closed codes agree with the signal taxonomy', () => {
-    // One mapping point, asserted across the two modules that hold it — the same
-    // rule transfer-seam.spec.js applies to the transfer plugin's refusal list.
-    // store/ has no import edge into core/, so the lists cannot be shared by
-    // construction; this is what keeps them from drifting instead.
+    // One mapping point, asserted across the two modules that hold it. The rule
+    // came from transfer-seam.spec.js, which applied it to the transfer plugin's
+    // refusal list; that spec and that list are retired (PPR-P2) and this is the
+    // only pairing left. store/ has no import edge into core/, so the lists
+    // cannot be shared by construction; this is what keeps them from drifting
+    // instead.
     test('every store failure code is a declared failure_class value', async () => {
         const { STORE_FAILURE_CODES } = await load('store/errors.js');
         const { SIGNAL_CODES } = await load('core/signals.js');

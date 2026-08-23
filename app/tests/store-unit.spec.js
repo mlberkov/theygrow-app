@@ -43,17 +43,19 @@ const dynamicImport = new Function('specifier', 'return import(specifier)');
 
 let loadRoot = null;
 
-// THE COPY PRESERVES THE MOUNT'S DIRECTORY LAYOUT, and since DIA-P1 it has to.
+// THE COPY PRESERVES THE MOUNT'S DIRECTORY LAYOUT, and it is kept that way
+// deliberately now that nothing forces it.
 //
-// Until that packet every store module imported only its siblings, so a FLAT
-// copy of store/ was faithful. store/transfer.js imports `../transfer/config.js`
-// — the transfer knobs live in their own surface, beside the handoff page that
-// shares them — and a flat copy turned that into a module resolution failure
-// that reads as "boot.js is not import-safe off the browser". The layout is
-// therefore reproduced rather than flattened: the marker package.json sits at
+// DIA-P1 forced it: store/transfer.js imported `../transfer/config.js`, and a
+// FLAT copy of store/ turned that into a module resolution failure reading as
+// "boot.js is not import-safe off the browser". PPR-P2 retires that module, so
+// every store module imports only its siblings again and a flat copy would work
+// today. It is not flattened, because the layout is the mount's and this fixture
+// is only faithful while it stays the mount's — the marker package.json sits at
 // the temp root and each directory is copied under its own name, so every
-// relative specifier resolves exactly as it does in the mount.
-const COPIED_DIRS = ['store', 'transfer'];
+// relative specifier resolves exactly as it does in the mount, including the
+// first one that reaches outside store/ again.
+const COPIED_DIRS = ['store'];
 
 test.beforeAll(() => {
     loadRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'theygrow-store-'));

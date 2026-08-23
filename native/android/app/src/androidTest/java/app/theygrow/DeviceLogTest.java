@@ -78,8 +78,8 @@ import org.junit.runner.RunWith;
  *       and would destroy the CI job's own artefact for every other suite. The
  *       needle scan deliberately covers the WHOLE process rather than that
  *       marker window: the claim is about the process, and a full run holds
- *       seven other suites' traffic in it — marks, imports, transfers,
- *       exports — that this leg never performs. The window scopes only the
+ *       the other suites' traffic in it — marks, imports, exports — that this
+ *       leg never performs. The window scopes only the
  *       channel assertion.
  *   <li><b>The reader's scope proves itself.</b> A second, unfiltered dump must
  *       contain a line from some other process, so a reader that could only ever
@@ -125,22 +125,18 @@ import org.junit.runner.RunWith;
  * way and is silent for a second reason ({@code FLAG_DEBUGGABLE} clear); that
  * second reason is derived from AGP's own defaults and is NOT observed here,
  * because no release artefact exists. It scans this process's log output; it
- * says nothing about the saved-instance-state parcel, about the handoff link's
- * journey through the activity manager, about {@code
+ * says nothing about the saved-instance-state parcel, about {@code
  * webContentsDebuggingEnabled}, which is a different sink on the same build, or
- * about the ungated tags below Capacitor — {@code SQLiteLog}, the SQLite
- * plugin's own {@code android.util.Log} calls, and this app's own {@code
- * TheyGrowTransfer}, none of which the knob touches and none of which this suite
- * drives.
+ * about the ungated tags below Capacitor — {@code SQLiteLog} and the SQLite
+ * plugin's own {@code android.util.Log} calls, neither of which the knob touches
+ * and neither of which this suite drives. A third such tag, this app's own
+ * {@code TheyGrowTransfer}, was enumerated here until PPR-P2 retired the plugin
+ * that wrote it.
  */
 @RunWith(AndroidJUnit4.class)
 public class DeviceLogTest {
 
     private static final String TAG = "LOGSCAN";
-
-    // The plugin's own tag, built rather than written, so this file's own log
-    // lines can never be the thing its scan finds.
-    private static final String TRANSFER_TAG = "TheyGrow" + "Transfer";
 
     private static final long POLL_MS = 400;
     private static final long EVALUATE_TIMEOUT_MS = 30_000;
@@ -248,96 +244,6 @@ public class DeviceLogTest {
                 squeeze(config).contains("\"loggingBehavior\":\"none\""));
     }
 
-    /**
-     * The transfer plugin's own tag, which the gate never used to reach (L3-P2).
-     *
-     * <p><b>WHY THIS LEG EXISTS, AND WHY HERE.</b> {@code DIA-P5}'s knob closes
-     * {@code com.getcapacitor.Logger}. {@code HistoryTransferPlugin} did not log
-     * through it — it called {@code android.util.Log} directly — so its ~14 call
-     * sites under one first-party tag wrote to logcat in every build, whatever
-     * the knob said. That is why {@code DIA-P5-INV-001}'s Scope had to ENUMERATE
-     * this tag as untouched, and why run 32074105863 measured seven of its lines
-     * standing in a capture whose subject was a closed gate ({@code DIA-DL-010}
-     * debt 13). The plugin now logs through {@code Logger}, keeping its tag
-     * string and gaining the gate. This suite owns the reader and its three
-     * controls, so the executor for that belongs beside them rather than in a
-     * fourth copy of a logcat scan.
-     *
-     * <p><b>WHAT IT DRIVES.</b> Two refusals across the real bridge into the
-     * real plugin: an undeclared option key, which goes through the shared
-     * {@code refuseOptions} helper, and a foreign handoff URL, which is a
-     * branch-local refusal. Both were {@code Log.w} call sites before this
-     * packet and neither starts anything — the first returns before any work,
-     * the second before any Intent — so the leg costs one bridge round trip and
-     * changes no state.
-     *
-     * <p><b>WHAT IT DOES NOT CLAIM.</b> That the plugin's diagnostics are
-     * STRUCTURALLY constrained. {@code refuse(code, evidence)} still takes a
-     * free string; what changed is that its sink is gated. The remaining half of
-     * debt 13 is open and inventoried, and this leg would go green on a
-     * diagnostic carrying anything at all — it asserts an absent SINK, not a
-     * safe payload.
-     */
-    @Test
-    public void the_transfer_plugins_own_tag_writes_nothing_to_the_device_log() {
-        // CONTROL 1, FIRST, for the reason the family-text leg states about its
-        // own: a zero from a matcher that cannot match is not evidence. The
-        // shape is the one run 32074105863 actually carried, including the
-        // externally supplied query key that run echoed verbatim.
-        String asItWasWritten =
-                "08-21 12:00:00.000  1234  1234 W "
-                        + TRANSFER_TAG
-                        + ": foreign_key: the handoff link at theygrow://transfer carried the"
-                        + " undeclared query key \"note\"";
-        assertTrue(
-                "the scanner cannot find the plugin's tag in a line built in the shape run"
-                        + " 32074105863 produced, so a zero below would mean the matcher stopped"
-                        + " matching rather than the plugin stopped writing",
-                occurrences(asItWasWritten, TRANSFER_TAG) > 0);
-
-        // CONTROL 2, before the launch, so the window covers boot.
-        String marker = "transfer-tag control контроль-кодировки-" + System.nanoTime();
-        Log.i(TAG, marker);
-
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            pollFor(scenario, BOOTED, EVALUATE_TIMEOUT_MS);
-
-            String refused = refuseTwice(scenario);
-            assertEquals(
-                    "the plugin did not refuse the two calls this leg is about, so it wrote"
-                            + " nothing and an empty count below would prove nothing: " + refused,
-                    "foreign_key|handoff_foreign_url",
-                    refused);
-
-            String whole = dump("logcat -d -v threadtime --pid=" + Process.myPid());
-            int at = whole.lastIndexOf(marker);
-            assertTrue(
-                    "the control marker is not in the captured log: the reader did not reach this"
-                            + " process's output, so the count below is a zero that means nothing"
-                            + " (captured " + whole.length() + " chars)",
-                    at >= 0);
-            String window = whole.substring(at);
-
-            // CONTROL 3, the channel: a window with nothing in it would satisfy
-            // an absence assertion for the wrong reason.
-            int signals = occurrences(window, "[signal] ");
-            assertTrue(
-                    "no [signal] line is in this window at all, so the capture proves nothing"
-                            + " about what else is or is not in it: signals=" + signals,
-                    signals > 0);
-
-            int tagged = occurrences(window, TRANSFER_TAG);
-            Log.i(TAG, "the plugin's tag after the gate reached it: taggedLines=" + tagged
-                    + " signals=" + signals);
-            assertEquals(
-                    "the transfer plugin still writes to logcat past the gate — every one of"
-                            + " those lines is a free string this repository bounds by review"
-                            + " rather than by construction (DIA-DL-010 debt 13); on run"
-                            + " 32074105863 there were seven of them",
-                    0,
-                    tagged);
-        }
-    }
 
     @Test
     public void the_app_writes_no_family_text_to_the_device_log() {
@@ -399,8 +305,8 @@ public class DeviceLogTest {
             // exists to prove the capture and to scope the channel assertion
             // below, and scanning only it would leave every other suite's
             // traffic in the same process unexamined — in a full run that is
-            // seven other suites, including the ones that drive marks, imports,
-            // transfers and exports, none of which this leg performs.
+            // every other suite, including the ones that drive marks, imports
+            // and exports, none of which this leg performs.
             Map<String, Integer> found = count(whole);
             List<String> offenders = new ArrayList<>();
             for (Map.Entry<String, Integer> hit : found.entrySet()) {
@@ -443,37 +349,6 @@ public class DeviceLogTest {
         }
     }
 
-    /**
-     * Drives two plugin refusals across the bridge and reports their codes.
-     *
-     * <p>Both are pre-flight refusals: the first is rejected by the shared
-     * option-key guard, the second by the URL comparison, and neither reaches an
-     * Intent, a file or the staged buffer. What comes back is the pair of closed
-     * codes, in order, so the leg can assert that the plugin really did take the
-     * two paths whose log lines it then requires to be absent.
-     */
-    private String refuseTwice(ActivityScenario<MainActivity> scenario) {
-        // ONE LITERAL CHAIN WITH A SUBSTITUTION, not a chain with a Java value
-        // concatenated into it. The two shapes behave identically at run time
-        // and differ entirely to app/tests/embedded-js-parse.spec.js: a
-        // non-literal operand is a script that guard cannot reconstruct, so it
-        // would have to enter its skip table as one more thing nobody parses.
-        // The substitution idiom is what the rest of these suites use
-        // (`__BASE__`, `__SKILLS__`, `__CHILD__`), and it keeps this snippet
-        // parse-checked on every push.
-        String body =
-                ("(function () {"
-                                + "var call = function (method, options) {"
-                                + " return window.Capacitor.nativePromise('__PLUGIN__', method,"
-                                + " options).then(function () { return 'resolved'; },"
-                                + " function (e) { return String(e && e.code); }); };"
-                                + "return call('openHandoff', { bogus: 1 }).then(function (first) {"
-                                + "return call('openHandoff', { url: 'https://example.invalid/x' })"
-                                + ".then(function (second) { return first + '|' + second; }); });"
-                                + "})()")
-                        .replace("__PLUGIN__", TRANSFER_TAG);
-        return await(scenario, "__p2TransferRefusals", body);
-    }
 
     // --- the act, as a script ------------------------------------------------
 
