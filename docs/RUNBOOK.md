@@ -587,6 +587,21 @@ The PWA is buildless — no bundler, no transpiler; the files execute as they li
 - **Static server.** Serve the `app/` directory with any static file server (e.g. `python -m http.server 8080 --directory app`) and open `http://localhost:8080`.
 - **Container parity.** Build and run the production container locally via `docker build -t theygrow-app app && docker run --rm -p 8080:8080 theygrow-app` (build context `app/`). This matches the production nginx config.
 
+### The commit gate — install it once per clone
+
+`.pre-commit-config.yaml` is tracked; the hook that runs it is **not**. `git clone` does not create `.git/hooks/pre-commit`, and until it exists `git commit` succeeds in silence with no hook output — which reads exactly like a green gate.
+
+```
+pre-commit install
+[ -x .git/hooks/pre-commit ] && echo "gate: armed" || echo "gate: MISSING"
+```
+
+Run it once per clone, and again after any re-clone. **Read the second line rather than the installer's message:** the evidence is a printed word, not an absence of error.
+
+A commit with the gate armed prints hook lines (`Passed` / `Skipped`) above the commit summary; a commit that prints **none of them did not run the gate**, whatever its exit code. Over a commit already made: `pre-commit run --from-ref HEAD~1 --to-ref HEAD`.
+
+Measured 2026-08-24: this clone had no hook, and `CGR-DL-001` was committed without the gate. Its green came from a manual run of the same nine hooks over the same range — a different statement, recorded as one.
+
 ### Parity suite (`/app`) — the A1 spa-split gate
 
 The three-level parity suite (DOM snapshot + visual regression + behavioural smoke) is the acceptance gate for every `spa-split` packet, and the repo's only frontend CI gate. It is dev/CI-only: it is excluded from the production image (`app/Dockerfile` COPYs an explicit file list) and from the Docker build context (`app/.dockerignore`), so the delivery channel stays buildless.
