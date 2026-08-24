@@ -1,0 +1,34 @@
+# Graphify corpus exclusions (ADR-051 p.7 — see vault:
+# 04-decisions/adr-051-graphify-code-graph-adoption-in-code-repo.md). Same
+# syntax as .gitignore. Merged with it and evaluated last, so this file can
+# only ever exclude MORE; it can never re-include something .gitignore drops.
+#
+# Why a separate file and not a .gitignore line: graphify deliberately
+# preserves git-TRACKED files against .gitignore rules, and .graphifyignore is
+# the one input that stays authoritative over that exemption. The frozen
+# generations below are tracked, so nothing else could drop them.
+
+# Frozen module generations. app/m/v8 is the live mount; v1..v7 are history and
+# are only ever read as history. Measured on the 2026-08-24 graph: 323 of 556
+# scanned files and 2582 of 5324 nodes came from them, and an acceptance run
+# sent 8 of its 38 lookups into v7 before it became clear v8 was the live one.
+# Accepted loss, named in the decision: the graph stops showing that the freeze
+# exists at all. That fact lives in app/index.html, which the tool does not
+# parse anyway.
+# WHEN A NEW GENERATION GOES LIVE, ADD THE ONE IT REPLACES HERE.
+app/m/v1/
+app/m/v2/
+app/m/v3/
+app/m/v4/
+app/m/v5/
+app/m/v6/
+app/m/v7/
+
+# The Android shell's staged web root — a byte copy of app/m/**. Measured: it
+# contributes 0 files and 0 nodes today, because native/android/.gitignore
+# already excludes it, so this line is inert on the standard run. It is written
+# anyway for two reasons that are not: the graph's corpus should not depend
+# silently on another subtree's ignore file, and --no-gitignore (which disables
+# .gitignore and keeps this file in force) would otherwise pull the whole copy
+# in behind a flag that reads as unrelated.
+native/android/app/src/main/assets/public/

@@ -1221,6 +1221,94 @@ A dev-only `docker-compose.yml` (repo root) brings up `/api` alongside a local P
 - **Check**: `curl http://localhost:8080/api/health` → `{"status":"ok","service":"theygrow-api"}`.
 - The `db` service only enables the pgvector extension; the episodic schema comes from Alembic — `alembic upgrade head` from `api/` with `DATABASE_URL` set (three revisions have landed: `source_messages`; `notes` + `event_chunks`; the per-chunk `vector(1536)` embedding). Since A3-P2 the served surface opens a connection too, from `/api/health/ready` — `curl http://localhost:8080/api/health/ready` → `{"status":"ready"}` against this stack. It needs no migration: the probe is `SELECT 1`.
 
+## Agent tooling on this workstation
+
+Two things live outside the repository but are part of how work on it gets done: the read-only clone of the owner's knowledge vault, and the Graphify code graph. The **rules** for both are in `CLAUDE.md` (`## Vault clone (read-only)`, `## Code graph (Graphify)`); what follows is the **operational reality** — paths, commands, the state things are actually in, and how to undo them. Nothing in this section is live product infrastructure.
+
+### Vault clone (read-only) — operational reality
+
+The clone at `~/vaults/theygrow-vault` is a reading cache for the owner's vault (`ADR-049`; see vault: `04-decisions/adr-049-claude-code-vault-clone-and-graphify-artifacts.md`). Its read-only-ness is enforced by a token, not by discipline — so what follows is about where that lock lives and how it can quietly stop existing.
+
+- **Remote:** `https://github.com/mlberkov/theygrow-vault.git` over HTTPS, no userinfo in the URL.
+- **The lock is a repository-local credential helper.** `git -C ~/vaults/theygrow-vault config --local --list` shows `credential.helper=store --file=/home/dev/.config/git/vault-ro-credentials`. That file is mode `0600`, one line, and sits outside any git repository. **Its path and mode are recorded here; its value is not, and must not be written into this repository in any form** (`M1-P3-INV-001`, and the vault's own rule that token values never come back into a document).
+- **The global config is clean, and that is load-bearing.** `git config --global --list` returns `user.name` and `user.email` and nothing else — no global `credential.helper`, and no `~/.git-credentials`. The lock is local by construction. Re-check this after any change to global git config: a global helper would apply to the clone too.
+- **The `GIT_ASKPASS` trap — the failure is silent by design, which is why it is written down.** In a shell spawned by the Cursor server, `GIT_ASKPASS` is set to that editor's `askpass.sh`, which supplies the **account** credentials — the ones with **write** rights. Git consults the local helper **first**, and it wins, so while the PAT is valid the read-only lock holds. **When the PAT expires, git falls back to askpass without saying so: `pull` keeps working, and the lock is gone with no signal at all.**
+  - Measured in a `cursor-server` shell (2026-08-24): `GIT_ASKPASS` set, `GIT_EDITOR=true`. A login terminal opened by hand may have neither variable — check rather than assume, since the two environments differ.
+  - **If a credential prompt or auth window ever appears, that is itself the signal that the local helper lost.** Cancel it, enter nothing, and report. Do not work around it, do not switch the remote to SSH, and do not let the ambient `GIT_ASKPASS` answer for you.
+- **Token renewal is due ≈2026-11-22** and is an owner action. The procedure, the exact scope to re-issue, and the negative probe to run afterwards are in vault: `05-inbox/owner-backlog.md`, item 12 — read them there rather than from memory (the date in that item is computed, not measured; the token page on GitHub is what is authoritative).
+- **The lock probe** — the only push-shaped command permitted here, and only with `--dry-run`:
+
+  ```
+  env -u GIT_ASKPASS GIT_TERMINAL_PROMPT=0 \
+    git -C ~/vaults/theygrow-vault push --dry-run origin HEAD:refs/heads/lock-probe
+  ```
+
+  Expected: **`403`**, write access not granted. Exit code `0` — or a `[new branch] … (dry run)` line — means the token carries write rights and the lock is not there. Report that; do not proceed as if it were fine.
+- **Session detector:** `git -C ~/vaults/theygrow-vault status --porcelain | wc -l` → `0`, at the start and end of any session that read the clone. A number, not an absence of output.
+
+### Code graph (Graphify)
+
+Graphify builds an AST-derived navigation graph over **this repository** (`ADR-051`; see vault: `04-decisions/adr-051-graphify-code-graph-adoption-in-code-repo.md`). It is a workstation tool, not a project dependency: it is installed per-machine, nothing in `pyproject.toml` or CI knows about it, and its output is git-ignored.
+
+**1. Install — owner-run, done 2026-08-24.**
+
+```
+uv tool install "graphifyy[sql]"
+```
+
+The upstream distribution is `graphifyy` (two `y`s); the commands it installs are `graphify` and `graphify-mcp`. Installed version at the time of writing: **0.9.48**.
+
+**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v8/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
+
+*(A note on a number that will not reproduce: before `.graphifyignore` landed, the graph held **209** `.sql` nodes across **9** files. Eight of those files were the same `store/schema/001-core.sql`, once per module generation — 7 frozen copies × 26 nodes, plus the live one, plus the dev script. The exclusion removed the duplicates, not the schema.)*
+
+Upgrade with `uv tool upgrade graphifyy`; the extra is recorded in the tool's uv receipt and survives the upgrade.
+
+**2. Run — two commands, from the repository root.**
+
+```
+graphify extract . --code-only --timing
+graphify cluster-only . --no-label
+```
+
+`--code-only` keeps the run on the local AST with no LLM call; `--no-label` stops `cluster-only` looking for an LLM backend to name communities. Both are mandatory — the reasons are in `CLAUDE.md` `## Code graph (Graphify)`, which is where the rules live. `--timing` is what makes the mode check below printable.
+
+Extraction is **incremental**: a re-run with a warm cache took ~8.4 s over 547 cached files with 32 re-extracted. `GRAPH_REPORT.md` and `graph.html` are produced by the **second** command only; after a bare `extract` they do not exist on disk.
+
+**3. Where the output lands.**
+
+`graphify-out/` at the repository root — seven entries, ~11 MB: `graph.json` (~6.8 MB), `graph.html`, `GRAPH_REPORT.md`, `manifest.json`, `cache/`, `.graphify_analysis.json`, `.graphify_root`. An eighth, `cost.json`, appears **only** if a semantic pass ran, which is why its absence is a check rather than a detail. The whole directory is ignored by the `graphify-out/` rule in `.gitignore` (`ADR-051` p.6) — regenerated on demand, never committed.
+
+**4. After every run — three counts and a mode check.**
+
+```
+git status --porcelain | wc -l                                # expect 0
+git check-ignore -v graphify-out                              # expect the .gitignore rule, exit 0
+git -C ~/vaults/theygrow-vault status --porcelain | wc -l     # expect 0
+```
+
+Each prints a number; an absence of output is not evidence. A non-zero count in this repository is unclosed artifact hygiene. A non-zero count in the clone means the run touched something it must not have — report it to the owner, and neither commit it nor silently revert it.
+
+**Mode check, same run:** `graphify-out/cost.json` must not exist, and `graphify extract` must print `[graphify timing] semantic extract: 0.0s` **on stderr**. Together they say no semantic pass ran and no LLM call was made. A non-zero time or a cost file means an LLM key has entered this environment, which changes the decision's class (`ADR-051` p.3) — stop and report.
+
+**5. Corpus exclusions.**
+
+`.graphifyignore` at the repository root (`ADR-051` p.7) keeps the frozen module generations `app/m/v1…v7` out of the graph; without it they are 323 of 556 scanned files and 48.5% of all nodes, and navigation lands in a frozen copy instead of the live mount. **Maintenance action, one line:** when a new generation goes live, add the one it replaces to that file.
+
+Changing `.graphifyignore` makes the next incremental run prune the now-excluded nodes by itself. If stale nodes survive a run, force a full re-scan:
+
+```
+graphify extract . --code-only --timing --force
+```
+
+**6. Undo, cheapest first.**
+
+- `rm -rf graphify-out/` — removes every artifact. The graph is derived; nothing is lost that two commands do not rebuild.
+- `uv tool uninstall graphifyy` — removes the tool from the machine.
+- Revert the `graphify-out/` rule in `.gitignore` and delete `.graphifyignore` — removes the repository's side of it.
+
+**`graphify uninstall --purge` is deliberately not the instruction.** It also strips agent configuration from every platform it detects on the machine, which is a wider blast radius than "remove the graph" — and this repository never had that configuration installed in the first place (`ADR-051` p.5).
+
 ## Live-infra divergence
 
 The PWA's live GCP infrastructure was created before the project was renamed to `theygrow-app`, so its identifiers do **not** match the new name. They are operational reality and the deployment continues to target them. The `/api` infrastructure (M2-P3) is greenfield and named in line with `theygrow-app`. All live identifiers — diverging or aligned — are carried here and only here.
