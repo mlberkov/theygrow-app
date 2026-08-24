@@ -124,8 +124,91 @@ authoritative, and clone files are never editable project files.
   Expected: `403`, write access not granted. Exit code `0` means the read-only
   lock is gone — report that. This is the only push-shaped command you may run,
   and only with `--dry-run`.
-- **Graph artifacts** (`graph.json`, `graph.html`, `GRAPH_REPORT.md`) are
-  generated, never committed; this repository ignores them (`.gitignore`).
+- **The code graph is not part of this perimeter.** It is never built over the
+  clone, and its rules are not these rules: they live in **Code graph
+  (Graphify)** below, a section of its own by `ADR-051` p.8.
+
+## Code graph (Graphify)
+
+Graphify is a code-navigation tool (`ADR-051`; see vault:
+`04-decisions/adr-051-graphify-code-graph-adoption-in-code-repo.md`). It gives
+file-and-line anchors instead of sequential reading. It has no normative status:
+the graph is derived from the code, is never fresher than the working tree, and
+is regenerated, never committed.
+
+- **Subject — this repository only.** The vault clone is never a graph subject.
+  `graphify extract` writes into its *target* directory, so a run over the clone
+  dirties that tree and collides head-on with the detector in **Vault clone
+  (read-only)** above (`ADR-051` p.1).
+- **Regeneration — two commands, AST only**, run from the repository root:
+
+  ```
+  graphify extract . --code-only --timing
+  graphify cluster-only . --no-label
+  ```
+
+  Both flags are mandatory, for stated reasons. `--code-only` keeps the run on
+  the local AST with no LLM call. Without `--no-label`, `cluster-only` goes
+  looking for an LLM backend to name communities. `GRAPH_REPORT.md` and
+  `graph.html` appear only after the second command — a bare `extract` does not
+  produce them. Operational detail (installation, the `[sql]` extra, where the
+  output lands, how to undo) is in `docs/RUNBOOK.md`.
+- **No new egress, and that is measured rather than promised** (`ADR-051` p.3):
+  this environment holds no LLM key, so no backend is armed. **Reversal
+  condition:** if such a key ever appears here, the run mode is re-decided by a
+  separate decision — not silently continued.
+- **Runs are manual**, at the discretion of the session doing the work. No
+  post-commit hook: `graphify hook install` bakes an interpreter path into this
+  repository's hooks and needs reinstalling on upgrade — permanent machinery,
+  not introduced before the benefit is confirmed (`ADR-051` p.4). Extraction is
+  incremental, which is what makes the manual mode cheap.
+- **Consumption is the plain CLI** — `graphify query`, `explain`, `path` against
+  the generated graph. Two things are **not** run, and the reason is the same
+  one both times (`ADR-051` p.5):
+  - **`graphify claude install`** edits this normative `CLAUDE.md`, creates a
+    `.claude/settings.json` that does not exist here, and installs a
+    `PreToolUse` hook — it changes the agent's permanent behaviour as a side
+    effect of installing a utility. Changes to that layer arrive as a docs
+    packet on the normal cycle, which is how this section got here.
+  - **The `graphify-mcp` server** is not started: a process and a tool surface
+    with no measured need.
+
+  Any subcommand that writes — `install`, `hook`, `add`, `watch`, or `extract`
+  outside the sequence above — is out.
+- **Three limits, and they are conditions of use rather than defects**
+  (`ADR-051` p.10). Read them as the terms on which an answer may cite the
+  graph:
+  - **The graph carries no literals.** Plugin names, SQL constants and config
+    values are not in it; those still require reading the source. Four of the
+    eight files opened in the acceptance run were opened for exactly this.
+  - **`explain` truncates at 20 connections**, so the tail of a wide export
+    surface and part of the schema objects are simply absent from its output.
+  - **`query` ranking is noisy.** In the acceptance run the top places went to
+    test files and the `api/` Python tree, and were discarded by judgement.
+
+  The consequence, stated as a rule: **the graph is a navigator to anchors, not
+  a replacement for reading, and an answer resting entirely on the graph is
+  reported as unconfirmed.**
+- **Corpus exclusions** live in `.graphifyignore` (`ADR-051` p.7). Freezing a
+  module generation means adding it there — one line — or the frozen copy keeps
+  answering navigation questions in place of the live mount.
+- **Detector, after every run.** Each check prints a **count**; an absence of
+  output is not evidence.
+
+  ```
+  git status --porcelain | wc -l                                   # expect 0
+  git check-ignore -v graphify-out                                 # names the rule
+  git -C ~/vaults/theygrow-vault status --porcelain | wc -l        # expect 0
+  ```
+
+  A non-zero count in this repository is unclosed artifact hygiene. A non-zero
+  count in the clone is a breach of the read-only contract (`ADR-049` p.2):
+  report it to the owner, and neither commit it nor silently revert it.
+  **Mode check, on the same run:** `graphify-out/cost.json` must not exist, and
+  `graphify extract` must print `[graphify timing] semantic extract: 0.0s` on
+  stderr. Together they say no semantic pass ran; that line is why `--timing` is
+  in the command. A non-zero time or a cost file means a key entered this
+  environment — stop and report, per the reversal condition above.
 
 ## Packet discipline
 
