@@ -415,3 +415,282 @@ test.describe('native shell — no stale mount address under native/ (EMV-P5-INV
     ).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// (f) THE LAUNCHER ICON IS THE PRODUCT'S, IN EVERY FORM ANDROID USES (UIP-P5).
+//
+// The sixth claim in this file, and the first one about a BITMAP rather than a
+// literal. Until UIP-P5 all fifteen launcher bitmaps were the stock Capacitor
+// mark — a blue "X" on a faint grid — and had been since `npx cap add android`
+// wrote them at L1-P1. Nothing noticed, because nothing looked: the manifest
+// pointed at resource names that existed, the build was green, and the only
+// place the difference showed was a parent's home screen.
+//
+// So this guard exists to make "the icon is ours" a property of the tree. Three
+// separate failures, each of which has actually happened to somebody:
+//
+//   * a REGENERATION THAT SILENTLY DID NOTHING — the assets are still the
+//     template's. Caught by CAPACITOR_PLACEHOLDER, a pinned list of the fifteen
+//     digests that shipped before this packet. That list never expires and is
+//     never rewritten: those bytes are wrong forever, whatever replaces them.
+//   * a REGENERATION THAT WROTE THE WRONG THING — one density everywhere, a
+//     half-finished run, a hand-edited PNG. Caught by EXPECTED (per-file digest,
+//     the "is the intended image" claim) and by the IHDR dimensions read out of
+//     the file's own bytes, which is the one thing here that does not need the
+//     digest to be right to be worth checking.
+//   * a MASTER THAT MOVED OUT FROM UNDER THE DERIVED SET — the owner supplies a
+//     corrected logo and the icons are not regenerated. Caught by pinning
+//     app/icons/icon-master-1024.png's digest, so the source and its fifteen
+//     derivatives can only drift apart loudly.
+//
+// WHY BYTES AND NOT PIXELS. This file is `fs` + `crypto` and no image library,
+// deliberately — the `contract` project runs on every push and installs nothing
+// beyond Playwright. Pixel-level re-derivation from the master is
+// `python3 native/tools/gen-launcher-icons.py --check`, which needs Pillow and
+// is therefore a developer/owner command, written down in docs/RUNBOOK.md and
+// named in UIP-P5-INV-001's Scope rather than quietly assumed to run.
+//
+// THIS GUARD IS STATIC AND CARRIES NO RUNTIME CLAIM (AGENTS.md §11). It reads
+// files and boots nothing. That the resources COMPILE is the `android` job's
+// `assembleDebug` on every push; that a launcher renders them correctly under
+// its own mask is a phone, and nothing here substitutes for either.
+test.describe('native shell — the launcher icon is the product\'s, in every form (UIP-P5-INV-001)', () => {
+  const RES = path.join(NATIVE_ROOT, 'android', 'app', 'src', 'main', 'res');
+  const MASTER = path.join(APP_ROOT, 'icons', 'icon-master-1024.png');
+
+  // The brand master every one of the fifteen is derived from (owner decision
+  // 2026-08-25, item 9). Pinned in TWO places on purpose — here and in
+  // native/tools/gen-launcher-icons.py — so a swap that updates one of them and
+  // not the other cannot pass quietly.
+  const MASTER_SHA256 = '46d27cf42368cf5934ae1e998b902ce7bda327b80f9555b2bcbac332a6bd3bcd';
+
+  // densityBucket -> [legacy px, adaptive foreground px]. 48dp and 108dp at
+  // 1x/1.5x/2x/3x/4x; these are also exactly the sizes the template shipped, so
+  // a wrong number here is a wrong number, not a convention change.
+  const DENSITIES = {
+    mdpi: [48, 108],
+    hdpi: [72, 162],
+    xhdpi: [96, 216],
+    xxhdpi: [144, 324],
+    xxxhdpi: [192, 432],
+  };
+
+  // What shipped BEFORE UIP-P5. Never update this list — extend it, if some
+  // other template's placeholder ever gets in.
+  const CAPACITOR_PLACEHOLDER = new Set([
+    '27ed3603010ebc278f64f8645741ab132ff517abb5308eb9df6c8e42a48956b2', // mdpi   ic_launcher
+    '58e78a618778926b1f6d9472a6468de878de8530970934e94aab5ba4ba08cc00', // mdpi   foreground
+    '0166fc333074c373fbd0ce6b5defd71552166165ac778121ca9c9dff6b83f0fc', // mdpi   round
+    '72b71c3581ca3b5a23b1c168d69b9d855b3f184fa079902a01f088eb4f0607d5', // hdpi   ic_launcher
+    '32baa10d2632a4417454a579f992bd640e0a3cec79321423559b2c9940de58a9', // hdpi   foreground
+    'bfcc1b0fa931b14bb241372c76ab4f04374b67d02363c98d9cb12edfdacdf5f3', // hdpi   round
+    'd35dbfff175b83c13ef59cf924abfc810f7b6a158595d7417c5498ea8c7c7ed1', // xhdpi  ic_launcher
+    '6f88083b8166cc559102f7044688de7525287632ebe09ac45d001ac8bf4b3eae', // xhdpi  foreground
+    '40911a00922868686854a4804b93fd6e56b503664696de03f450bff690affb6d', // xhdpi  round
+    'ed346eb1e3f0280f15709393705899b3ff55c20b88f4e0308006b3c33cf5fe14', // xxhdpi ic_launcher
+    '4a82bc1e9923576275869998925ce0ae021a79aa18b24a0dd87ad6b61ca85053', // xxhdpi foreground
+    '1ee4cd9ff371dcb2e3938097e434f6fb8731688ed7165e61fc63693ad5b2f455', // xxhdpi round
+    '87cb2f2ffe992652bb4fa768c73719a37b5852ab17fbf8e170e888f7a42b0761', // xxxhdpi ic_launcher
+    'bd24fd383253bf8d43f0a81f11c071d76d1d555114376dd647cd9fb38fa0a9da', // xxxhdpi foreground
+    'ab93096331e7cd8ec379f73f1e9adcaaa9ee1115c9f4ff10411a811fb9700174', // xxxhdpi round
+  ]);
+
+  // What the master derives today, on the toolchain UIP-DL-005 records. A
+  // deliberate regeneration moves these AND the table in that decision entry.
+  const EXPECTED = {
+    'mipmap-mdpi/ic_launcher.png': '6776c0ab05c2794a839abc8131a4294a812958685c1da75fc91b071503c62259',
+    'mipmap-mdpi/ic_launcher_foreground.png': '160b9063f9c4f2e6916bb863d2342bd2f3382b8948a03568185e3b64be732263',
+    'mipmap-mdpi/ic_launcher_round.png': '87df0a4496b0a09048b282c61c0adcad1db10df38906289abd6d7630f9346f43',
+    'mipmap-hdpi/ic_launcher.png': '3c59e913f8a66b956d55cb31c7f9ea74ad4967af434520985c8fb8e79fb9ee3b',
+    'mipmap-hdpi/ic_launcher_foreground.png': 'bbde1f59e7e8a28cc9297343b5d2e78790befe9a7e69dc1516627ed6375ce8f7',
+    'mipmap-hdpi/ic_launcher_round.png': '16c3c49613da509574aa6718d8ae3408065ce173b923e32e8e2b98f444b7f194',
+    'mipmap-xhdpi/ic_launcher.png': 'ac37d7d8a7964a5264c1ee2b1721a407cfc1bb6d890014183b97d63466080264',
+    'mipmap-xhdpi/ic_launcher_foreground.png': '673d5fa68c29349e6d0c07eb8fa5f968366e87ad4bfedd8eb8edfccc308905c1',
+    'mipmap-xhdpi/ic_launcher_round.png': 'ad65389764fe35118dd2880c824cb310ce420f69c9faf3f1cf7e35e650671235',
+    'mipmap-xxhdpi/ic_launcher.png': 'c42e905baf046a6613afc899e6fef346e7b53fd50eafbaa55a53678ba419c4f7',
+    'mipmap-xxhdpi/ic_launcher_foreground.png': 'a1d0f143012a36bc6200c17790f0b9a13ffa1a5964857c35f98d1a0caf023722',
+    'mipmap-xxhdpi/ic_launcher_round.png': 'dd9238f859ad4e17b9ac955a6e85fb85ed4f8757b52b37cd38219897cc90b31d',
+    'mipmap-xxxhdpi/ic_launcher.png': 'a53021a24accaa81523e91453521d3ddec00a55a26518125e439f332a9db30e8',
+    'mipmap-xxxhdpi/ic_launcher_foreground.png': '0bf41f4bc2d4f121a006981bd0bf588d313447c27b0dd4c819a89c766c93088e',
+    'mipmap-xxxhdpi/ic_launcher_round.png': '3ebcfc4ea5e880a07f010c419bf6bfea761d3f32efd7771a1ce5b428e70f1a39',
+  };
+
+  const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  // Read the dimensions out of the file's OWN bytes rather than trusting a
+  // filename or a digest: IHDR is the first chunk a PNG must carry, so width
+  // and height sit at fixed offsets 16..24, big-endian.
+  function pngSize(file) {
+    const buf = fs.readFileSync(file);
+    if (buf.length < 24 || !buf.subarray(0, 8).equals(PNG_MAGIC)) return null;
+    if (buf.subarray(12, 16).toString('ascii') !== 'IHDR') return null;
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+
+  const BITMAPS = [];
+  for (const [bucket, [legacy, foreground]] of Object.entries(DENSITIES)) {
+    BITMAPS.push([`mipmap-${bucket}/ic_launcher.png`, legacy]);
+    BITMAPS.push([`mipmap-${bucket}/ic_launcher_round.png`, legacy]);
+    BITMAPS.push([`mipmap-${bucket}/ic_launcher_foreground.png`, foreground]);
+  }
+
+  const manifest = fs.readFileSync(ANDROID_MANIFEST, 'utf8');
+
+  test('the icon set is fully enumerated, and the guard is comparing something', () => {
+    // Anti-vacuity, in this file's house style. A typo that emptied the tables
+    // would make every assertion below pass while checking nothing, and the
+    // placeholder list going empty would make the whole point of the block
+    // vanish silently.
+    expect(BITMAPS.length, 'the density x form matrix is incomplete').toBe(15);
+    expect(CAPACITOR_PLACEHOLDER.size, 'the placeholder list must hold all fifteen').toBe(15);
+    expect(Object.keys(EXPECTED).length, 'the expected-digest table must cover all fifteen').toBe(15);
+    for (const [rel] of BITMAPS) {
+      // toContain over the key list, NOT toHaveProperty: these keys carry `/`
+      // and `.`, and toHaveProperty reads a dotted string as a nested path, so
+      // `mipmap-mdpi/ic_launcher.png` would be looked up as a `png` field of an
+      // `ic_launcher` field. It reds on a table that is completely correct.
+      expect(Object.keys(EXPECTED), `${rel} has no expected digest`).toContain(rel);
+    }
+    for (const digest of [...CAPACITOR_PLACEHOLDER, ...Object.values(EXPECTED)]) {
+      expect(digest, `not a sha256: ${digest}`).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  test('the brand master is present and is the one the icons were derived from', () => {
+    // Provenance. If the owner supplies a corrected logo, this reds and forces a
+    // regeneration rather than letting the source and its derivatives drift.
+    expect(fs.existsSync(MASTER), `the brand master is missing: ${MASTER}`).toBe(true);
+    expect(
+      sha256(MASTER),
+      'app/icons/icon-master-1024.png changed — regenerate the launcher icons'
+        + ' (python3 native/tools/gen-launcher-icons.py) and move BOTH pins:'
+        + ' this file and native/tools/gen-launcher-icons.py'
+    ).toBe(MASTER_SHA256);
+
+    const generator = path.join(NATIVE_ROOT, 'tools', 'gen-launcher-icons.py');
+    expect(fs.existsSync(generator), 'the committed generator is missing').toBe(true);
+    const source = fs.readFileSync(generator, 'utf8');
+    expect(source, 'the generator no longer names the master').toContain('icon-master-1024.png');
+    expect(source, 'the generator no longer pins the master digest').toContain(MASTER_SHA256);
+  });
+
+  test('every density and variant exists, at the right size, and is the intended image', () => {
+    const problems = [];
+    for (const [rel, expectedPx] of BITMAPS) {
+      const abs = path.join(RES, rel);
+      if (!fs.existsSync(abs)) {
+        problems.push(`${rel}: missing`);
+        continue;
+      }
+      const size = pngSize(abs);
+      if (size === null) {
+        problems.push(`${rel}: not a PNG (no signature or no IHDR)`);
+        continue;
+      }
+      if (size.width !== expectedPx || size.height !== expectedPx) {
+        problems.push(`${rel}: ${size.width}x${size.height}, expected ${expectedPx}x${expectedPx}`);
+        continue;
+      }
+      const digest = sha256(abs);
+      if (CAPACITOR_PLACEHOLDER.has(digest)) {
+        problems.push(`${rel}: still the Capacitor placeholder`);
+      } else if (digest !== EXPECTED[rel]) {
+        problems.push(`${rel}: ${digest.slice(0, 16)}…, expected ${EXPECTED[rel].slice(0, 16)}…`);
+      }
+    }
+    expect(
+      problems,
+      'the launcher icon set does not match the brand master. Regenerate with'
+        + ' `python3 native/tools/gen-launcher-icons.py`, verify with `--check`, and'
+        + ' move the digests here and in docs/decision-log.md (UIP-DL-005) together'
+    ).toEqual([]);
+  });
+
+  test('no two of the fifteen are the same file', () => {
+    // A generator that wrote one size into every bucket, or one form into all
+    // three names, produces a set that passes "exists" and "is not the
+    // placeholder" and is still wrong. Digest collision across the set is the
+    // cheapest way to say so, and it does not depend on EXPECTED being right.
+    const seen = new Map();
+    const collisions = [];
+    for (const [rel] of BITMAPS) {
+      const abs = path.join(RES, rel);
+      if (!fs.existsSync(abs)) continue;
+      const digest = sha256(abs);
+      if (seen.has(digest)) collisions.push(`${seen.get(digest)} == ${rel}`);
+      else seen.set(digest, rel);
+    }
+    expect(collisions, 'these launcher assets are byte-identical to each other').toEqual([]);
+  });
+
+  test('the manifest, the adaptive wiring and the background colour agree', () => {
+    // Asserted against the MANIFEST rather than a hard-coded list, so the claim
+    // is "every variant the manifest references exists" and not "these files
+    // exist". A manifest repointed at a name nobody generated reds here.
+    const icon = manifest.match(/android:icon="@mipmap\/([\w]+)"/);
+    const round = manifest.match(/android:roundIcon="@mipmap\/([\w]+)"/);
+    expect(icon, 'AndroidManifest.xml declares no @mipmap android:icon').not.toBeNull();
+    expect(round, 'AndroidManifest.xml declares no @mipmap android:roundIcon').not.toBeNull();
+    expect(icon[1]).toBe('ic_launcher');
+    expect(round[1]).toBe('ic_launcher_round');
+
+    for (const name of [icon[1], round[1]]) {
+      // API 26+ resolves the anydpi-v26 XML; API 24-25 falls back to the
+      // bitmaps, which minSdkVersion = 24 makes a real path and not a relic.
+      const adaptive = path.join(RES, 'mipmap-anydpi-v26', `${name}.xml`);
+      expect(fs.existsSync(adaptive), `${name} has no adaptive icon for API 26+`).toBe(true);
+      const xml = fs.readFileSync(adaptive, 'utf8');
+      expect(xml, `${name}.xml declares no foreground`).toMatch(/<foreground android:drawable="@mipmap\/ic_launcher_foreground"\s*\/>/);
+      expect(xml, `${name}.xml declares no background`).toMatch(/<background android:drawable="@color\/ic_launcher_background"\s*\/>/);
+      for (const bucket of Object.keys(DENSITIES)) {
+        expect(
+          fs.existsSync(path.join(RES, `mipmap-${bucket}`, `${name}.png`)),
+          `${name} is missing its ${bucket} bitmap, which API 24-25 falls back to`
+        ).toBe(true);
+      }
+    }
+
+    const colours = fs.readFileSync(path.join(RES, 'values', 'ic_launcher_background.xml'), 'utf8');
+    expect(
+      colours,
+      '@color/ic_launcher_background is what both adaptive icons composite the'
+        + ' foreground over — an undefined colour is a build failure, a changed one'
+        + ' is a brand decision'
+    ).toMatch(/<color name="ic_launcher_background">#FFFFFF<\/color>/);
+  });
+
+  test('no launcher resource sits in the tree that nothing references', () => {
+    // The Capacitor/Android-Studio template also left drawable/ic_launcher_background.xml
+    // (a teal grid) and drawable-v24/ic_launcher_foreground.xml (a gradient),
+    // referenced by NOTHING: the adaptive icons name @color/ and @mipmap/, not
+    // @drawable/. They compiled into every APK for four milestones. Deleted at
+    // UIP-P5; this is what keeps them deleted and catches the next one.
+    const referenced = new Set(['mipmap:ic_launcher', 'mipmap:ic_launcher_round']);
+    for (const name of ['ic_launcher', 'ic_launcher_round']) {
+      const xml = fs.readFileSync(path.join(RES, 'mipmap-anydpi-v26', `${name}.xml`), 'utf8');
+      for (const m of xml.matchAll(/@(\w+)\/(\w+)/g)) referenced.add(`${m[1]}:${m[2]}`);
+    }
+
+    const orphans = [];
+    for (const dir of fs.readdirSync(RES, { withFileTypes: true })) {
+      if (!dir.isDirectory()) continue;
+      // `values` files DECLARE resources, they are not resources named by their
+      // filename — @color/ic_launcher_background lives in one and is checked above.
+      const type = dir.name.split('-')[0];
+      if (type === 'values') continue;
+      for (const entry of fs.readdirSync(path.join(RES, dir.name))) {
+        if (!entry.startsWith('ic_launcher')) continue;
+        const name = entry.replace(/\.(png|xml|webp)$/, '');
+        if (!referenced.has(`${type}:${name}`)) {
+          orphans.push(`${dir.name}/${entry} — nothing references @${type}/${name}`);
+        }
+      }
+    }
+    expect(
+      orphans,
+      'launcher resources reachable from no reference. They still compile into'
+        + ' the APK and they still look like the icon to a reader — delete them,'
+        + ' or reference them on purpose'
+    ).toEqual([]);
+  });
+});
