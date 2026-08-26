@@ -402,8 +402,13 @@ decides the order you do things in.
    requires the page to state both, compares the two change-history tables **row for row**, and requires
    the current date to appear exactly twice in the page. Any one of the four literals moved alone is red.
    **Nothing compares the date to the wall clock** — that judgement is yours, and this step is where it
-   is made. PPR-P3 set edition 1.0 to `23.08.2026`; UIP-P2 set edition 1.1 to `26.08.2026`, the day it
-   landed.
+   is made. PPR-P3 set edition 1.0 to `23.08.2026`, the day that packet landed. UIP-P2 set edition 1.1 to
+   `26.08.2026` on the same reasoning, and that reasoning was **wrong**: edition 1.1 had reached no reader
+   — the milestone was merged and not promoted (`ADR-020`) — so the day the packet landed was not the day
+   it came into force. UIP-P6 set it to `27.08.2026`, **the day of promotion**, before publication rather
+   than after. **The date this step names is the day the revision reaches a parent, not the day it was
+   written**, and a merged-but-unpromoted revision is corrected here rather than superseded by a new
+   edition.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
    the document reachable is the obligation; collecting acceptance to the POLICY is not, and is
    deliberately absent. *(Rewritten at PPR-P3: this step also said it "does not build the web channel's
