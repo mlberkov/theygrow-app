@@ -1,8 +1,11 @@
 // Поверхность: профиль ребёнка — кнопка, dropdown и модалка создания.
 //
-// Единственное обратное ребро графа инвертировано здесь: switchProfile()
-// перестраивает таблицу, но profile.js НЕ импортирует table.js (иначе
-// table -> profile -> table). Entry передаёт перестроение в initProfiles().
+// ОБА ОБРАТНЫХ РЕБРА ГРАФА ИНВЕРТИРОВАНЫ ЗДЕСЬ, И ОДНИМ И ТЕМ ЖЕ ПРИЁМОМ.
+// switchProfile() перестраивает таблицу, но profile.js НЕ импортирует table.js
+// (иначе table -> profile -> table); с UIP-P4 создание профиля открывает первую
+// запись, но profile.js НЕ импортирует diary.js — дневник уже импортирует эту
+// поверхность (ему нужна openCreateProfileModal), и импорт обратно замкнул бы
+// цикл. Оба действия передаёт entry, в initProfiles().
 
 import {
     BACKEND,
@@ -19,13 +22,19 @@ import { calculateAge, formatAge } from '../core/format.js';
 // до неё switchProfile недостижим (dropdown ещё не построен).
 let onProfileSwitched = () => {};
 
+// Предложение первой записи о только что заведённом ребёнке (UIP-P4).
+// Инжектируется тем же вызовом и по той же причине — см. шапку файла.
+// По умолчанию no-op: сборка, которая ничего не передала, просто заводит профиль.
+let onProfileCreated = () => {};
+
 // Инициализация профилей: обновление UI за владельцем этих элементов.
 //
 // L1-P4: загрузка семьи ушла в core/state.js initHistory(), которую entry
 // вызывает раньше — источник данных теперь зависит от того, открылось ли
 // нативное хранилище, а этой поверхности такой выбор не принадлежит.
-export function initProfiles(rebuildTable) {
+export function initProfiles(rebuildTable, offerFirstEntry = () => {}) {
     onProfileSwitched = rebuildTable;
+    onProfileCreated = offerFirstEntry;
     updateProfileButton();
     updateProfileDropdown();
 }
@@ -166,10 +175,32 @@ function closeCreateProfileModal() {
     document.getElementById('createProfileForm').reset();
 }
 
+/**
+ * Заводит ребёнка и переключается на него — а с UIP-P4 ещё и предлагает первую
+ * запись о нём.
+ *
+ * ПОРЯДОК ЗДЕСЬ НЕСУЩИЙ, НО ПРИЧИНА НЕ ТА, НА КОТОРУЮ ПАДАЕТ ГЛАЗ, И ЭТО
+ * ПРОВЕРЕНО МУТАЦИЕЙ, А НЕ ВЫВЕДЕНО. Приписывание записи от этого порядка НЕ
+ * зависит: surfaces/diary.js считает автора и ребёнка в момент СОХРАНЕНИЯ
+ * (author() внутри saveEntry), а не в момент открытия формы, — то есть
+ * приписывание позднее связывание, и оно сильнее любого порядка здесь. От
+ * порядка зависит другое: БУДЕТ ЛИ ПРЕДЛОЖЕНИЕ СДЕЛАНО ВООБЩЕ. До switchProfile
+ * на свежей установке текущего профиля ещё нет, whyNotWritable() отвечает «нет
+ * ребёнка», и offerFirstEntry молча не покажет ничего — родитель, только что
+ * заведший первого ребёнка, остался бы ровно там, где этот пакет его нашёл.
+ * Исполнители: перенос этого вызова выше краснит четыре ветки
+ * app/tests/diary-save.spec.js.
+ *
+ * Предложение — на КАЖДОЕ создание, а не только на первое: владелец сказал
+ * «после создания профиля» без оговорок, а «только в первый раз» потребовало бы
+ * запомненного флага, то есть ключа в браузере родителя. Этот пакет живёт в
+ * милестоуне, который такие ключи убирает (UIP-DL-001), а не заводит.
+ */
 async function createNewProfile(name, birthdate) {
     const newProfile = await createProfile(name, birthdate);
     if (!newProfile) return;
     await switchProfile(newProfile.id);
+    onProfileCreated();
 }
 
 export function wireProfile() {
@@ -200,8 +231,13 @@ export function wireProfile() {
         const birthdate = document.getElementById('childBirthdate').value;
 
         if (name && birthdate) {
-            createNewProfile(name, birthdate);
+            // ОКНО СОЗДАНИЯ ЗАКРЫВАЕТСЯ ПЕРВЫМ, И ЭТО ПОРЯДОК, А НЕ ВКУС
+            // (UIP-P4). Следом за созданием открывается окно дневника на форме
+            // первой записи, и «на экране ровно одно окно» должно быть
+            // свойством порядка операторов, а не того, где внутри
+            // createNewProfile окажется первый await.
             closeCreateProfileModal();
+            createNewProfile(name, birthdate);
         }
     });
 }

@@ -52,6 +52,15 @@ const CHILD = {
     createdAtUtc: 1_700_000_000_000,
 };
 
+// The child a leg creates through the form, and the sibling that comes after.
+// Neither id is written here: the app mints them, and a leg that pinned one
+// would stop being able to see which child an entry was attributed to.
+const NEW_CHILD = { name: 'Мила', birthdate: '2024-09-15' };
+const SIBLING = { name: 'Артём', birthdate: '2022-04-02' };
+// The pinned clock (`support/seed.js`), which is what the form defaults to.
+const TODAY = '2026-03-15';
+const FIRST_ENTRY = 'Первый день дома: спал у меня на руках всю дорогу';
+
 const MORNING = '2026-02-01';
 const ENTRY = 'Впервые сам встал у дивана и держался почти минуту';
 const CORRECTED = 'Не у дивана, а у стула';
@@ -70,6 +79,23 @@ async function bootWithStore(page) {
         mountBase: MOUNT.prefix,
         statements: STATEMENTS,
         child: CHILD,
+        selfParticipantId: SELF,
+    });
+    await gotoApp(page, { state: STATES.empty });
+}
+
+/**
+ * Boots the app with a store that opened and holds NOBODY.
+ *
+ * The state a first launch is in, and the one this packet's flow starts from:
+ * the app opens the create-profile window itself (`FIU-P2-INV-001`), so a leg
+ * below fills that window rather than pressing a control to reach it.
+ */
+async function bootWithEmptyStore(page) {
+    await installPageBridge(page, {
+        mountBase: MOUNT.prefix,
+        statements: STATEMENTS,
+        child: null,
         selfParticipantId: SELF,
     });
     await gotoApp(page, { state: STATES.empty });
@@ -420,5 +446,225 @@ test.describe('a save the store ACCEPTED is never reported to the parent as a fa
         expect(writes, 'a refused write emitted no signal').toHaveLength(1);
         expect(writes[0]).toContain('outcome=failed');
         expect(writes[0]).toContain('failure_class=disk_full');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT A PARENT MEETS THE MOMENT THEY HAVE A CHILD TO WRITE ABOUT (UIP-P4).
+//
+// THE SYMPTOM THE OWNER FOUND ON A DEVICE. Creating a profile left him on the
+// skills table, and the only way to write anything was to find «Дневник» in the
+// header, meet an empty list, and press «Новая запись» there — three actions,
+// none of them offered, for the thing he had just asked for by creating a child.
+// The flow now continues into the entry form itself.
+//
+// WHY THESE LEGS ARE HERE AND NOT IN `diary-surface.spec.js`. Every leg in that
+// file reaches the surface with NO store behind it, so it ends in a refusal
+// before the store is called — and the whole subject here is what happens after
+// a profile is really written. This file already has a seam at the bridge
+// boundary that RESOLVES, which is what makes «the entry landed on the child
+// that was just created» assertable at all.
+//
+// WHAT THEY DO NOT CLAIM, said plainly. No SQLite: the seam executes no SQL,
+// models no `v_child_attribute_current` and enforces no foreign key, so «a child
+// created here comes back out of a real journal» is `DiaryEntryTest` on a
+// device, exactly as `FIU-P2-INV-001`'s Scope already says. And nothing here is
+// about the web channel — that the flow does NOT fire where the diary cannot be
+// written is `behavior.spec.js::creating a profile from the form leaves the app
+// with a usable one`, on a channel with no store at all.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The id the app minted for the child it just wrote, read off the transcript. */
+function createdChildIds(calls) {
+    return statements(calls)
+        .filter((item) => item.statement === STATEMENTS.childInsert)
+        .map((item) => item.values[0]);
+}
+
+/** Fills the create-profile window that is already on screen, and submits it. */
+async function createProfile(page, { name, birthdate }) {
+    await expect(page.locator('#createProfileModal')).toHaveCSS('display', 'block');
+    await page.locator('#childName').fill(name);
+    await page.locator('#childBirthdate').fill(birthdate);
+    await page.locator('#createProfileForm button[type="submit"]').click();
+}
+
+const recordsWritten = (calls) =>
+    statements(calls).filter((item) => item.statement === STATEMENTS.RECORD_INSERT_SQL);
+
+test.describe('a profile just created opens the diary on its first entry', () => {
+    test('the form is on screen, ready to type, and it is the only window', async ({ page }) => {
+        await bootWithEmptyStore(page);
+        // THE PREMISE, not a step this leg performs: with nobody in the store the
+        // app opens the create window itself (FIU-P2-INV-001). If that stopped
+        // happening, this leg reds here rather than somewhere confusing later.
+        await createProfile(page, NEW_CHILD);
+
+        await expect(
+            page.locator('#diaryForm'),
+            'the parent was left on the table with nowhere to write — the packet\'s whole subject'
+        ).toBeVisible();
+        await expect(page.locator('#diaryModal')).toHaveCSS('display', 'block');
+        await expect(page.locator('#diaryListPane')).toBeHidden();
+        // «Ready to type into» is a claim about the caret, not about the layout.
+        await expect(page.locator('#diaryBody')).toBeFocused();
+        await expect(page.locator('#diaryEventDate')).toHaveValue(TODAY);
+
+        // EXACTLY ONE WINDOW (owner item 4). The create window is closed, and
+        // nothing else has stacked behind or above the field — the intro window
+        // included, which no longer opens by itself since UIP-P3.
+        await expect(page.locator('#createProfileModal')).toHaveCSS('display', 'none');
+        await expect(
+            page.locator('.modal.show'),
+            'more than one window is on screen at the moment the parent starts typing'
+        ).toHaveCount(1);
+
+        // Two controls, and the second one says what it does here.
+        await expect(page.locator('#diarySaveBtn')).toBeVisible();
+        await expect(page.locator('#diaryCancelBtn')).toHaveText('Закрыть');
+    });
+
+    test('«Сохранить» writes one entry, through the same path, about the new child', async ({
+        page,
+    }) => {
+        await bootWithEmptyStore(page);
+        await createProfile(page, NEW_CHILD);
+        await expect(page.locator('#diaryForm')).toBeVisible();
+
+        await page.locator('#diaryBody').fill(FIRST_ENTRY);
+        await page.locator('#diarySaveBtn').click();
+
+        // The confirmation is the list, exactly as it is from the ordinary door:
+        // this packet introduced no second save and no second confirmation.
+        await expect(page.locator('#diaryList .diary-entry')).toHaveCount(1);
+        await expect(page.locator('#diaryList .diary-entry-body')).toHaveText(FIRST_ENTRY);
+        await expect(page.locator('#diaryList .diary-entry-date')).toHaveText(TODAY);
+        await expect(page.locator('#diaryForm')).toBeHidden();
+        await expect(page.locator('#diaryModal')).toHaveCSS('display', 'block');
+
+        const calls = await transcript(page);
+        const written = recordsWritten(calls);
+        expect(written, 'the entry never reached the store').toHaveLength(1);
+        expect(written[0].values).toContain(FIRST_ENTRY);
+        expect(written[0].values).toContain(TODAY);
+        expect(written[0].values, 'attributed to the id the store minted').toContain(SELF);
+
+        // AND IT WENT INTO THE NEW CHILD'S DIARY. Asked of the area lookup,
+        // because that is where the subject is bound — the record row carries no
+        // child column at all.
+        const [childId] = createdChildIds(calls);
+        expect(childId, 'no child was written, so this leg is about the wrong thing').toBeTruthy();
+        const lookup = calls.find(
+            (call) =>
+                call.method === 'query' && call.options.statement === STATEMENTS.AREA_LOOKUP_SQL
+        );
+        expect(lookup.options.values.slice(0, 2)).toEqual([SELF, childId]);
+    });
+
+    test('«Закрыть» leaves a created profile, writes nothing, and is not a dead end', async ({
+        page,
+    }) => {
+        await bootWithEmptyStore(page);
+        await createProfile(page, NEW_CHILD);
+        await expect(page.locator('#diaryForm')).toBeVisible();
+
+        await page.locator('#diaryCancelBtn').click();
+
+        // What the parent is left with reads as success, not as a creation that
+        // failed: the window is gone, nothing else took its place, and the child
+        // is in the header where the app names whose table this is.
+        await expect(page.locator('#diaryModal')).toHaveCSS('display', 'none');
+        await expect(page.locator('.modal.show')).toHaveCount(0);
+        await expect(page.locator('#profileName')).toContainText(NEW_CHILD.name);
+        expect(
+            recordsWritten(await transcript(page)),
+            'closing the first-entry form wrote an entry the parent never saved'
+        ).toHaveLength(0);
+
+        // NOT A DEAD END: the ordinary door is where it always was, and behind it
+        // the diary is empty and says so.
+        await page.locator('#diaryBtn').click();
+        await expect(page.locator('#diaryEmpty')).toBeVisible();
+        await expect(page.locator('#diaryNewBtn')).toBeVisible();
+
+        // AND THE MODE DID NOT SURVIVE THE CLOSE. Opened from the list, the same
+        // control is «Отмена» again and returns to the list instead of closing
+        // the window — otherwise a parent editing an entry later would lose the
+        // window on a button that says it only cancels an edit.
+        await page.locator('#diaryNewBtn').click();
+        await expect(page.locator('#diaryCancelBtn')).toHaveText('Отмена');
+        await page.locator('#diaryCancelBtn').click();
+        await expect(page.locator('#diaryModal')).toHaveCSS('display', 'block');
+        await expect(page.locator('#diaryListPane')).toBeVisible();
+    });
+
+    test('the SECOND child gets the same offer, and the entry lands on the second child', async ({
+        page,
+    }) => {
+        // The household with two children, which a real family reaches within a
+        // day. WHAT THIS PROVES: the offer is not a first-run special case, and
+        // an entry written from it lands in the NEW child's diary — asked of the
+        // area lookup, because that is where the subject is bound.
+        //
+        // WHAT IT DOES NOT PROVE, and this is measured rather than assumed: it
+        // does not catch the offer being made BEFORE `switchProfile()` resolves.
+        // That mutation was run and this leg stayed green, because `saveEntry`
+        // computes the subject at SAVE time (`author()`) — late binding, which
+        // is stronger than any ordering here — so a form opened a moment early
+        // still writes to whoever is current when «Сохранить» is pressed. What
+        // that mutation DOES red is the fresh-install case, four legs of this
+        // block, where there is no current child yet and the offer is withheld
+        // outright by `whyNotWritable()`.
+        await bootWithStore(page);
+        await page.locator('#profileButton').click();
+        await page.locator('#profileDropdown .create-new').click();
+        await createProfile(page, SIBLING);
+
+        await expect(page.locator('#diaryForm')).toBeVisible();
+        await expect(page.locator('.modal.show')).toHaveCount(1);
+        await expect(page.locator('#profileName')).toContainText(SIBLING.name);
+
+        await page.locator('#diaryBody').fill(FIRST_ENTRY);
+        await page.locator('#diarySaveBtn').click();
+        await expect(page.locator('#diaryList .diary-entry')).toHaveCount(1);
+
+        const calls = await transcript(page);
+        const [siblingId] = createdChildIds(calls);
+        expect(siblingId).toBeTruthy();
+        expect(siblingId, 'the seeded child was reused instead of the new one').not.toBe(CHILD.id);
+
+        const lookups = calls.filter(
+            (call) =>
+                call.method === 'query' && call.options.statement === STATEMENTS.AREA_LOOKUP_SQL
+        );
+        const asked = lookups[lookups.length - 1].options.values.slice(0, 2);
+        expect(asked, 'the first entry about the new child was written into another diary').toEqual(
+            [SELF, siblingId]
+        );
+        expect(recordsWritten(calls)).toHaveLength(1);
+        expect(
+            statements(calls).filter((item) => item.statement === STATEMENTS.AREA_INSERT_SQL),
+            'the new child got no diary of their own'
+        ).toHaveLength(1);
+    });
+
+    test('THE ARM — an empty save from this door writes nothing and says why', async ({ page }) => {
+        // The offer arrives without being asked for, so the field it opens on is
+        // empty by construction and «Сохранить» is one press away. Nothing is
+        // disabled and nothing is silently swallowed: the refusal this surface
+        // already had names what is missing and keeps the form open.
+        await bootWithEmptyStore(page);
+        await createProfile(page, NEW_CHILD);
+        await expect(page.locator('#diaryForm')).toBeVisible();
+
+        await page.locator('#diarySaveBtn').click();
+
+        await expect(page.locator('#diaryStatus')).toBeVisible();
+        await expect(page.locator('#diaryStatus')).toContainText('в ней пока нет текста');
+        await expect(page.locator('#diaryForm')).toBeVisible();
+        expect(
+            recordsWritten(await transcript(page)),
+            'an empty entry was written into the family journal'
+        ).toHaveLength(0);
     });
 });

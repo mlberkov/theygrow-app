@@ -113,6 +113,19 @@ test.describe('main flow — checkbox -> ZPD recompute -> save', () => {
         + ' looking at an app that cannot record anything'
     ).toContainText('Мила');
 
+    // AND NOTHING ELSE OPENED (UIP-P4). Since that packet a created profile
+    // continues into the diary's first-entry form — but only where the diary can
+    // be written, which this channel cannot: there is no store here at all
+    // (`store/bridge.js` is inert in a browser by construction, LSC-P1-INV-001),
+    // so a form offered here would take a parent's text about their child and
+    // refuse it on save. This assertion is the negative arm of `UIP-P4-INV-001`;
+    // the flow's own legs are in `diary-save.spec.js`, behind a store that opens.
+    await expect(
+      page.locator('#diaryModal'),
+      'the first-entry form was offered on a channel whose save is certain to refuse'
+    ).toHaveCSS('display', 'none');
+    await expect(page.locator('.modal.show')).toHaveCount(0);
+
     // It is a real profile, not a label: the same tick that was refused above
     // is now recorded, and it survives a reload.
     await checkboxFor(page, CHAIN.ready).click();

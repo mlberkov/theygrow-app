@@ -5,10 +5,15 @@
 // below keeps the exact statement order the single-file version had, because
 // listener registration order relative to buildTableBody() is behaviour.
 //
-// GRAPH SHAPE. entry -> surfaces/* -> core/*, and it is a DAG: the only
-// backward call — switchProfile() rebuilding the table — is inverted by passing
-// the rebuild into initProfiles(), so surfaces/profile.js never imports
-// surfaces/table.js. Shared mutable state that two surfaces read (the ZPD
+// GRAPH SHAPE. entry -> surfaces/* -> core/*, and it is a DAG: the two backward
+// calls are inverted by passing them into initProfiles(), so
+// surfaces/profile.js imports neither of the surfaces it acts on. One is
+// switchProfile() rebuilding the table (surfaces/table.js). The other, since
+// UIP-P4, is a created profile opening the diary on its first-entry form
+// (surfaces/diary.js) — and that direction matters more than the first, because
+// surfaces/diary.js already imports surfaces/profile.js for
+// openCreateProfileModal, so an import back would close a real cycle rather
+// than a hypothetical one. Shared mutable state that two surfaces read (the ZPD
 // filter flag) lives in core/, not in whichever surface happens to own the
 // button. A cycle would in fact evaluate correctly here, but it is not a
 // property a later packet should have to re-derive.
@@ -35,7 +40,7 @@ import { wireSkillCompletion } from './surfaces/skill-completion.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
 import { wireChannel } from './surfaces/channel.js';
-import { wireDiary } from './surfaces/diary.js';
+import { offerFirstEntry, wireDiary } from './surfaces/diary.js';
 import { wireExport } from './surfaces/export.js';
 import { initNativeStore } from './store/boot.js';
 
@@ -48,7 +53,10 @@ import { initNativeStore } from './store/boot.js';
 async function init(storeOutcome) {
     await initHistory(storeOutcome);
 
-    initProfiles(buildTableBody);
+    // Два инжектированных действия, оба — обратные рёбра графа (см. GRAPH SHAPE
+    // выше): перестроить таблицу после смены ребёнка и предложить первую запись
+    // о только что заведённом.
+    initProfiles(buildTableBody, offerFirstEntry);
 
     // Загрузить сохранённые состояния UI
     loadCategoryStates();

@@ -58,22 +58,64 @@ const path = require('path');
  * a responder that matched nothing would throw on the first call — loudly, but
  * about the wrong thing.
  */
-function jsStringConstant(source, name, where) {
-    const declaration = new RegExp(`^const ${name} =([\\s\\S]*?);$`, 'm').exec(source);
-    if (!declaration) throw new Error(`${where} declares no \`const ${name}\``);
-    const body = declaration[1];
+function quotedConcatenation(body, label) {
     const parts = body.match(/'[^']*'/g);
     if (!parts) {
-        throw new Error(`\`const ${name}\` in ${where} is not a concatenation of quoted literals`);
+        throw new Error(`${label} is not a concatenation of quoted literals`);
     }
     const between = body.replace(/'[^']*'/g, '');
     if (/[A-Za-z_$]/.test(between)) {
         throw new Error(
-            `\`const ${name}\` in ${where} interpolates something this reader cannot see;`
+            `${label} interpolates something this reader cannot see;`
                 + ' the seam would be answering a different statement from the app'
         );
     }
     return parts.map((part) => part.slice(1, -1)).join('');
+}
+
+function jsStringConstant(source, name, where) {
+    const declaration = new RegExp(`^const ${name} =([\\s\\S]*?);$`, 'm').exec(source);
+    if (!declaration) throw new Error(`${where} declares no \`const ${name}\``);
+    return quotedConcatenation(declaration[1], `\`const ${name}\` in ${where}`);
+}
+
+/**
+ * The same reading, one level in: `const NAME = Object.freeze({ key: '...' })`.
+ *
+ * UIP-P4 needs `DETAIL_SQL.child_attribute`, which is a named constant living
+ * inside a frozen map rather than at the top level. Reading it is the same
+ * choice `READ_FROM_SOURCE` makes everywhere else — a retyped copy is what
+ * drifts — and it fails closed in the same three directions: no such object, no
+ * such key, and a value this reader cannot see whole. The keys are found by
+ * their indentation so the value may span lines, exactly as the shipped file
+ * writes it.
+ */
+function jsObjectStringConstant(source, name, key, where) {
+    const declaration = new RegExp(
+        `^const ${name} = Object\\.freeze\\(\\{\\n([\\s\\S]*?)\\n\\}\\);$`,
+        'm'
+    ).exec(source);
+    if (!declaration) {
+        throw new Error(`${where} declares no \`const ${name} = Object.freeze({...})\``);
+    }
+    const lines = declaration[1].split('\n');
+    const starts = [];
+    lines.forEach((line, at) => {
+        const found = /^ {4}([A-Za-z_$][\w$]*):/.exec(line);
+        if (found) starts.push({ key: found[1], at });
+    });
+    const index = starts.findIndex((entry) => entry.key === key);
+    if (index === -1) {
+        throw new Error(`\`const ${name}\` in ${where} has no key "${key}"`);
+    }
+    const from = starts[index].at;
+    const to = index + 1 < starts.length ? starts[index + 1].at : lines.length;
+    const body = lines
+        .slice(from, to)
+        .join('\n')
+        .replace(new RegExp(`^ {4}${key}:`), '')
+        .replace(/,\s*$/, '');
+    return quotedConcatenation(body, `\`${name}.${key}\` in ${where}`);
 }
 
 // The statements the app issues that ARE declared as named constants. Read, not
@@ -91,7 +133,18 @@ const READ_FROM_SOURCE = Object.freeze({
         'RECORD_COUNT_SQL',
         'FTS_REBUILD_SQL',
     ],
-    'store/journal.js': ['CHILDREN_SQL', 'MARKS_SQL'],
+    // UIP-P4 adds ENTRY_SQL: creating a profile is now driven through the UI in
+    // a browser leg, so the seam has to answer the journal spine as well as the
+    // diary.
+    'store/journal.js': ['CHILDREN_SQL', 'MARKS_SQL', 'ENTRY_SQL'],
+});
+
+// The same reading for statements that are named constants inside a frozen map.
+// `DETAIL_SQL.child_attribute` is the row that carries a child's name and
+// birthdate, and the seam needs it to answer `CHILDREN_SQL` with the child the
+// app has just made (UIP-P4).
+const READ_FROM_OBJECTS = Object.freeze({
+    'store/journal.js': [['DETAIL_SQL', 'child_attribute']],
 });
 
 // The statements `store/store.js` and `store/journal.js` INLINE at their call
@@ -118,6 +171,11 @@ const INLINED_BY_THE_APP = Object.freeze({
     // direction, and also a red in a suite that has nothing to do with parking.
     markClean:
         'UPDATE store_lifecycle SET clean_shutdown = 1, opened_at_utc = ? WHERE id = 1',
+    // UIP-P4 — the `child` row `repo-journal.js::childRow()` returns from inside
+    // an object literal, so there is no constant to read. Same terms as the rest
+    // of this map: exact equality, and a drift reds with its own text.
+    childInsert:
+        'INSERT INTO child (id, created_at_utc) VALUES (?, ?) ON CONFLICT (id) DO NOTHING',
 });
 
 /** Every statement the seam knows, keyed by name, read where it can be read. */
@@ -128,6 +186,13 @@ function shippedStatements(appRoot, mountDir) {
         const source = fs.readFileSync(file, 'utf8');
         for (const name of names) {
             statements[name] = jsStringConstant(source, name, rel);
+        }
+    }
+    for (const [rel, entries] of Object.entries(READ_FROM_OBJECTS)) {
+        const file = path.join(appRoot, 'm', mountDir, rel);
+        const source = fs.readFileSync(file, 'utf8');
+        for (const [name, key] of entries) {
+            statements[`${name}_${key}`] = jsObjectStringConstant(source, name, key, rel);
         }
     }
     return statements;
@@ -150,6 +215,34 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
             // INSERT's bound values are remembered and handed back under the
             // column names the shipped read query itself asks for.
             const records = [];
+            // WHICH CHILD EACH ROW BELONGS TO, held beside the rows rather than
+            // in them, so what the seam hands back keeps exactly the column set
+            // `RECORDS_SQL` declares (UIP-P4). `record` has no child column —
+            // the real query reaches the child through `area_child`, and so does
+            // this: `areaOfChild` is filled from the shipped
+            // `AREA_CHILD_INSERT_SQL`, never invented here.
+            const areaOfChild = new Map();
+            const childOfArea = new Map();
+            const childOfRecord = new Map();
+
+            // The family the store holds. An ARRAY since UIP-P4, because a
+            // profile can now be created through the UI: the seam has to answer
+            // `CHILDREN_SQL` with the child the app just wrote rather than with
+            // the one the leg seeded. A fresh install is still `child: null`.
+            const children = family
+                ? [
+                    {
+                        id: family.id,
+                        created_at_utc: family.createdAtUtc,
+                        name: family.name,
+                        birthdate: family.birthdate,
+                    },
+                ]
+                : [];
+            // journal_entry id -> subject_child_id, so a `child_attribute` row
+            // can be attached to the child its entry is about. Read out of the
+            // shipped ENTRY_SQL values; the seam guesses nothing.
+            const subjectOfEntry = new Map();
 
             // What the next search is to be answered with, and what it becomes
             // once the index has been rebuilt. Set by the leg, never by the
@@ -184,6 +277,10 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     )
                     .map((row) => ({ ...row }));
 
+            /** The rows in one child's diary, reached the way the query reaches them. */
+            const ownedBy = (childId) =>
+                records.filter((row) => childOfRecord.get(row.id) === childId);
+
             const unknown = (method, statement) => {
                 throw new Error(
                     `[page-bridge] ${method} asked for a statement this seam does not know,`
@@ -205,7 +302,7 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                 return knobs;
             };
 
-            const answerQuery = async (statement) => {
+            const answerQuery = async (statement, values) => {
                 const cfg = await config();
                 // Built from the shipped knobs, so a changed journal mode or
                 // busy timeout moves both sides at once.
@@ -230,27 +327,36 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     // "no profile" are true at once. Nothing else in this seam
                     // needs to know: the app's own zero-child branches take over
                     // from here.
-                    if (!family) return [];
-                    return [
-                        {
-                            id: family.id,
-                            created_at_utc: family.createdAtUtc,
-                            name: family.name,
-                            birthdate: family.birthdate,
-                        },
-                    ];
+                    //
+                    // The ORDER is the one CHILDREN_SQL declares — created_at,
+                    // then id — because `core/state.js` takes `profiles[0]` when
+                    // the remembered selection is not among them.
+                    return children
+                        .slice()
+                        .sort((a, b) =>
+                            a.created_at_utc === b.created_at_utc
+                                ? (a.id < b.id ? -1 : 1)
+                                : a.created_at_utc - b.created_at_utc
+                        )
+                        .map((row) => ({ ...row }));
                 }
                 if (statement === sql.MARKS_SQL) return [];
 
                 if (statement === sql.AREA_LOOKUP_SQL) {
                     // No diary area until the first entry creates one, which is
-                    // the first-write case the surface has to handle.
-                    return records.length > 0 ? [{ id: 'area-page-bridge' }] : [];
+                    // the first-write case the surface has to handle. Keyed by
+                    // the CHILD the statement binds (slot 2) since UIP-P4: with
+                    // two children in the store, answering from one shared pile
+                    // would let a leg about the second child pass while the
+                    // surface wrote into the first one's diary.
+                    return areaOfChild.has(values[1])
+                        ? [{ id: areaOfChild.get(values[1]) }]
+                        : [];
                 }
                 if (statement === sql.RECORDS_SQL) {
                     const stagedList = window.__pageBridgeList;
                     if (stagedList.failWith) throw new Error(stagedList.failWith);
-                    return newestFirst(records);
+                    return newestFirst(ownedBy(values[1]));
                 }
 
                 // THIS SEAM MATCHES NOTHING, AND THAT IS THE POINT (DIA-P4).
@@ -272,17 +378,69 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     // would classify the engine's own words.
                     const staged = window.__pageBridgeSearch;
                     if (staged.failWith) throw new Error(staged.failWith);
+                    // SLOT 3, NOT SLOT 2, and the difference is the whole
+                    // reason this is bound rather than assumed: the search
+                    // statement binds the MATCH expression first, so the child
+                    // sits one place further along than it does in every other
+                    // statement here.
                     return newestFirst(
-                        records.filter((row) => staged.answer.includes(row.id))
+                        ownedBy(values[2]).filter((row) => staged.answer.includes(row.id))
                     );
                 }
-                if (statement === sql.RECORD_COUNT_SQL) return [{ n: records.length }];
+                if (statement === sql.RECORD_COUNT_SQL) return [{ n: ownedBy(values[1]).length }];
                 return unknown('query', statement);
             };
 
             const applyMutation = (statement, values) => {
                 if (statement === sql.AREA_INSERT_SQL) return;
-                if (statement === sql.AREA_CHILD_INSERT_SQL) return;
+                if (statement === sql.AREA_CHILD_INSERT_SQL) {
+                    // area_id, child_id — the pair the real query joins through.
+                    areaOfChild.set(values[1], values[0]);
+                    childOfArea.set(values[0], values[1]);
+                    return;
+                }
+                // A PROFILE CREATED THROUGH THE UI (UIP-P4). Three statements,
+                // in the order `repo-journal.js::appendChild` sends them inside
+                // one transaction: the child row in the prelude, then a spine
+                // entry and its attribute row per attribute. The seam holds what
+                // they say and nothing more — it applies no DDL, enforces no
+                // foreign key, and models no `v_child_attribute_current`. That
+                // a child really comes back out of a journal is `DiaryEntryTest`
+                // on a device, and `FIU-P2-INV-001`'s Scope says so.
+                if (statement === sql.childInsert) {
+                    children.push({
+                        id: values[0],
+                        created_at_utc: values[1],
+                        name: null,
+                        birthdate: null,
+                    });
+                    return;
+                }
+                if (statement === sql.ENTRY_SQL) {
+                    // id, kind, author, subject_child_id, ...
+                    subjectOfEntry.set(values[0], values[3]);
+                    return;
+                }
+                if (statement === sql.DETAIL_SQL_child_attribute) {
+                    // journal_id, attribute, value, sensitive.
+                    const childId = subjectOfEntry.get(values[0]);
+                    const child = children.find((row) => row.id === childId);
+                    if (!child) {
+                        throw new Error(
+                            '[page-bridge] a child_attribute row arrived for a journal entry this'
+                                + ' seam never saw, so it refuses rather than inventing a child: '
+                                + JSON.stringify(values[0])
+                        );
+                    }
+                    if (values[1] !== 'name' && values[1] !== 'birthdate') {
+                        throw new Error(
+                            '[page-bridge] a child_attribute this seam does not model: '
+                                + JSON.stringify(values[1])
+                        );
+                    }
+                    child[values[1]] = values[2];
+                    return;
+                }
                 if (statement === sql.markOpen) return;
                 if (statement === sql.markClean) return;
                 if (statement === sql.projectionContext) return;
@@ -292,6 +450,15 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                     // Positional, as the shipped statement declares it: id,
                     // area, author, kind, body, event_date_local, entry_at_utc,
                     // entry_utc_offset_min, updated_at_utc.
+                    const owner = childOfArea.get(values[1]);
+                    if (owner === undefined) {
+                        throw new Error(
+                            '[page-bridge] a record arrived for an area no `area_child` row ever'
+                                + ' named, so the seam cannot say whose diary it is: '
+                                + JSON.stringify(values[1])
+                        );
+                    }
+                    childOfRecord.set(values[0], owner);
                     records.push({
                         id: values[0],
                         body: values[4],
@@ -370,7 +537,9 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
                         return { changes: { changes: 0 } };
                     }
                     if (method === 'query') {
-                        return { values: await answerQuery(options.statement) };
+                        return {
+                            values: await answerQuery(options.statement, options.values ?? []),
+                        };
                     }
                     if (method === 'run') {
                         applyMutation(options.statement, options.values ?? []);
@@ -395,4 +564,9 @@ async function installPageBridge(page, { mountBase, statements, child, selfParti
     );
 }
 
-module.exports = { installPageBridge, jsStringConstant, shippedStatements };
+module.exports = {
+    installPageBridge,
+    jsObjectStringConstant,
+    jsStringConstant,
+    shippedStatements,
+};

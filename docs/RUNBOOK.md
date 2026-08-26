@@ -813,7 +813,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 
 **Diary smoke (owner-run, after installing the APK — DIA-P3).** The instrumented gate presses these same controls, but on a fresh emulator image with an engine that was made full on purpose. What no test can do is read the sentences as a parent reads them, so read them.
 
-1. Open the app and press **Дневник** in the header. On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Create a profile, reopen: the list is empty and says «Записей пока нет».
+1. Open the app and press **Дневник** in the header. On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Press **«Создать профиль»** there and fill it in. **Since UIP-P4 what follows is the packet's whole subject, so read it as a parent would:** the entry form must open **by itself**, with the cursor already in the text field, and it must be the **only** thing on screen — the create window closed, nothing stacked behind or above it. Press **«Закрыть»** (the form's second button says exactly that, and here it closes the window rather than returning to a list): you must be back on the table, with the child's name in the header and nothing else open, and **no entry must have been written**. Now press **Дневник** again: the list is empty and says «Записей пока нет», and «Новая запись» is where it always was. *(The old wording of this step — «Create a profile, reopen: the list is empty…» — described the app before UIP-P4, when nothing happened after a profile was created; it is the symptom the owner found on a device.)* **And when you add a SECOND child later** — the dropdown, «+ Создать новый профиль» — the same form appears for them; write two words and press «Сохранить», then check the entry stands in the **new** child's diary and that the first child's is untouched. Off-device that is `app/tests/diary-save.spec.js`; on a phone it is the only place the real store answers.
 2. Press **Новая запись**. The day defaults to today. **Set it back a few days** — this is the one product claim the smoke exists for: a parent writes in the evening about the morning, and the entry belongs to the day it is about.
 3. Write two or three sentences and press **Сохранить**. **Three things must happen together:** the window stays open, the list comes back, and the new entry is at the top of it with the day you chose. The window not closing is deliberate (`DIA-DL-005` (g)) — the list is the confirmation.
 4. Press **Изменить** on that entry, change a word and the day, and save again. The list must show **one** entry, corrected. A second entry appearing means an edit has become an append and the diary has silently become a journal — stop and report it.
@@ -1043,7 +1043,10 @@ milestone* step 10 withdrew at L3-P4 and which PPR-P2 made impossible outright b
 mechanism. The current order is: the diary and its search, then the export archive, whose step 9 reads
 the diary entry back out of the archive.)*
 
-1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. Press **Новая запись**,
+1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. *(Since UIP-P4 there is a
+   second way in, and on a fresh install you meet it first: creating the profile opens the entry form by itself.
+   That flow has its own step — see the Дневник smoke below — and this one starts after it has been closed.)*
+   Press **Новая запись**,
    pick a day that is NOT today — deliberately, because the event day and the moment of writing are
    different columns and this is the only place a person checks that the form asks for the first — type a
    couple of sentences, press **Сохранить**. The window stays open and the entry appears first in the list.
