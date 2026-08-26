@@ -8,7 +8,7 @@
 # the one input that stays authoritative over that exemption. The frozen
 # generations below are tracked, so nothing else could drop them.
 
-# Frozen module generations. app/m/v8 is the live mount; v1..v7 are history and
+# Frozen module generations. app/m/v9 is the live mount; v1..v8 are history and
 # are only ever read as history. Measured on the 2026-08-24 graph: 323 of 556
 # scanned files and 2582 of 5324 nodes came from them, and an acceptance run
 # sent 8 of its 38 lookups into v7 before it became clear v8 was the live one.
@@ -23,6 +23,7 @@ app/m/v4/
 app/m/v5/
 app/m/v6/
 app/m/v7/
+app/m/v8/
 
 # The Android shell's staged web root — a byte copy of app/m/**. Measured: it
 # contributes 0 files and 0 nodes today, because native/android/.gitignore

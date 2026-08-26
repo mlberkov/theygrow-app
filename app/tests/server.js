@@ -272,7 +272,7 @@ function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
       return;
     }
 
-    // --- nginx: location = /privacy, location = /privacy/ ------------------
+    // --- nginx: = /privacy, = /privacy/, = /privacy.html -------------------
     // The policy document (PPR-P1), and the only route in this file where the
     // SERVED path and the FILE differ — /privacy is answered by privacy.html.
     // That difference is the whole reason nginx needs an exact-match location
@@ -285,6 +285,17 @@ function createServer({ profile = PROFILE, root = SERVE_ROOT } = {}) {
     // this file: the APK serves no /privacy route and links the policy at its
     // https address.
     if (isNginx && pathname === '/privacy/') {
+      res.writeHead(301, { Location: '/privacy' }).end();
+      return;
+    }
+    // UIP-P2. The third spelling — the file's own name — answered 200 through
+    // the try_files fallback until that packet, so the document had TWO
+    // addresses and named neither as canonical. Same relative Location as the
+    // branch above, and for the same reason: `absolute_redirect off` at server
+    // scope (PPR-P4) is what keeps nginx from emitting scheme://host:8080.
+    // Capacitor keeps serving the file under its own name — the APK has no
+    // nginx and no /privacy route.
+    if (isNginx && pathname === '/privacy.html') {
       res.writeHead(301, { Location: '/privacy' }).end();
       return;
     }

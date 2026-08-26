@@ -136,12 +136,21 @@ module.exports = defineConfig({
       // DIA-P3 adds one: diary-write, the record path's control flow against the
       // recorder — one transaction for the area and its first entry, an edit
       // that is an UPDATE, a full disk classified rather than swallowed. What
-      // PPR-P2 adds consent-gate: the shell's analytics seam read as source (the
-      // loader is created in exactly one place and that place is behind the
-      // gate), and the consent module's own decision functions imported
-      // off-device the way store-unit imports the store. Its executing twin —
-      // no request reaches the analytics origin until a visitor says yes — is
-      // consent-surface.spec.js in `behavior`, and this file says so in both
+      // PPR-P2 added consent-gate, and UIP-P1 replaced it with two files. The
+      // consent half has no object: analytics left the web showcase entirely
+      // (vault ADR-043 annotation 2026-08-25), so the gate, the banner and the
+      // stored answer are gone rather than switched off. What is left of that
+      // file is download-offer, the platform probe behind the APK control —
+      // never a consent subject, still enforcing PPR-P2-INV-002, renamed because
+      // docs/INVARIANTS.md names its path and a file named for a retired subject
+      // misleads the next reader. And analytics-absence takes the place the
+      // consent legs held: an ABSENCE guard, over the shipped mount tree and the
+      // shell, that no analytics origin, loader, measurement id or event
+      // vocabulary is anywhere in what ships. It is here rather than in
+      // `behavior` because an absence is a property of the tree, which is the
+      // admissible static kind (AGENTS.md §11). Its executing twin — that a real
+      // browser reaches no analytics origin in any visitor state — is
+      // analytics-egress.spec.js in `behavior`, and this file says so in both
       // places on purpose.
       // those statements MEAN is `pytest app/tests/schema`
       // (test_diary_write_path.py) and whether a parent's entry actually lands
@@ -164,13 +173,15 @@ module.exports = defineConfig({
       // at runtime, by behavior.spec.js.
       // PPR-P1 adds one: privacy-page, the policy document as a property of the
       // tree — that the image ships it, that it precaches nothing, that it
-      // carries no script and no link, and that it still says what
-      // docs/privacy-policy-v1.0.md says. It is here because all of that is
+      // carries no script, that every link it does carry is on a declared
+      // allowlist and none of them is its own address (UIP-P2, which replaced
+      // the blanket no-<a> rule), and that it still says what the CURRENT
+      // edition — docs/privacy-policy-v1.1.md — says. It is here because all of that is
       // read from files and boots nothing. What a browser does at the address —
       // that the shell is not served there, that no third party is reached, and
       // that the visit leaves the cached shell alone — is privacy-surface.spec.js
       // in `behavior`, deliberately not this one.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|consent-gate)\.spec\.js/,
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -240,12 +251,17 @@ module.exports = defineConfig({
       // overwrite the app shell offline copy through the service worker's
       // navigation mirror. It is NOT in `native` below: that project serves a
       // different web root, and the APK offers no /privacy route at all.
-      // PPR-P2 adds consent-surface: whether anything is fetched from the
-      // analytics origin, and when. Every leg of it is a claim about a request a
+      // PPR-P2 added consent-surface and UIP-P1 replaced it with analytics-egress:
+      // whether anything is fetched from an analytics origin AT ALL, in any
+      // visitor state. The subject changed from "and when" to "ever", because
+      // the answer no longer depends on anything the visitor did — there is no
+      // loader to gate. Every leg of it is still a claim about a request a
       // browser did or did not make, which is the definition of a claim no
-      // source scan can carry; its off-device half — the three-state truth table
-      // and the platform probe — is in `contract` as consent-gate.
-      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|consent-surface)\.spec\.js/,
+      // source scan can carry, and it carries its own anti-vacuity leg: the same
+      // observer must record a request that IS expected, or a zero means only
+      // that the instrument saw nothing. Its static half — that the vocabulary
+      // is absent from the tree — is in `contract` as analytics-absence.
+      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

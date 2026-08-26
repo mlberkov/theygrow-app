@@ -124,11 +124,26 @@ test.describe('the web channel offers what it can deliver, and nothing else', ()
 
     test('the browser channel says the copy it holds is the only one', async ({ page }) => {
         // The sentence the archive modal used to carry, on the channel it is
-        // true for. Executed rather than scanned: it must be on screen without
-        // opening anything.
+        // true for. Executed rather than scanned.
+        //
+        // IT MOVED INTO THE INTRO WINDOW AT UIP-P3, and the leg moved with it.
+        // DIA-P2 put it above the table precisely so a parent met it without
+        // opening anything; the owner reversed that on 2026-08-25 because the
+        // top of the page said the same things twice. The cost is real and is
+        // what this leg now shows: the sentence is reached by pressing the
+        // header control, and by nothing else. `UIP-DL-003` records the choice.
         await gotoApp(page, { state: STATES.seeded });
 
         const note = page.locator('#webChannelNote');
+        // Before the window is opened it is in the document and off screen —
+        // asserted so "visible" below is a fact about the reveal and not about
+        // an element that was on screen all along.
+        await expect(note).toHaveCount(1);
+        await expect(note).toBeHidden();
+
+        await page.locator('#aboutBtn').click();
+        await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+
         await expect(note).toBeVisible();
         await expect(note).toContainText('только в этом браузере');
         await expect(note).toContainText('резервной копии');
@@ -431,6 +446,15 @@ test.describe('the native branch offers the archive, and its modal is actually v
         // The browser-only sentence does not follow the app inside: on this
         // channel the device store is the source of truth, and the statement
         // would be false.
+        //
+        // THE WINDOW IS OPENED FIRST, AND THAT IS NOT CEREMONY (UIP-P3). Since
+        // the sentence moved inside the intro, a closed window would make
+        // `toBeHidden()` true for the wrong reason — an element inside a
+        // `display: none` modal is hidden whatever the channel gate decided.
+        // Opening it puts the channel branch back in front of the assertion.
+        await page.locator('#aboutBtn').click();
+        await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+        await expect(page.locator('#webChannelNote')).toHaveCount(1);
         await expect(page.locator('#webChannelNote')).toBeHidden();
     });
 
@@ -563,14 +587,20 @@ test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)
             )
         ).toBe(POLICY_WITHHELD_VALUE);
 
+        // THE WINDOW IS OPENED FIRST, and the order is the assertion's meaning.
+        // "Hidden" has to be a fact about the LINK, not about the window it sits
+        // in — inside a closed modal every child is hidden whatever the
+        // declaration said. Until UIP-P3 a first run opened the window by itself
+        // and this leg asserted that it was open; the auto-open is gone (owner
+        // decision 2026-08-25), so the control is what opens it, and the claim
+        // underneath is unchanged.
+        await page.locator('#aboutBtn').click();
+        await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+        await expect(page.locator('#onboardingModal h2')).toBeVisible();
+
         // In the document — one set of bytes for both channels — and not in view.
         await expect(page.locator('#introPolicyLink')).toHaveCount(1);
         await expect(page.locator('#introPolicyLink')).toBeHidden();
-
-        // The intro is open on a first run, so "hidden" here is a fact about the
-        // link and not about the window it sits in.
-        await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
-        await expect(page.locator('#onboardingModal h2')).toBeVisible();
 
         // And nowhere else either: this is the only home the link has.
         expect(
@@ -602,6 +632,11 @@ test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)
                     POLICY_META
                 )
             ).toBe(POLICY_PUBLISHED_VALUE);
+
+            // The window opens on the control since UIP-P3 — the intro no longer
+            // comes up by itself on a first run, on either channel.
+            await page.locator('#aboutBtn').click();
+            await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
 
             const link = page.locator('#introPolicyLink');
             await expect(link).toBeVisible();

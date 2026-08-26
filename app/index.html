@@ -65,140 +65,56 @@
          "Privacy policy". -->
     <meta name="theygrow-privacy-policy" content="published">
 
-    <!-- Google tag (gtag.js) -->
+    <!-- КАНАЛ ВЫПОЛНЕНИЯ, ОБЪЯВЛЕННЫЙ ДО ЗАГРУЗКИ МОНТАЖА (L1-P4).
+
+         Единственное, что осталось от блока «Google tag (gtag.js)», который
+         стоял здесь до UIP-P1. Аналитика ушла с веб-витрины целиком (аннотация
+         к ADR-043 от 2026-08-25, класс: разворот): вместе с ней сняты загрузчик
+         gtag.js, window.theygrowAnalytics, trackEvent(), dataLayer, gtag(),
+         идентификатор измерения, переключатель ?dbg=1|0 с ключом ga_debug и
+         константы APP_VERSION/UI_LOCALE, которые существовали только чтобы
+         обогащать события. Поверхность согласия ушла вместе со своим предметом,
+         а не осталась выключенной.
+
+         Этот флаг — не про аналитику и остаётся по трём причинам: его читают
+         app/tests/channel-composition.spec.js и app/tests/diary-surface.spec.js
+         как посылку своих веток, а мост Capacitor внедряется до загрузки
+         приложения, поэтому вопрос «какой это канал» отвечается уже здесь, в
+         <head>, до того как стартует граф модулей. Перенести его в монтаж
+         значило бы отвечать на него позже, чем он нужен. -->
     <script>
-      // L1-P4: THE NATIVE CHANNEL CARRIES NO ANALYTICS. Owner decision, taken
-      // with the milestone in view; it closes the standing analytics question
-      // (LSC-DL-001 (o)) for this channel only, and leaves the web channel's
-      // open with its own address.
-      //
-      // Implemented as a RUNTIME BRANCH, not a second file: both channels ship
-      // byte-identical bytes (LSC-P1-INV-002), which is the same shape the
-      // export surface and the store use to behave differently in each. The
-      // Capacitor bridge is injected before the app boots, so this test is
-      // already answerable here in the head.
-      //
-      // The loader tag was STATIC until L1-P4 and is created at run time instead,
-      // because stopping the events while still fetching gtag.js would leave the
-      // egress in place: the request itself carries the device address and the
-      // user agent, which is the part that had to stop.
-      //
-      // PPR-P2 TURNS THE SAME ARGUMENT ON THE WEB CHANNEL, AND NOTHING HERE
-      // CREATES THE TAG ANY MORE. Until this packet a browser fetched gtag.js on
-      // every load and gtag('config') ran while the head was still parsing, so
-      // the visitor's address had already reached googletagmanager.com before
-      // anyone was asked anything. The whole block below is now a DEFINITION: the
-      // shell says HOW analytics starts and stops, and never decides WHETHER.
-      // That decision is /m/v{N}/surfaces/consent.js, which calls
-      // window.theygrowAnalytics.enable() only when the visitor's stored answer
-      // is exactly CONSENT_CONFIG.stateGranted.
-      //
-      // THIS IS BASIC CONSENT MODE, and it is the mode app/privacy.html §5
-      // states: «До согласия теги Google Analytics не загружаются». There is
-      // deliberately no gtag('consent', 'default', …) call — that is ADVANCED
-      // mode, which loads the tag first and asks it to behave, and shipping it
-      // would make the policy's own sentence false.
       window.IS_NATIVE_SHELL = !!(
         window.Capacitor
         && typeof window.Capacitor.isNativePlatform === 'function'
         && window.Capacitor.isNativePlatform()
       );
-
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-
-      // === Debug mode: ?dbg=1 включает, ?dbg=0 выключает, иначе читаем localStorage ===
-      const GA_DEBUG = (() => {
-        const p = new URLSearchParams(window.location.search).get('dbg');
-        if (p === '1') { localStorage.setItem('ga_debug', '1'); return true; }
-        if (p === '0') { localStorage.removeItem('ga_debug'); return false; }
-        return localStorage.getItem('ga_debug') === '1';
-      })();
-
-      // === App constants (соответствуют custom definitions в GA4) ===
-      const APP_VERSION = '1.0.0';
-      const UI_LOCALE = document.documentElement.lang || 'ru';
-      const GA_MEASUREMENT_ID = 'G-F5Q0JC691W';
-
-      // === The analytics seam the mount drives (PPR-P2) ===
-      //
-      // Defined, never called from here. The ONLY caller is the consent surface
-      // in the module mount, and the only argument it ever needs is the
-      // visitor's own stored answer. Fail-closed by construction: this flag
-      // starts false, nothing in the head flips it, and every path that could
-      // reach googletagmanager.com is behind it.
-      let analyticsEnabled = false;
-
-      window.theygrowAnalytics = {
-        enable() {
-          // The native channel never enables, whatever calls this. Belt to the
-          // consent surface's own braces: that module returns before it reaches
-          // here on a Capacitor shell, and this line means a future caller
-          // cannot undo L1-P4's decision by accident.
-          if (window.IS_NATIVE_SHELL) return;
-          if (analyticsEnabled) return;
-          analyticsEnabled = true;
-          // Clear Google's own opt-out switch, in case this visitor declined
-          // earlier in the same page life and has now changed their mind.
-          window['ga-disable-' + GA_MEASUREMENT_ID] = false;
-          // The measurement id is written ONCE, here, and the loader URL is
-          // built from it. It used to appear twice — once in this URL as a
-          // literal and once as the constant — which is two things to keep
-          // equal for no gain.
-          const loader = document.createElement('script');
-          loader.async = true;
-          loader.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_MEASUREMENT_ID;
-          document.head.appendChild(loader);
-          gtag('js', new Date());
-          gtag('config', GA_MEASUREMENT_ID, ...(GA_DEBUG ? [{ debug_mode: true }] : []));
-          if (GA_DEBUG) {
-            trackEvent('app_debug_ping', { timestamp: Date.now() });
-          }
-        },
-        disable() {
-          // WITHDRAWAL, AND AN HONEST ACCOUNT OF WHAT IT CAN DO. A <script> the
-          // document has already fetched cannot be un-fetched, and removing the
-          // element would not unload it. What CAN be done is what Google
-          // documents: ga-disable-<id> stops the loaded tag sending anything.
-          // Together with the flag below, nothing further leaves the page — and
-          // on the next load the gate never creates the tag at all.
-          analyticsEnabled = false;
-          window['ga-disable-' + GA_MEASUREMENT_ID] = true;
-        },
-      };
-
-      // === Event helper: безопасная отправка с обогащением ===
-      function trackEvent(name, params) {
-        // Second half of the same decision. The loader is not fetched on the
-        // native channel, so gtag() would only ever fill a queue nobody drains —
-        // but a queue of family-shaped events sitting in memory is not the state
-        // to leave the app in either, and one early return is easier to reason
-        // about than an unreachable one.
-        if (window.IS_NATIVE_SHELL) return;
-        // PPR-P2 — the same argument for a visitor who has not consented, or has
-        // withdrawn. dataLayer is created unconditionally above, so without this
-        // line an undecided visitor's session would accumulate a queue of events
-        // waiting for a tag that may never load.
-        if (!analyticsEnabled) return;
-        if (typeof gtag !== 'function') return;
-        try {
-          const p = Object.assign({ ui_locale: UI_LOCALE, app_version: APP_VERSION }, params);
-          if (GA_DEBUG) p.debug_mode = true;
-          gtag('event', name, p);
-        } catch (e) { /* GA blocked — ignore */ }
-      }
     </script>
 
-    <title>Child Dev Tracker</title>
-    <link rel="stylesheet" href="/m/v8/app.css">
+    <!-- ИМЯ ВКЛАДКИ — ЭТО ИМЯ ПРОДУКТА (UIP-P3). До этого пакета здесь стояло
+         «Child Dev Tracker» — рабочее имя времён первого прототипа, которое
+         посетитель видел на вкладке, в закладке и при наведении, пока и
+         манифест, и офлайн-страница, и окно перед установкой уже год говорили
+         «TheyGrow». Байты одни на оба канала: шелл едет внутри APK без
+         изменений (LSC-P1-INV-002).
+
+         ЭТУ СТРОКУ ЧИТАЕТ НЕ ТОЛЬКО БРАУЗЕР. docs/RUNBOOK.md, § Promotion +
+         rollback, шаг 3, грепает её у выкаченной ревизии — и это единственное
+         место, где имя вкладки вообще проверяется. Пара «шелл ↔ RUNBOOK»
+         закреплена app/tests/delivery-contract.spec.js (UIP-P3-INV-002): в этом
+         репозитории записанный руками литерал уже четырежды устаревал молча (см.
+         историю бампов маунта в том же шаге), и одна проверка, которая краснеет
+         вместо ложной красноты в день промоушена, дешевле пятого раза. -->
+    <title>TheyGrow</title>
+    <link rel="stylesheet" href="/m/v9/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v8/ graph — FORTY-THREE today. The count is written here as a series
+         /m/v9/ graph — FORTY-ONE today. The count is written here as a series
          because the series is the point: fifteen at A1-P6, twenty-one once
          L1-P2 added the native store, forty-six once DIA-P3 added the diary,
-         forty-five once L3-P2 deleted the transfer offer's surface, and
-         and forty-three since PPR-P2 retired the transfer mechanism (four out)
-         and added the consent gate (two in). It had
+         forty-five once L3-P2 deleted the transfer offer's surface,
+         forty-three once PPR-P2 retired the transfer mechanism (four out) and
+         added the consent gate (two in), and forty-one since UIP-P1 retired
+         analytics and the consent gate with it (two out). It had
          been left at twenty-one through four packets, which read as a claim
          about the list below rather than as the history it is; the number is
          only worth carrying if it is the current one, so it is corrected in
@@ -213,7 +129,7 @@
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v8/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v9/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -226,49 +142,47 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v8/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v8/core/state.js">
-    <link rel="modulepreload" href="/m/v8/core/storage.js">
-    <link rel="modulepreload" href="/m/v8/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v8/core/signals.js">
-    <link rel="modulepreload" href="/m/v8/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v8/core/format.js">
-    <link rel="modulepreload" href="/m/v8/core/zpd.js">
-    <link rel="modulepreload" href="/m/v8/core/urgency.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v8/store/boot.js">
-    <link rel="modulepreload" href="/m/v8/store/store.js">
-    <link rel="modulepreload" href="/m/v8/store/journal.js">
-    <link rel="modulepreload" href="/m/v8/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v8/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v8/store/records.js">
-    <link rel="modulepreload" href="/m/v8/store/bridge.js">
-    <link rel="modulepreload" href="/m/v8/store/config.js">
-    <link rel="modulepreload" href="/m/v8/store/errors.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/channel.js">
-    <link rel="modulepreload" href="/m/v8/channel/config.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/consent.js">
-    <link rel="modulepreload" href="/m/v8/consent/config.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/diary.js">
-    <link rel="modulepreload" href="/m/v8/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v8/export/run.js">
-    <link rel="modulepreload" href="/m/v8/export/build.js">
-    <link rel="modulepreload" href="/m/v8/export/readout.js">
-    <link rel="modulepreload" href="/m/v8/export/sink.js">
-    <link rel="modulepreload" href="/m/v8/export/text.js">
-    <link rel="modulepreload" href="/m/v8/export/readme.js">
-    <link rel="modulepreload" href="/m/v8/export/zip.js">
-    <link rel="modulepreload" href="/m/v8/export/pdf.js">
-    <link rel="modulepreload" href="/m/v8/export/ttf.js">
-    <link rel="modulepreload" href="/m/v8/export/config.js">
-    <link rel="modulepreload" href="/m/v8/export/errors.js">
+    <link rel="modulepreload" href="/m/v9/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v9/core/state.js">
+    <link rel="modulepreload" href="/m/v9/core/storage.js">
+    <link rel="modulepreload" href="/m/v9/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v9/core/signals.js">
+    <link rel="modulepreload" href="/m/v9/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v9/core/format.js">
+    <link rel="modulepreload" href="/m/v9/core/zpd.js">
+    <link rel="modulepreload" href="/m/v9/core/urgency.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v9/store/boot.js">
+    <link rel="modulepreload" href="/m/v9/store/store.js">
+    <link rel="modulepreload" href="/m/v9/store/journal.js">
+    <link rel="modulepreload" href="/m/v9/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v9/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v9/store/records.js">
+    <link rel="modulepreload" href="/m/v9/store/bridge.js">
+    <link rel="modulepreload" href="/m/v9/store/config.js">
+    <link rel="modulepreload" href="/m/v9/store/errors.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v9/channel/config.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/diary.js">
+    <link rel="modulepreload" href="/m/v9/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v9/export/run.js">
+    <link rel="modulepreload" href="/m/v9/export/build.js">
+    <link rel="modulepreload" href="/m/v9/export/readout.js">
+    <link rel="modulepreload" href="/m/v9/export/sink.js">
+    <link rel="modulepreload" href="/m/v9/export/text.js">
+    <link rel="modulepreload" href="/m/v9/export/readme.js">
+    <link rel="modulepreload" href="/m/v9/export/zip.js">
+    <link rel="modulepreload" href="/m/v9/export/pdf.js">
+    <link rel="modulepreload" href="/m/v9/export/ttf.js">
+    <link rel="modulepreload" href="/m/v9/export/config.js">
+    <link rel="modulepreload" href="/m/v9/export/errors.js">
 </head>
 <body>
     <!-- PWA Update Available Banner -->
@@ -295,36 +209,6 @@
         <button type="button" id="exportDoneDismiss" aria-label="Закрыть">&times;</button>
     </div>
 
-    <!-- СОГЛАСИЕ НА АНАЛИТИКУ, ВЕБ-КАНАЛ (PPR-P2, PDR-035 §5).
-         Разметка одна на оба канала (LSC-P1-INV-002); показывает её
-         surfaces/consent.js и только в браузере — на нативном канале аналитики
-         нет вообще (L1-P4), поэтому спрашивать не о чем.
-
-         ДВА ДЕЙСТВИЯ РАВНОГО ВЕСА, И ТРЕТЬЕГО ВЫХОДА НЕТ. Обе кнопки — <button>
-         с одним и тем же классом: не ссылка против кнопки, не серое против
-         цветного, не мелкое против крупного. Крестика здесь нет намеренно:
-         «закрыть — не значит согласиться» тогда выполняется по построению, а не
-         обещанием, потому что закрыть баннер, не ответив, нельзя. Цена — баннер
-         стоит, пока не ответят; вернуться к вопросу можно потом ссылкой
-         «Cookie» в подвале, поэтому ответ ничего не запирает.
-
-         role="region", а не dialog: баннер ничего не перекрывает и фокус не
-         держит. Окно, из которого нельзя выйти, — это и есть тёмный паттерн,
-         которого здесь не должно быть. Класс .app-banner нужен правилу
-         .app-banner.show (EMV-P1-INV-001, app/tests/show-rule-coverage.spec.js).
-
-         tabindex="-1" — чтобы фокус можно было перевести на сам баннер, когда
-         его открывают из подвала. На первый показ фокус не переводится: отнимать
-         фокус во время загрузки страницы — отдельный дефект. -->
-    <div id="cookieBanner" class="app-banner cookie-banner" role="region"
-         aria-label="Cookie" tabindex="-1">
-        <span>Мы считаем посещения страниц, чтобы понимать, что читают. Включить статистику?</span>
-        <div class="cookie-banner-actions">
-            <button type="button" class="cookie-banner-btn" id="cookieEnableBtn">Включить</button>
-            <button type="button" class="cookie-banner-btn" id="cookieDeclineBtn">Не включать</button>
-        </div>
-    </div>
-
     <!-- Новый заголовок с профилем -->
     <header>
         <div class="header-top">
@@ -338,18 +222,29 @@
                         <!-- Профили будут добавлены динамически -->
                     </div>
                 </div>
-                <!-- О ПРИЛОЖЕНИИ (L3-P3). Постоянный вход во вступительное окно,
-                     на ОБОИХ каналах и без объявлений: он не предлагает
-                     действия, которого канал не выполняет, — он открывает текст,
-                     который лежит в тех же байтах.
+                <!-- О ПРИЛОЖЕНИИ (L3-P3; значок сменён в UIP-P3). Постоянный вход
+                     во вступительное окно, на ОБОИХ каналах и без объявлений: он
+                     не предлагает действия, которого канал не выполняет, — он
+                     открывает текст, который лежит в тех же байтах.
 
-                     ПОЧЕМУ ОН ВООБЩЕ ПОЯВИЛСЯ. Вступление закрывается навсегда
-                     первым же ✕ (FIU-DL-003, решение про ✕), а с этого пакета
-                     внутри него лежит ссылка на политику конфиденциальности.
-                     Окно, которое нельзя открыть второй раз, сделало бы документ
-                     недостижимым после первого закрытия — то есть обещание,
-                     которое исполняется ровно один раз. Эта кнопка и есть то,
-                     что превращает «показали однажды» в «доступно всегда».
+                     С UIP-P3 ЭТО ЕДИНСТВЕННЫЙ ВХОД, И ОТ ЭТОГО ЗАВИСИТ БОЛЬШЕ,
+                     ЧЕМ РАНЬШЕ. Вступление больше не приходит само — ни на первом
+                     запуске, ни в каком другом состоянии (решение владельца
+                     2026-08-25). Внутри него лежат ссылка на политику
+                     конфиденциальности (PDR-035, аннотация 2026-08-21: у ссылки
+                     ровно два носителя — это окно и эта кнопка) и строка о том,
+                     что у браузерной копии нет резервной. Обе достижимы ровно
+                     через эту кнопку, поэтому она обязана быть видимой в ЛЮБОМ
+                     состоянии, включая первый запуск: это утверждение, а не
+                     пожелание, и его исполняет app/tests/behavior.spec.js
+                     (UIP-P3-INV-001).
+
+                     ЗНАЧОК «i», А НЕ «?» (UIP-P3). Вопросительный знак обещает
+                     справку по затруднению — «что-то не получается, спроси
+                     здесь»; за кнопкой лежит рассказ о приложении и документ о
+                     данных, то есть сведения, а не помощь. Функция не менялась
+                     ни на байт: тот же id, то же имя, тот же обработчик, то же
+                     окно и та же ссылка внутри него.
 
                      ЗНАЧОК, А НЕ ПОДПИСЬ, и круг, а не пилюля: действие канала в
                      шапке одно и оно главное (см. .header-action), а это —
@@ -358,8 +253,9 @@
                      может стать несколькими разделами, и тогда меняется то, что
                      за кнопкой, а не кнопка.
 
-                     Ни onclick, ни телеметрии здесь нет — как и у соседей
-                     (решение владельца 2026-08-16, гейт D). -->
+                     Ни onclick, ни телеметрии здесь нет — как и у соседей, и с
+                     UIP-P1 её нет вообще нигде (аннотация к ADR-043 от
+                     2026-08-25 развернула гейт D, оставлявший GA4 до L4). -->
                 <button type="button"
                         class="header-help"
                         id="aboutBtn"
@@ -370,8 +266,8 @@
                          stroke-linecap="round" stroke-linejoin="round"
                          aria-hidden="true" focusable="false">
                         <circle cx="12" cy="12" r="9"/>
-                        <path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.6"/>
-                        <path d="M12 16.8h.01"/>
+                        <path d="M12 11v5"/>
+                        <path d="M12 7.5h.01"/>
                     </svg>
                 </button>
                 <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
@@ -417,8 +313,8 @@
                      которого на этом канале не происходит, — ровно тот дефект,
                      который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
 
-                     Ни GA4-события, ни onclick здесь нет (решение владельца
-                     2026-08-16, гейт D). -->
+                     Ни события аналитики, ни onclick здесь нет — и с UIP-P1
+                     аналитики нет ни на одном канале. -->
                 <button type="button"
                         class="header-action"
                         id="diaryBtn"
@@ -455,14 +351,33 @@
                      «копировать ссылку» для действия, которое никуда не ведёт.
                      Ровно этим предмет в шапке и читался как случайная ссылка.
 
-                     Здесь НЕТ телеметрии — ни события GA4, ни сигнала (решение
-                     владельца 2026-08-16, гейт D). -->
+                     И С UIP-P3 ОНА БОЛЬШЕ НЕ ГОВОРИТ «СКАЧАТЬ APK». Кнопка ничего
+                     не скачивает: она открывает окно, а файл предлагается внутри
+                     него и только тому, чья платформа умеет его поставить
+                     (PPR-P2-INV-002). Подпись обещала загрузку там, где загрузки
+                     нет вообще — на десктопе, — и это записанный долг, который
+                     Scope PPR-P2-INV-002 назвал словами «still reads «Скачать
+                     APK» on a desktop where nothing is downloadable». Имя теперь
+                     называет то, что за кнопкой: «Приложение для Android».
+
+                     ВИДИМОЙ ПОДПИСИ БОЛЬШЕ НЕТ, и это разворот решения L3-P3
+                     (решение владельца 2026-08-25, UIP-DL-003). Тот пакет оставил
+                     подпись видимой на мобильном по измеренной ширине — 348 из
+                     360, 400 из 412 — доводом «значок сам по себе не называет
+                     ничего». Кнопка стала предметом того же вида, что архив и
+                     дневник: значок в шапке, имя — в title/aria-label. Доступное
+                     имя от подписи не зависело и не изменилось; исчезло только
+                     то, что читает глаз. Правила #apkBtn в app.css, которые
+                     держали подпись видимой, убраны вместе с ней.
+
+                     Здесь НЕТ телеметрии. Аналитики нет ни у одной поверхности
+                     с UIP-P1; отсутствие СИГНАЛА — по-прежнему решение. -->
                 <button type="button"
                         class="header-action"
                         id="apkBtn"
                         hidden
-                        title="Скачать APK"
-                        aria-label="Скачать APK">
+                        title="Приложение для Android"
+                        aria-label="Приложение для Android">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
                          stroke-linecap="round" stroke-linejoin="round"
@@ -471,25 +386,19 @@
                         <path d="M12 7v7"/>
                         <path d="M9 11l3 3 3-3"/>
                     </svg>
-                    <span class="header-action-label">Скачать APK</span>
                 </button>
             </div>
         </div>
-        <div class="header-subtitle">
-            Отслеживание развития навыков ребёнка по месяцам согласно возрастным нормам
-        </div>
+        <!-- ПОДЗАГОЛОВКА ЗДЕСЬ БОЛЬШЕ НЕТ (UIP-P3). Строка «Отслеживание развития
+             навыков ребёнка по месяцам согласно возрастным нормам» стояла под
+             шапкой и повторяла то, что вступительное окно уже говорит своими
+             словами и подробнее. Шапка называет продукт и предлагает действия;
+             объяснять, что это за продукт, — работа окна за кнопкой «i», а не
+             второй строки, которую читают все и каждый раз. Правила
+             .header-subtitle ушли из app.css вместе с ней: класс без предмета
+             — это следующий пакет, который «почему-то не применяется». -->
     </header>
 
-    <!-- ЕДИНСТВЕННАЯ КОПИЯ — ЗДЕСЬ (DIA-P2). Строка веб-канала, скрытая на
-         нативном. До этого пакета этот факт был сказан один раз — внутри модалки
-         архива, которая на вебе больше не открывается. Утверждение истинно
-         ровно сейчас и ровно на этом канале: пока перенос не подтверждён
-         (ADR-048 §5), localStorage этого браузера держит единственную копию
-         истории семьи, и резервной копии у неё нет нигде. Стоит над таблицей, а
-         не в окне: родитель должен встретить это, не открывая ничего. -->
-    <p id="webChannelNote" class="channel-note" hidden>
-        Всё, что вы отмечаете здесь, хранится только в этом браузере: резервной копии у этих данных нет. Архив умеет собирать только приложение на телефоне.
-    </p>
 
     <!-- Таблица -->
     <div class="table-wrapper">
@@ -511,22 +420,6 @@
         </button>
         <button class="filter-toggle-btn" id="activitiesBtn">
             Подходящие активности
-        </button>
-        <!-- ОТЗЫВ СОГЛАСИЯ, В ПОДВАЛЕ САЙТА (PPR-P2). app/privacy.html §5
-             обещает ровно это: «Отозвать согласие можно в любое время по ссылке
-             «Cookie» в подвале сайта; это действие доступно так же просто, как
-             согласие». Один клик открывает тот же баннер с теми же двумя
-             кнопками — столько же действий, сколько стоило согласиться.
-
-             Приходит СКРЫТОЙ и раскрывается только в браузере
-             (surfaces/consent.js): на нативном канале отзывать нечего.
-
-             Третья кнопка в этом футере — первая с L1-P3. Позиционного правила
-             `footer button:nth-child(3)` она НЕ возвращает: у неё свой класс,
-             см. комментарий в app.css о том, почему позиционную форму сюда не
-             пускают. -->
-        <button type="button" class="footer-legal-btn" id="cookieSettingsBtn" hidden>
-            Cookie
         </button>
     </footer>
 
@@ -586,6 +479,14 @@
          смотрит. Отдельного баннера здесь нет намеренно — находка владельца
          2026-08-16 (DIA-DL-004) была про подтверждение внутри окна, которое
          вот-вот исчезнет; это окно не исчезает.
+
+         У ОКНА ДВА ВХОДА, И ВТОРОЙ ОТКРЫВАЕТ ЕГО СРАЗУ НА ФОРМЕ (UIP-P4).
+         Первый — кнопка «Дневник» в шапке: окно открывается на списке. Второй —
+         только что созданный профиль ребёнка: родителя не отправляют искать
+         дневник ради того, о чём он попросил, заведя ребёнка. Это то же окно и
+         та же форма, а не вторая поверхность записи; условие у второго входа то
+         же, что у кнопки «Новая запись» ниже, — писать должно быть куда
+         (surfaces/diary.js, offerFirstEntry).
 
          Текст записи ставится только через textContent (surfaces/diary.js).
          Это семейный текст: он не проходит через innerHTML нигде. -->
@@ -671,6 +572,12 @@
                     <textarea id="diaryBody" name="diaryBody" rows="6" aria-required="true"></textarea>
                 </div>
                 <p id="diaryStatus" class="export-status" hidden></p>
+                <!-- У ВТОРОЙ КНОПКИ ДВА ЗНАЧЕНИЯ, И ПОДПИСЬ НАЗЫВАЕТ ТЕКУЩЕЕ
+                     (UIP-P4). Форму открыли из списка — «Отмена» возвращает к
+                     списку; форма пришла сама, следом за созданием профиля, —
+                     «Закрыть» закрывает окно. Подпись ставит surfaces/diary.js
+                     на каждом открытии формы, поэтому она не может разойтись с
+                     тем, что кнопка делает; в разметке стоит обычный случай. -->
                 <div class="modal-buttons">
                     <button type="button" class="modal-button modal-button-secondary" id="diaryCancelBtn">Отмена</button>
                     <button type="submit" class="modal-button modal-button-primary" id="diarySaveBtn">Сохранить</button>
@@ -696,8 +603,9 @@
     </div>
 
     <!-- ЧТО ЭТО ЗА ПРИЛОЖЕНИЕ И ГДЕ ЖИВУТ ДАННЫЕ — экран перед установкой
-         (L3-P3). Открывается кнопкой «Скачать APK» в шапке, то есть ровно в тот
-         момент, когда посетитель решил ставить. До этого пакета в этот момент он
+         (L3-P3). Открывается кнопкой «Приложение для Android» в шапке (до UIP-P3
+         она называлась «Скачать APK» и обещала загрузку, которой на десктопе не
+         происходит), то есть ровно в тот момент, когда посетитель решил ставить. До этого пакета в этот момент он
          получал голую загрузку: страницу релизов, файл .apk и ни одного слова о
          том, что он ставит и что случится с записями о его ребёнке.
 
@@ -727,7 +635,7 @@
          добавила бы обязанность прочитать документ, не добавив выбора, а рядом с
          кнопкой загрузки читалась бы как предупреждение. На вопрос «что будет с
          данными» здесь отвечает сам текст. Документ живёт во вступительном окне,
-         которое открывается «?» в шапке на обоих каналах. -->
+         которое открывается «i» в шапке на обоих каналах. -->
     <div id="installModal" class="modal">
         <div class="modal-content install-modal-content">
             <span class="modal-close" id="installModalClose">&times;</span>
@@ -799,6 +707,39 @@
             </div>
             <div class="onboarding-modal-body">
                 <p>Это приложение позволяет отслеживать прогресс твоего ребёнка и видеть список подходящих развивающих активностей. Все персональные данные хранятся только на этом устройстве и никуда не отправляются, что обеспечивает полную приватность. Позже функционал расширится, и потребуется регистрация, но сейчас всё работает без регистрации прямо на твоём устройстве.</p>
+
+                <!-- ЕДИНСТВЕННАЯ КОПИЯ — ЗДЕСЬ (DIA-P2; перенесено в это окно
+                     UIP-P3). Строка веб-канала, скрытая на нативном. Утверждение
+                     истинно ровно сейчас и ровно на этом канале: пока перенос не
+                     подтверждён (ADR-048 §5), localStorage этого браузера держит
+                     единственную копию истории семьи, и резервной копии у неё нет
+                     нигде.
+
+                     ПОЧЕМУ ОНА ПЕРЕЕХАЛА СЮДА, И ЧТО ЭТО СТОИТ. DIA-P2 поставил
+                     её полосой над таблицей ровно с доводом «родитель должен
+                     встретить это, не открывая ничего». Решение владельца
+                     2026-08-25 разворачивает этот довод: шапка и верх страницы
+                     говорили одно и то же дважды, а место для рассказа о продукте
+                     — это окно. Цена названа прямо, а не замолчана: теперь
+                     посетитель встречает эту строку, только открыв окно кнопкой
+                     «i». Соседний абзац выше говорит, ГДЕ данные лежат; этот —
+                     что второй копии у них нет. Это разные факты, и второй не
+                     следует из первого.
+
+                     ЭЛЕМЕНТ, А НЕ ФРАЗА В ОБЩЕМ АБЗАЦЕ, потому что разметка окна
+                     одна на оба канала, а утверждение — только про веб: внутри
+                     приложения источник истины — устройственное хранилище, и та
+                     же фраза там была бы ложью. Раскрывает её surfaces/channel.js
+                     тем же единственным условием, что и раньше (`hidden = native`),
+                     — id намеренно сохранён: он называет не место, а канал, чьё
+                     это утверждение.
+
+                     Класса .channel-note на ней больше нет: он рисовал полосу во
+                     всю ширину страницы, а здесь это абзац среди абзацев. Правило
+                     ушло из app.css вместе со своим последним носителем. -->
+                <p id="webChannelNote" hidden>
+                    Всё, что вы отмечаете здесь, хранится только в этом браузере: резервной копии у этих данных нет. Архив умеет собирать только приложение на телефоне.
+                </p>
                 <p>Чтобы весь функционал работал в полном объёме, нужно:</p>
                 <ol>
                     <li>создать профиль ребёнка (кнопка наверху) и указать его дату рождения;</li>
@@ -815,7 +756,8 @@
                 <!-- ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ (L3-P3, FIU-DL-003). Единственный
                      дом этой ссылки в приложении, на ОБОИХ каналах: окно, которое
                      объясняет, что это за сервис, — и есть то место, где такому
-                     документу место. Открывается «?» в шапке, сколько угодно раз.
+                     документу место. Открывается «i» в шапке, сколько угодно раз
+                     (значок сменён в UIP-P3; кнопка, окно и ссылка — те же).
 
                      ПРИХОДИТ СКРЫТОЙ и раскрывается, только когда <meta
                      name="theygrow-privacy-policy"> объявляет, что документ
@@ -836,26 +778,36 @@
                    target="_blank"
                    rel="noopener noreferrer">Политика конфиденциальности</a>
             </div>
-            <!-- ГАЛОЧКИ «БОЛЬШЕ НЕ ПОКАЗЫВАТЬ» ЗДЕСЬ БОЛЬШЕ НЕТ (L3-P3,
-                 FIU-DL-001 долг 14). Закрытие этого окна — любое из трёх: ✕,
-                 «Закрыть», клик по фону — теперь значит «прочитал», и второй раз
-                 оно само не приходит. Три выхода, из которых запоминался ровно
-                 один, и были тем дефектом; галочка не чинила его, а перекладывала
-                 на родителя. Прочитать заново можно кнопкой «?» в шапке. -->
+            <!-- ЗАКРЫТИЕ ЗНАЧИТ ТОЛЬКО «ЗАКРЫТЬ» (UIP-P3). Выходов по-прежнему
+                 три — ✕, «Закрыть», клик по фону, — и с этого пакета они
+                 равнозначны буквально: окно не приходит само ни до, ни после
+                 любого из них, поэтому запоминать, каким из трёх его закрыли,
+                 больше незачем. Ключ onboarding_dismissed и обе его функции ушли
+                 из core/storage.js; значения, уже лежащие в браузерах, оставлены
+                 как есть — чистить их значило бы писать в чужой браузер без
+                 причины (прецедент UIP-DL-001).
+
+                 ИСТОРИЯ, ЧТОБЫ СЛЕДУЮЩИЙ ЧИТАТЕЛЬ НЕ ВОССТАНАВЛИВАЛ ЕЁ ПО ДИФФАМ.
+                 Здесь стояла галочка «Больше не показывать»; L3-P3 сняла её
+                 (FIU-DL-001 долг 14), сделав «прочитал» из любого закрытия, —
+                 потому что у окна было три двери, одинаковых на вид и разных по
+                 последствиям. UIP-P3 убирает автопоказ целиком, и вместе с ним —
+                 сам вопрос «показывать ли». Открыть окно можно кнопкой «i» в
+                 шапке, сколько угодно раз. -->
             <div class="onboarding-modal-footer">
                 <button class="onboarding-close-btn" id="onboardingCloseBtn">Закрыть</button>
             </div>
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v8/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v9/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v8/app.js for boot order, and the modulepreload block in the head
+         m/v9/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v8/app.js"></script>
+    <script type="module" src="/m/v9/app.js"></script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v8/sw-register.js"></script>
+    <script type="module" src="/m/v9/sw-register.js"></script>
 </body>
 </html>

@@ -204,7 +204,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'WebViewStorageTest.java',
-        line: 242,
+        line: 271,
         argument: '"(" + BOOTED + ") ? \'booted\' : null"',
         reason:
             'a chain with a non-literal operand: the boot sentinel is a Java constant spliced'
@@ -212,7 +212,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'WebViewStorageTest.java',
-        line: 256,
+        line: 285,
         argument: '"(" + BOOTED + ") ? (" + expression + ") : null"',
         reason:
             'the same splice, wrapping a caller-supplied snippet as well — two non-literal'
@@ -220,7 +220,7 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'WebViewStorageTest.java',
-        line: 268,
+        line: 297,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },

@@ -442,7 +442,14 @@ test.describe('the surface has no network leg, and gaining one is an owner decis
         );
     });
 
-    test('no emitter routes a signal into the analytics shim', () => {
+    // Kept at UIP-P1 rather than retired with the shim it names. Analytics left
+    // the web showcase entirely, so `trackEvent` exists nowhere in the tree and
+    // this leg cannot fail today — which is the point of a drift gate, not an
+    // argument against one: what it guards is a signal being handed to whatever
+    // measurement surface a later packet introduces, and the cheapest moment to
+    // catch that is the packet that introduces it. The name says "shim" because
+    // that is what the destination was called; the property is about the source.
+    test('no emitter routes a signal into a measurement call', () => {
         for (const urlPath of SHIPPED_JS) {
             const source = sourceOf(urlPath);
             if (!source.includes('emitSignal')) continue;

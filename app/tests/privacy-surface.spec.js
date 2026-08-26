@@ -13,8 +13,15 @@
 //      every unknown path, silently, with no error anywhere. A source scan
 //      cannot see it; only a navigation can.
 //   2. The page could pull in a third party. The document states in §3.2 and
-//      §5 that it runs no analytics before consent; a policy page that loaded
-//      gtag while saying so would be the worst possible defect in this file.
+//      §5 that it runs no analytics at all; a policy page that loaded a tag
+//      while saying so would be the worst possible defect in this file.
+//      (Since UIP-P1 no page of this product loads analytics, and since UIP-P2
+//      the document's §5 says exactly that rather than describing a consent
+//      gate. This leg is unchanged either way: what it asserts is that the
+//      POLICY PAGE reaches no third party, which was true before the removal
+//      and stays true after it. UIP-P2 adds links to the page and this leg is
+//      what proves they are inert until a reader chooses one — an <a> starts no
+//      request.)
 //   3. A visit could POISON THE APP SHELL. app/sw.js mirrors every navigation
 //      into the cache keyed '/', which is the shell's offline copy, unless the
 //      path is named in NON_SHELL_PAGES. /privacy is the second real page this
@@ -91,11 +98,11 @@ test.describe('the policy page runs nothing and reaches nobody', () => {
       'the request listener never saw the document itself'
     ).toBe(true);
 
-    // The analytics hosts are stubbed for the whole suite by the page fixture
-    // (support/seed.js) so CI generates no third-party egress. That stub
-    // fulfils requests; it does not hide them — page.on('request') fires for a
-    // routed request exactly as for any other — so an absence asserted here is
-    // a real absence, not an artefact of the harness.
+    // Nothing is stubbed or routed for this navigation. The analytics-host stub
+    // that support/seed.js used to install went with the analytics surface at
+    // UIP-P1 — there is no request left to keep off the network — so an absence
+    // asserted here is a plain absence with no harness standing behind it at
+    // all, which is a stronger reading of the same assertion than before.
     const origin = new URL(page.url()).host;
     expect(
       seen.filter((r) => new URL(r.url).host !== origin),
@@ -136,6 +143,86 @@ test.describe('the policy page runs nothing and reaches nobody', () => {
       ),
       'the policy page registered a service worker'
     ).toBe(0);
+  });
+});
+
+test.describe('the document is navigable in both directions (UIP-P2)', () => {
+  test('the way back into the app is a real link and it lands on the app', async ({ page }) => {
+    // The claim no markup scan can carry, and the whole of debt 29's first half:
+    // a parent who opened the policy from the Play card or from the intro window
+    // can get to the product. The click is the executor; privacy-page.spec.js
+    // only knows there is an href.
+    await page.goto(ROUTE);
+
+    const back = page.locator('a[href="/"]').first();
+    await expect(back).toBeVisible();
+
+    await back.click();
+    await page.waitForLoadState('domcontentloaded');
+
+    expect(new URL(page.url()).pathname, 'the back link did not navigate to the app').toBe('/');
+    await expect(page.locator(`[id="mainTable"]`)).toHaveCount(1);
+  });
+
+  test('the external policies are links a reader can follow, not typed-out addresses', async ({
+    page,
+  }) => {
+    // Debt 29's second half. What is asserted is the RESOLVED href off the
+    // rendered page — the property a reader actually gets — plus the referrer
+    // guard on each. The links are deliberately NOT followed: CI has no network,
+    // and following them would make Google, Cloudflare and GitHub dependencies
+    // of this suite.
+    await page.goto(ROUTE);
+
+    const EXTERNAL = [
+      'https://policies.google.com/privacy',
+      'https://www.cloudflare.com/privacypolicy/',
+      'https://docs.github.com/site-policy/privacy-policies/github-privacy-statement',
+      'https://www.gov.il/en/departments/the_privacy_protection_authority',
+    ];
+
+    const anchors = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('a')).map((a) => ({
+        href: a.href,
+        rel: a.getAttribute('rel') || '',
+        text: a.textContent.trim(),
+      }))
+    );
+
+    expect(anchors.length, 'the page rendered no links at all').toBeGreaterThan(4);
+
+    for (const url of EXTERNAL) {
+      const found = anchors.filter((a) => a.href === url);
+      expect(found.length, `no rendered link resolves to ${url}`).toBeGreaterThan(0);
+      for (const a of found) {
+        expect(a.rel, `${url} is linked without rel="noopener noreferrer"`).toContain('noreferrer');
+        // The visible text is still the address itself, so the printed document
+        // reads exactly as the Markdown source does.
+        expect(a.text, `${url} is linked under text that is not the address`).toBe(url);
+      }
+    }
+  });
+
+  test('the document still QUOTES its own address rather than linking it', async ({ page }) => {
+    await page.goto(ROUTE);
+
+    // Compared as whole URLs, not as pathnames: `policies.google.com/privacy`
+    // has the same PATH as this document and would read as a self-link. That
+    // near-miss is why this leg is written out rather than trusted to a filter.
+    const selfLinks = await page.evaluate(() => {
+      const self = [
+        `${location.origin}/privacy`,
+        `${location.origin}/privacy.html`,
+        'https://theygrow.app/privacy',
+      ];
+      return Array.from(document.querySelectorAll('a'))
+        .map((a) => a.href)
+        .filter((href) => self.includes(href));
+    });
+    expect(selfLinks, 'the rendered page links its own address').toEqual([]);
+    await expect(
+      page.locator('code', { hasText: 'https://theygrow.app/privacy' })
+    ).not.toHaveCount(0);
   });
 });
 
@@ -196,9 +283,13 @@ test.describe('visiting the policy page does not overwrite the app shell offline
 
   test('the same visit under the .html spelling is equally harmless', async ({ page }) => {
     // Both spellings are named in NON_SHELL_PAGES because the fetch handler
-    // compares url.pathname, and the file is reachable under its own name too.
-    // One entry without the other is a guard that holds for the address people
-    // are given and fails for the one a crawler or an old link finds.
+    // compares url.pathname, and one entry without the other is a guard that
+    // holds for the address people are given and fails for the one a crawler or
+    // an old link finds. Since UIP-P2 the .html spelling REDIRECTS to the
+    // canonical address on the nginx channel, and both entries stay: the
+    // redirect is a web-channel rule, the APK has no nginx and serves the file
+    // under its own name, and the worker sees the /privacy.html navigation
+    // before any redirect is followed.
     await gotoApp(page, { state: STATES.seeded });
     await page.evaluate(() => navigator.serviceWorker.ready);
 
@@ -209,7 +300,12 @@ test.describe('visiting the policy page does not overwrite the app shell offline
     expect(before, 'the app shell is not in the cache to be overwritten').not.toBeNull();
     expect(before).toContain(SHELL_MARKER);
 
-    await page.goto('/privacy.html');
+    const response = await page.goto('/privacy.html');
+    expect(response.status()).toBe(200);
+    expect(
+      new URL(page.url()).pathname,
+      'the .html spelling did not land on the canonical address — the document answers at two addresses again'
+    ).toBe(ROUTE);
     await expect(page.locator('h1')).toHaveText(DOCUMENT_TITLE);
 
     await expect

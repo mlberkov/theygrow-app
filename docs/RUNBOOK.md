@@ -6,7 +6,7 @@ Operational reality of `theygrow-app` today, plus the live-infra divergence note
 
 The product in production is a **static PWA** served by nginx and deployed on GCP Cloud Run. The served PWA assets live under `/app` (the M2-P1 monorepo split moved them there from the repository root); in M2-P3 the build-config relocated from the repository root into the owning subtrees — PWA build-config under `/app`, API build-config under `/api`. The `/api` backend now deploys as **its own Cloud Run service** on its own URL (see below).
 
-- Entry point: `app/index.html` — the app shell. Since A1-P5 the only JS still inline in it is the `<head>` gtag/`trackEvent` shim (whose remaining callers are the install-prompt IIFE below — the Telegram link whose `onclick` used to need it went with DIA-P2, `DIA-DL-004` (b)) and the PWA install-prompt IIFE (left inline deliberately: `beforeinstallprompt` is unobservable to the parity suite, see `A1-DL-006`). Everything else lives under the module mount.
+- Entry point: `app/index.html` — the app shell. Since UIP-P1 the only JS still inline in it is a four-line `<script>` that sets `window.IS_NATIVE_SHELL`. **No mount module reads that flag** — the mount answers the channel question itself, from `window.Capacitor`, in each module that needs it (`sw-register.js` and `store/bridge.js` read the global directly; `store/boot.js` goes through `isNativeStore()`), which is the established shape in that tree. Its readers are the parity suite: `channel-composition.spec.js`, `diary-surface.spec.js` and `analytics-egress.spec.js` read it back as the premise of their native branch, and `analytics-absence.spec.js` asserts its presence in the shell text. It stays in `<head>` because the Capacitor bridge is injected before the app loads, so «which channel is this» is answerable there, before the module graph boots. *(Rewritten at UIP-P1. This line described a `<head>` gtag/`trackEvent` shim and the PWA install-prompt IIFE. The IIFE went with the install offer at L3-P3 (`FIU-DL-003`) and this line had not been revised for it; the shim went with the whole analytics surface at UIP-P1 — loader, `window.theygrowAnalytics`, `trackEvent`, `dataLayer`, `gtag`, the measurement id, the `?dbg=1|0` switch, `APP_VERSION` and `UI_LOCALE` — see `UIP-DL-001`.)* Everything else lives under the module mount.
 - PWA assets: `app/manifest.json`, `app/sw.js`, `app/offline.html`, `app/icons/`.
 - Module mount: `app/m/v{N}/` served at `/m/v{N}/` — the versioned home of everything extracted out of the shell (today `app.css`, `sw-register.js`, the app entry `app.js`, the `core/` modules holding shared state, I/O and pure helpers, and the `surfaces/` modules holding one file per UI surface). The shell **executes** three of these — `app.css`, and `sw-register.js` and `app.js` as its two `<script type="module">` entries; everything under `core/` and `surfaces/` is reached through `import` statements, which is why the ship-list guard walks the import graph (`A1-P4-INV-001`). Since A1-P6 the shell also **names** each of those fifteen modules in a `<link rel="modulepreload">` hint, which collapses the cold-boot fetch waterfall from four discovery waves to one. A hint is a delivery instruction, not an entry: `modulepreload` fetches and compiles but never evaluates, so the graph still boots from `app.js` alone, and the guard deliberately does not treat hints as walk roots. The hint set is asserted equal to the walked graph in both directions (`A1-P6-INV-001`). See `A1-DL-007`. **Version-in-path**, so the bytes at a published URL never change: a content change ships as a **new** mount version and the old one stays on disk, byte-untouched. Served immutable by the generic static nginx location and precached by the SW; bumps are owner-run — see **Module mount** below. See `A1-DL-004`, `A1-P3-INV-001`.
 - KB artifact: `app/kb-v1.json` — the vendored, versioned domain-KB artifact (vault ADR-026; curation home is the separate `theygrow-domain-kb` repo). The app is a pure READER: it boots by fetching `/kb-v1.json` (no inline data copy since VDK-P3). Served immutable by nginx (versioning-by-filename, vault ADR-024) and precached by the SW. Consumed byte-as-published (`VDK-P3-INV-001`); re-vendoring and version bumps are owner-run — see **KB artifact** below. See `VDK-DL-001`.
@@ -52,17 +52,46 @@ Three places in this file, and the header comment of all three build-configs, us
 
 > **Owner GCP action.** Every `gcloud` command below is run by the owner against the live project — Claude Code does not run them. The PWA Cloud Run service `child-tracker-service` and region `europe-west1` are the live-infra identifiers carried in this RUNBOOK (see "Live-infra divergence"); the contract files do not name them.
 
+0. **BEFORE ANYTHING ELSE, WHILE THE UIP MILESTONE IS OPEN: do not promote a revision that carries
+   UIP-P1 without UIP-P2. — SATISFIED on `feat/ui-polish` as of UIP-P2, and kept as the tripwire rather
+   than deleted.** UIP-P1 deleted the analytics surface and with it the «Cookie» control in the site
+   footer, while the shipped `app/privacy.html` §5 still promised that control by name («Отозвать
+   согласие можно в любое время по ссылке «Cookie» в подвале сайта»). UIP-P2 published edition **1.1**
+   (`docs/privacy-policy-v1.1.md`, converted into `app/privacy.html`), in which §5 describes no
+   analytics, no consent and no control, so the two packets now travel together on one branch and the
+   condition holds by construction. **The exposure window opens at PROMOTION, not at merge** — `ADR-020`
+   keeps every push at 0% traffic, so a merged-but-unpromoted revision harms nobody, and a promoted one
+   publishes a policy describing a control that does not exist. **Check, one command:**
+   `grep -c 'Cookie' app/privacy.html` and `grep -c cookieSettingsBtn app/index.html`. **Both read `0`
+   since UIP-P2.** While the first is non-zero and the second is zero, the revision is not promotable —
+   that pair IS the mismatch: the document promises the control, the shell does not ship it. Both
+   non-zero would mean the control came back, which is not a state this milestone produces. **It is a
+   proxy and is written down as one:** it reads the two files rather than the served bytes, so it cannot
+   tell you what a tagged revision actually serves — step 3's `curl` against `$TAG_URL/privacy` is the
+   only thing in this file that observes that. *(Added at UIP-P1; the reasoning is `UIP-DL-001` (j) and
+   its **What it hands on**. **Amended at UIP-P2 (`UIP-DL-002`), and the amendment overrides this step's
+   own former instruction to delete itself once UIP-P2 landed.** What the condition is actually about is
+   that the code removal and the policy revision reach a parent in the SAME promotion; that stays true
+   for every promotion while this milestone is open, and a step deleted the moment it first goes green is
+   a tripwire removed at exactly the point it starts being cheap to keep. It is retired at milestone
+   close, with the milestone it belongs to.)*
+   **This step is numbered 0 rather than inserted as a new 1** for the reason `PPR-DL-003` (g) recorded:
+   the numbering of steps 1–5 in this section carries textual cross-references elsewhere in this file —
+   step 3 (the tagged-revision smoke) and step 5 (the installed-client check) are both named by number
+   in other sections — and renumbering them to make room would break references that name a step by its
+   number.
+
 1. **What the deploy does.** `app/cloudbuild.yaml` Step 3 deploys `child-tracker-service` with `--no-traffic --tag sha-$SHORT_SHA`. Each push lands a fresh revision at **0% traffic**, reachable only via its **per-revision** `sha-<SHORT_SHA>` tagged URL. The live revision is untouched until promotion.
 2. **Get the tagged URL.** The tag is per-revision (sha-specific), so smoke the *just-deployed* revision — not a persistent URL. Read the tagged URL from the Cloud Build deploy log, or:
    `gcloud run services describe child-tracker-service --region europe-west1 --format 'value(status.traffic)'`
    (the tagged URL has the form `https://sha-<SHORT_SHA>---child-tracker-service-<hash>.europe-west1.run.app`).
 3. **Smoke the tagged revision** (owner/manual, no JS toolchain) — against the tagged URL `$TAG_URL`:
    - Health: `curl -fsS "$TAG_URL/" -o /dev/null -w '%{http_code}\n'` → `200`.
-   - Live-DOM (app shell served): `curl -fsS "$TAG_URL/" | grep -q '<title>Child Dev Tracker</title>'` → exit 0.
+   - Live-DOM (app shell served): `curl -fsS "$TAG_URL/" | grep -q '<title>TheyGrow</title>'` → exit 0. *(Corrected at UIP-P3: the title was «Child Dev Tracker», a working name from the first prototype, while the manifest, the offline page and the pre-install window all said «TheyGrow». **This literal is now paired to the shell by a guard** — `app/tests/delivery-contract.spec.js`, `UIP-P3-INV-002` — because a string written down here and checked nowhere else is the shape that went stale four times in the mount line below. The failure mode is a false RED against a sound revision, on the one procedure whose job is to say whether the revision is sound.)*
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
-   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v8/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v8/app.js"` and `curl -fsSI "$TAG_URL/m/v8/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v8/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at three closes now (`/m/v6/` → `/m/v7/` → `/m/v8/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18).
+   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v9/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v9/app.js"` and `curl -fsSI "$TAG_URL/m/v9/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v9/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at four closes now (`/m/v6/` → `/m/v7/` → `/m/v8/` → `/m/v9/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18), and again at UIP-P1 for the bump to `/m/v9/` (`CACHE_VERSION` v19).
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
    - **The privacy policy is served, and served as a document** (added at PPR-P3, `PPR-DL-001` (k); two of the four lines repaired at PPR-P4, `PPR-DL-004`). Nothing in this repository runs the real nginx image — the parity suite drives `app/tests/server.js`, a hand-written mirror — so this is the only place the production response for `/privacy` is ever observed, and the in-app link is not to be trusted until it has been. **That is also why these lines themselves have to be right: two of them were not.** One reported a false red on a clean page and one accepted a `301` without reading where it pointed — which is how `/privacy/` shipped a redirect to an address that does not answer:
      - `curl -sI "$TAG_URL/privacy"` → `200`, `content-type: text/html`, `cache-control: public, max-age=3600, must-revalidate`, and **not** `immutable`. The document is versioned by its own text and effective date, at one address; an immutable cache class would strand a redaction.
@@ -319,9 +348,16 @@ decides the order you do things in.
    `app/m/v{N}/channel/config.js` as `CHANNEL_CONFIG.policyUrl` — today `https://theygrow.app/privacy`.
    It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
    geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
-   download and a pinch-zoom rather than a document. The page is a hand conversion of
-   `docs/privacy-policy-v1.0.md`, and the two are paired by `app/tests/privacy-page.spec.js` heading by
-   heading so a drift is a red test rather than a discovery months later.
+   download and a pinch-zoom rather than a document. The page is a hand conversion of the CURRENT edition
+   — `docs/privacy-policy-v1.1.md` since UIP-P2 — and the two are paired by
+   `app/tests/privacy-page.spec.js` heading by heading so a drift is a red test rather than a discovery
+   months later. **One address, and since UIP-P2 exactly one:** `/privacy/` and `/privacy.html` both
+   answer `301` to `/privacy`, so the document cannot accumulate a second bookmarked address across
+   editions. **Superseded editions stay in `docs/` and are never republished** — `docs/privacy-policy-v1.0.md`
+   (effective date `23.08.2026`) is kept byte-untouched as history, because §10 of the document promises
+   that the address always carries the edition currently in force. **Whether a parent ever read edition
+   1.0 is not a repository fact** — the PPR milestone is merged and NOT promoted — so the history table
+   records the edition and its stated effective date, and claims nothing about a window of force.
 2. **Then declare it. — DONE at PPR-P3.** In `app/index.html`,
    `<meta name="theygrow-privacy-policy" content="published">`. Anything that is not exactly `published` — a
    missing tag, an empty value, a typo, a stale `none` — means "no document", and no link is offered
@@ -345,23 +381,44 @@ decides the order you do things in.
 6. **Re-check the effective date against the day you actually promote, and edit four places if it slipped.**
    The document states the date it comes into force, and a policy whose stated effective date precedes the
    day it became readable was never in force when it said it was (`PPR-DL-001` (f)). The literal lives in
-   **four** places and they must agree — the pairing test requires it:
-   - `docs/privacy-policy-v1.0.md:5` — the header block, «Дата вступления в силу:»
-   - `docs/privacy-policy-v1.0.md:145` — the `1.0` row of the change-history table
-   - `app/privacy.html:103` — the same header block in the page
-   - `app/privacy.html:263` — the same `1.0` row in the page
+   **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
+   step used to carry (`app/privacy.html:103` and `:263`) had already gone stale to `:107` and `:267`
+   by the time anyone read them, which is the failure mode of addressing a moving file by offset:
+   - `docs/privacy-policy-v1.1.md` — the header block, the line beginning `**Дата вступления в силу:**`
+   - `docs/privacy-policy-v1.1.md` — the **top** row of the change-history table, i.e. the row whose
+     first cell is the version the header declares
+   - `app/privacy.html` — the same header block, `<strong>Дата вступления в силу:</strong>`
+   - `app/privacy.html` — the same top row of its change-history table
+
+   **The rows for SUPERSEDED editions are frozen and do not move with the date.** `| 1.0 | 23.08.2026 |`
+   records when edition 1.0 came into force; editing it would rewrite history to make a later promotion
+   look tidy, and the pairing test reds on it in both files.
 
    One token each; change nothing else, and **do not let an editor strip the trailing double-spaces** at
-   `docs/privacy-policy-v1.0.md:3-4` — they are Markdown hard line breaks, which is why that path is
-   excluded from the hygiene hooks. `app/tests/privacy-page.spec.js::the effective date is resolved, and is
-   the same date in both files` reds on a mismatch, but **nothing compares the date to the wall clock** —
-   that judgement is yours, and this step is where it is made. PPR-P3 set it to `23.08.2026`.
+   lines 3–4 of the Markdown source — they are Markdown hard line breaks, which is why `docs/privacy-policy-v`
+   is excluded from the hygiene hooks by version-agnostic prefix, so every future edition inherits it.
+   **What reds on a mismatch, since UIP-P2 (`UIP-P2-INV-001`):** `app/tests/privacy-page.spec.js` reads
+   the version and the date out of the Markdown header, requires the top history row to carry both,
+   requires the page to state both, compares the two change-history tables **row for row**, and requires
+   the current date to appear exactly twice in the page. Any one of the four literals moved alone is red.
+   **Nothing compares the date to the wall clock** — that judgement is yours, and this step is where it
+   is made. PPR-P3 set edition 1.0 to `23.08.2026`; UIP-P2 set edition 1.1 to `26.08.2026`, the day it
+   landed.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
    the document reachable is the obligation; collecting acceptance to the POLICY is not, and is
    deliberately absent. *(Rewritten at PPR-P3: this step also said it "does not build the web channel's
    analytics-consent surface", which stopped being true at PPR-P2 — the banner, the gate and the «Cookie»
    footer control shipped there, `PPR-P2-INV-001`. What survives of `A3-DL-003` debt 2 is the storage
-   question for the recorded answer, not the surface.)*
+   question for the recorded answer, not the surface.)* *(Rewritten again at UIP-P1, and this time the
+   subject is gone rather than moved: analytics left the web showcase entirely (vault `ADR-043`
+   annotation 2026-08-25, class: reversal), so the banner, the gate and the «Cookie» control are deleted,
+   `PPR-P2-INV-001` is retired and `UIP-P1-INV-001` takes its place. `A3-DL-003` debt 2 — where a recorded
+   consent answer should live — is closed by there being no answer to record. The two `localStorage` keys
+   the retired surface wrote, `analytics_consent` and `ga_debug`, are deliberately NOT cleared from
+   visitors' browsers: nothing reads them, and clearing them would be a write with no reason behind it
+   (`UIP-DL-001` (r)). **The document was revised at UIP-P2 (`UIP-DL-002`): edition 1.1 describes no
+   analytics on either channel, asks for no consent and names no control, and the promotion condition in
+   § Promotion + rollback records the pair as satisfied.**)*
 
 ## Module mount (owner-run version bump)
 
@@ -622,7 +679,7 @@ The three-level parity suite (DOM snapshot + visual regression + behavioural smo
 
 **The Capacitor channel** (L1-P1, the `native` project). The script stages `native/www/` from `app/Dockerfile`'s `COPY` list before running, and a second server serves it under a **Capacitor-shaped** delivery profile: no nginx cache/MIME headers, no `try_files` SPA fallback, no `/api`. The project runs the existing `dom-parity` and `behavior` specs at the mobile viewport against the **committed `dom-mobile` baselines** — deliberately not a baseline set of its own, since the two channels ship byte-identical assets and a second set would only double the re-blessing cost. What it catches is a shell that has come to depend on something only nginx provides. The service-worker block of `behavior.spec.js` **skips** here: in the APK the shell is read from local assets, so `/sw.js` is never re-fetched, the waiting worker never appears and `#updateBanner` can never fire — the update channel is inert and the only update path is APK replacement (`LSC-DL-001`).
 
-**Installed-client upgrade path** (EMV-P3, `EMV-P3-INV-001`). A second cookie-keyed switch on the same server serves the **previously published generation** — `app/index.html` and `app/sw.js` rewritten from the current mount to the previous one with `CACHE_VERSION` decremented (`app/tests/support/prev-generation.js`), while `/m/v{N-1}/**` is served from disk as the frozen generation it is. `app/tests/upgrade-path.spec.js` installs that generation, lets it precache, then takes the switch away and serves the current build, and asserts what the upgraded client evaluates and sees — on both legs: the client that **accepts** the update banner, and the client that **never touches it** and simply opens the app again. Both are asserted because the second is the majority case; the measured outcome is that both land on the current mount, the unaccepting one on its next navigation (network-first shell + a mount URL it has no cached copy of). It runs in `behavior` only — the update channel is inert in the Capacitor shell (`LSC-DL-001`). **Its fidelity bound, which the promotion smoke depends on:** the staged generation is the one this repo published (verified byte-identical to the shell at `711b5bc`), *not* the bytes any particular live client holds, and no test can see a real device's cache age. That is why **Promotion + rollback** step 5 checks an actually-installed client and is not optional. When only one mount version is shipped — after an owner retires the old one — the property is vacuous by construction and the two tests **skip with that reason printed**.
+**Installed-client upgrade path** (EMV-P3, `EMV-P3-INV-001`). A second cookie-keyed switch on the same server serves the **previously published generation** — `app/index.html` and `app/sw.js` rewritten from the current mount to the previous one with `CACHE_VERSION` decremented (`app/tests/support/prev-generation.js`), while `/m/v{N-1}/**` is served from disk as the frozen generation it is. `app/tests/upgrade-path.spec.js` installs that generation, lets it precache, then takes the switch away and serves the current build, and asserts what the upgraded client evaluates and sees — on both legs: the client that **accepts** the update banner, and the client that **never touches it** and simply opens the app again. Both are asserted because the second is the majority case; the measured outcome is that both land on the current mount, the unaccepting one on its next navigation (network-first shell + a mount URL it has no cached copy of). It runs in `behavior` only — the update channel is inert in the Capacitor shell (`LSC-DL-001`). **Its fidelity bound, which the promotion smoke depends on:** the staged generation is the one this repo published (verified byte-identical to the shell at `711b5bc`), *not* the bytes any particular live client holds, and no test can see a real device's cache age. That is why **Promotion + rollback** step 5 checks an actually-installed client and is not optional. When only one mount version is shipped — after an owner retires the old one — the property is vacuous by construction and the two tests **skip with that reason printed**. **A SECOND BOUND, FOUND AT UIP-P1 AND PREVIOUSLY UNSTATED — read it before trusting "lands on the current mount on its next open".** The shell is served `public, max-age=3600, must-revalidate` (`app/nginx.conf`, mirrored by `app/tests/server.js`). The worker serves navigations network-first, but network-first means `fetch()`, and a plain `fetch()` reads the browser HTTP cache — so an installed client that reopens the app **within the hour** gets its own cached shell, not the freshly deployed one, however new the worker parked in `waiting` is. The unaccepting client lands on the current mount once that hour has passed, or once it accepts the banner, and not before. **The suite could not see this until UIP-P1**: `app/tests/support/seed.js` registered a `page.route()` to stub the analytics hosts, and enabling routing in Playwright disables the browser HTTP cache for the whole context — an undeclared side effect of a stub written for hermeticity, which leg 2 silently depended on. Removing the stub with the analytics surface it stubbed turned the leg red. It now clears the HTTP cache explicitly, through CDP, under a comment saying why (`UIP-DL-001` (i), (t)). **Nothing about the product changed; what changed is that the hour is written down.** For an owner it means step 5's installed-client check may legitimately show the old shell if the client was opened recently, and that is the product behaving as configured rather than a failed deploy.
 
 **Ship-list drift guard** (A1-P3, a second and different guard). The parity server serves from the `app/` directory **on disk**, so a file `app/Dockerfile` forgets to `COPY` passes the whole suite and 404s only in production — and `app/Dockerfile` has no wildcard `COPY`. `app/tests/delivery-contract.spec.js` therefore parses the real `COPY` list and asserts, in both directions, that everything the shipped shell references is shipped by the image *and* precached by name in `OFFLINE_URLS`. Since A1-P4 it asserts the same two things about a **third** surface — the transitive static `import` graph reached from the shell's `<script type="module">` entries (`A1-P4-INV-001`), which is the only thing standing between a new `core/` or `surfaces/` file and a production 404 that no other test can see. Since A1-P6 there is a **fourth** direction: the `<link rel="modulepreload">` hint set must equal that import graph exactly, in both directions (`A1-P6-INV-001`). That direction is also why the third is rooted where it is — hints are `href=` attributes, so seeding the walk from every `.js` the shell names would make it delete the whole graph as "entries" and assert nothing at all, silently (`A1-DL-007` (d)). The second direction is what keeps a copy-forward mount bump honest: every generation ever published stays shipped (`/m/v1/` through `/m/v4/` as of DIA-P1), so a shell pointing at the current mount while `OFFLINE_URLS` still listed the previous one would otherwise be invisible. The parser fails **closed** — any `COPY` form it does not fully understand throws rather than guessing. It does **not** consult `app/.dockerignore`: never add a pattern there matching `m/`.
 
@@ -634,7 +691,46 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
 - `native/android/` — the generated Android project, **committed**. Its build outputs and the copies `cap sync` writes into it are gitignored, so it must be re-staged and re-synced before every build. **Do not read `native/android/app/src/main/assets/public/` as the shipped set.** It is whatever the last `cap sync` on that machine happened to write, it is gitignored, and on the development machine it is known to be stale — missing `store/` and `export/` entirely. The shipped set is `native/www/`, regenerated by `npm run sync`. Harmless to the build, misleading to a reader; recorded as a side-find in `LSC-DL-004` (debt 2) and **disposed of at the L1 milestone close as documented-not-fixed** (`LSC-DL-005` (f)(3)) — the warning in this paragraph is the disposition. What would fix it properly is a staging step that cleans the directory rather than writing over it.
 - `native/www/` — **not** committed. It is derived; regenerate it.
 
-**Toolchain.** `@capacitor/cli` requires **Node ≥ 22** and hard-fails below it (the development machine has Node 18). Gradle needs **JDK 21** — `native/android/app/capacitor.build.gradle` pins `sourceCompatibility`/`targetCompatibility` to 21 — plus an Android SDK. **None of the three is present on the development machine**, so the APK cannot be built there at all; the `android` CI job is what proves the shell compiles.
+**Toolchain.** `@capacitor/cli` requires **Node ≥ 22** and hard-fails below it. Gradle needs **JDK 21** — `native/android/app/capacitor.build.gradle` pins `sourceCompatibility`/`targetCompatibility` to 21 — plus an Android SDK. *(Corrected at UIP-P5. This paragraph read «the development machine has Node 18» and «**None of the three is present on the development machine**, so the APK cannot be built there at all». All three have since arrived and were measured on 2026-08-27: Node **v22.23.2**, OpenJDK **21.0.11**, and an Android SDK at `$ANDROID_HOME` with build-tools **35.0.0 / 36.0.0** — `npm run sync && ./gradlew assembleDebug` completes on the host in seconds. The correction matters because the false version told a reader not to attempt the one check that catches a broken resource before CI does.)* The `android` CI job remains the gate of record for «the shell compiles»; what changed is that a local run is now possible, not that it replaces the job. **The identical claim in `.github/workflows/ci.yml`'s `android`-job comment is still stale** — recorded as a side-find in `UIP-DL-005` debt (c) rather than edited from an icon packet.
+
+**Launcher icon (UIP-P5) — what it is, and how to redo it byte-for-byte.**
+
+The app icon is **derived**, never hand-drawn and never hand-edited. The source of
+truth is the brand master `app/icons/icon-master-1024.png` (1024×1024 RGBA, sha256
+`46d27cf4…3bcd`); the fifteen bitmaps under
+`native/android/app/src/main/res/mipmap-*/` are its output and are **committed**.
+Regeneration is one command, run from the repository root:
+
+```
+python3 native/tools/gen-launcher-icons.py            # rewrite the fifteen PNGs
+python3 native/tools/gen-launcher-icons.py --check    # verify the tree IS the derivation
+python3 native/tools/gen-launcher-icons.py --check --arm
+                                                      # prove the check can fail
+```
+
+It needs **Python ≥ 3.10 and Pillow ≥ 9.2** and nothing else. Pillow is a
+workstation tool in the same class as the Android SDK: it is **not** a dependency of
+either delivery channel, it is in no `package.json` and in no `pyproject.toml`, and
+nothing at build time or run time invokes the generator. The web channel stays
+buildless, as `native/package.json` says.
+
+- **The geometry is measured, not typed in.** The script reads the master's own
+  content extent at run time and scales it into Android's 66 dp adaptive **safe
+  circle**. A new master therefore reflows by itself — what it may **not** do is
+  arrive quietly: the master's digest is pinned in the script **and** in
+  `app/tests/native-shell.spec.js`, and both must move together. `UIP-DL-005` (b)
+  records the numbers so a future swap can be compared against them.
+- **Byte-for-byte reproduction needs the same toolchain.** Generated on 2026-08-27
+  with CPython `/usr/bin/python3` and **Pillow 10.2.0**; the digests are in
+  `UIP-DL-005`. On a different Pillow/zlib the PNG bytes may differ while the image
+  is identical — which is exactly why `--check` compares **pixels** and the test
+  compares **bytes**. If `--check` is green and the test is red, you have a Pillow
+  difference, not an icon difference: regenerate and move the pinned digests.
+- **`cap sync` does not touch `res/`,** so the committed icons survive every sync.
+  What would overwrite them is re-running `npx cap add android` over the project.
+- **After regenerating, run both:** the `contract` project (`PARITY_NO_DOCKER=1
+  scripts/parity-suite.sh --project=contract`) for the pins, and a build
+  (`./gradlew assembleDebug`) for the compile. Neither shows you the icon.
 
 **Getting an installable APK (owner-run, in this order).**
 
@@ -669,6 +765,19 @@ The Android app is a **shell around the same web assets the PWA ships**, not a s
      the one thing no test reaches: that the address answers with the document in production, which the
      `curl` smoke in **Promotion + rollback** step 3 checks before you promote.
    - **`chrome://inspect` finds nothing since L3-P1, and no test can tell you so.** `android.webkit.WebView` has a static setter and no getter, so `FIU-P1-INV-002` asserts the value handed to it and stops there. If you want the effect itself, this is the only place it can be looked at: with the device attached, open `chrome://inspect/#devices` in a desktop Chrome and confirm the app's WebView is **not** listed. Record what you saw — that observation exists nowhere else in this repository (`FIU-DL-001` debt 16).
+   - **since UIP-P5, look at the ICON, and this is the only place anyone can.** On the home
+     screen and in the app drawer the icon must be the **TheyGrow logo** — the purple figure
+     and the orange swoosh — and **not** a blue X on a pale grid, which is what every build
+     before this one carried. Check three things a repository cannot: nothing is **cut off**
+     at the top or the bottom (the launcher masks the icon to a circle, a squircle or a
+     teardrop depending on the handset, and the logo is padded into the 66 dp safe circle to
+     survive all three); it is the **same size** as the icons beside it rather than visibly
+     smaller or larger; and the white plate behind it looks right against your wallpaper and
+     in a **dark** system theme. `UIP-P5-INV-001` pins the bytes, their dimensions and every
+     reference to them, and `:app:assembleDebug` proves they compile — none of that is a
+     rendered icon. **On a phone this checks the build in your hand:** the icon rides in the
+     APK, so a handset shows it only from the first build produced after UIP-P5, and on an
+     older APK the blue X is correct and is not a finding.
 
 **Building locally instead (only on a machine with the full toolchain).**
 
@@ -756,7 +865,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 
 **Diary smoke (owner-run, after installing the APK — DIA-P3).** The instrumented gate presses these same controls, but on a fresh emulator image with an engine that was made full on purpose. What no test can do is read the sentences as a parent reads them, so read them.
 
-1. Open the app and press **Дневник** in the header. On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Create a profile, reopen: the list is empty and says «Записей пока нет».
+1. Open the app and press **Дневник** in the header. On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Press **«Создать профиль»** there and fill it in. **Since UIP-P4 what follows is the packet's whole subject, so read it as a parent would:** the entry form must open **by itself**, with the cursor already in the text field, and it must be the **only** thing on screen — the create window closed, nothing stacked behind or above it. Press **«Закрыть»** (the form's second button says exactly that, and here it closes the window rather than returning to a list): you must be back on the table, with the child's name in the header and nothing else open, and **no entry must have been written**. Now press **Дневник** again: the list is empty and says «Записей пока нет», and «Новая запись» is where it always was. *(The old wording of this step — «Create a profile, reopen: the list is empty…» — described the app before UIP-P4, when nothing happened after a profile was created; it is the symptom the owner found on a device.)* **And when you add a SECOND child later** — the dropdown, «+ Создать новый профиль» — the same form appears for them; write two words and press «Сохранить», then check the entry stands in the **new** child's diary and that the first child's is untouched. Off-device that is `app/tests/diary-save.spec.js`; on a phone it is the only place the real store answers.
 2. Press **Новая запись**. The day defaults to today. **Set it back a few days** — this is the one product claim the smoke exists for: a parent writes in the evening about the morning, and the entry belongs to the day it is about.
 3. Write two or three sentences and press **Сохранить**. **Three things must happen together:** the window stays open, the list comes back, and the new entry is at the top of it with the day you chose. The window not closing is deliberate (`DIA-DL-005` (g)) — the list is the confirmation.
 4. Press **Изменить** on that entry, change a word and the day, and save again. The list must show **one** entry, corrected. A second entry appearing means an edit has become an append and the diary has silently become a journal — stop and report it.
@@ -986,7 +1095,10 @@ milestone* step 10 withdrew at L3-P4 and which PPR-P2 made impossible outright b
 mechanism. The current order is: the diary and its search, then the export archive, whose step 9 reads
 the diary entry back out of the archive.)*
 
-1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. Press **Новая запись**,
+1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. *(Since UIP-P4 there is a
+   second way in, and on a fresh install you meet it first: creating the profile opens the entry form by itself.
+   That flow has its own step — see the Дневник smoke below — and this one starts after it has been closed.)*
+   Press **Новая запись**,
    pick a day that is NOT today — deliberately, because the event day and the moment of writing are
    different columns and this is the only place a person checks that the form asks for the first — type a
    couple of sentences, press **Сохранить**. The window stays open and the entry appears first in the list.
@@ -1122,13 +1234,26 @@ not a case the parent can fix and not one this procedure has a command for.
    milestone; what follows it does, so read the expectation for the milestone you are closing and not for
    the one before it.
 
-   **For PPR the expected movement is the FOOTER band, on 16 of the 20**, and it was measured rather than
-   assumed at PPR-P2 by decoding each `-diff.png` and taking the bounding box of the marked pixels: on
-   desktop every changed region is rows **760-790 of 800**, on mobile rows **712-737 of 760**, and nothing
-   else on any page. The cause is the new «Cookie» control in the footer (`#cookieSettingsBtn`). The four
-   modal shots move for the same reason and not because a modal changed — a `rgba(0, 0, 0, 0.5)` overlay
-   lets the footer show through. PPR-P3's declaration flip adds the policy link to the intro window, which
-   moves `modal-onboarding` in both projects; both are already in the red set, so the count stays 16.
+   **For UIP the expected movement is the FOOTER band again, and on the same 16 of the 20**, because the
+   change is the inverse of PPR's: UIP-P1 deletes the «Cookie» control (`#cookieSettingsBtn`) that PPR-P2
+   added, and returns «Подходящие активности» to the footer's right edge by giving the free space back to
+   the `#activitiesBtn { margin-left: auto }` rule that predates it (`UIP-DL-001` (f), (o)). The four modal
+   shots move for the same reason they moved at PPR and not because a modal changed — an
+   `rgba(0, 0, 0, 0.5)` overlay lets the footer show through.
+
+   **The pixel bands are NOT written here, deliberately.** PPR's numbers (desktop rows 760-790 of 800,
+   mobile 712-737 of 760) describe a different change and must not be carried across; UIP's own bands are
+   whatever the re-bless run measures. **Decode each `-diff.png` and take the bounding box of the marked
+   pixels, as PPR-P2 did, and record the result in the packet report** — a band nobody measured is not
+   evidence, and a band copied from the previous milestone is worse than none.
+
+   **What WOULD be a finding rather than an expected move:** any changed region outside the footer band.
+   The consent banner appears in no baseline, and the reason is the fixture rather than the profile:
+   every seeded state carried an explicit `analytics_consent: 'granted'` (that is why PPR-P2 put it
+   there — see the retired `PPR-P2-INV-001`), so `shouldAskForConsent` was false and `#cookieBanner`
+   was hidden at capture time in all of them, including `shell-no-profile`. Its deletion should
+   therefore move nothing on its own. The intro-window policy link PPR-P3 added is untouched by this
+   packet and `modal-onboarding` should move only in its footer band.
 
    The 16, named so the run can be checked against them rather than eyeballed —
    `visual-desktop/`: `control-footer`, `modal-activities`, `modal-create-profile`, `modal-onboarding`,
@@ -1137,6 +1262,15 @@ not a case the parent can fix and not one this procedure has a command for.
    `shell-seeded`, `shell-zpd-empty-state`, `shell-zpd-filtered`.
    Expected to come back GREEN, all four: `visual-desktop/header.png`, `visual-mobile/header.png`,
    `visual-mobile/modal-create-profile.png`, `visual-mobile/modal-skill.png`.
+
+   **The DOM baselines are NOT part of this step and were re-blessed by the agent at UIP-P1**, because they
+   are neither viewport- nor font-metric-dependent and run on the host. **Four moved, in two pairs.**
+   `dom-desktop/control-footer.html` and `dom-mobile/control-footer.html` lost the PPR-P2 comment block
+   and the `#cookieSettingsBtn` button. `dom-desktop/header.html` and `dom-mobile/header.html` moved for
+   **comments only** — three header comments attributed the absence of telemetry on those controls to
+   the owner decision this milestone reverses, and were corrected; no element, attribute or text node
+   changed, which is why the two `header.png` shots are still expected GREEN. The `native` project
+   shares `dom-mobile`'s snapshot path, so six failing tests moved four files.
 
    **What is a FINDING rather than a re-bless**, i.e. stop and report instead of committing the PNG:
    movement in any of those four expected-green shots; movement in a region other than the footer band and
@@ -1157,7 +1291,8 @@ not a case the parent can fix and not one this procedure has a command for.
    in place, so through that milestone `CACHE_VERSION` stayed **v16** and the mount checks addressed `/m/v6/`.
    *(Corrected at L3-P1, `FIU-DL-001`: that sentence was written while `/m/v6/` was still unpublished, and it
    stopped describing the tree the moment L2 merged. L3-P1 bumped the mount to `/m/v7/` with `CACHE_VERSION`
-   **v17**, and PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, so the checks in step 3 address `/m/v8/` — as the corrected
+   **v17**, PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, and UIP-P1 bumped it to
+   `/m/v9/` with `CACHE_VERSION` **v19**, so the checks in step 3 address `/m/v9/` — as the corrected
    lines there now do, corrected a second time at PPR-P3. The rule the L2
    note is an instance of, and the one to apply at every future close, is `Module mount` item 1: read the
    current values out of `app/index.html` and `app/sw.js` rather than out of this sentence.)*
@@ -1184,10 +1319,15 @@ not a case the parent can fix and not one this procedure has a command for.
     done**: nothing in the code removes, rewrites or marks the source consumed, no transfer exists to
     confirm, and the browser copy is therefore the only copy of a family's history with no path off it. The
     decision and the moment stay the owner's, and the honest default is *not yet*. Removing the install
-    prompt (PDR-034 §3, gated on this smoke). The GA4 surface, which stays until authentication appears at
-    L4. Retiring `m/v1`–`m/v7`. *(Rewritten at PPR-P3, in three places. The mount item read `m/v1`–`m/v5`
-    and had been carried forward unrevised through two bumps; `/m/v8/` is the running generation since
-    PPR-P2, so `/m/v6/` and `/m/v7/` join the list, and retiring any of them stays an owner-level decision.
+    prompt (PDR-034 §3, gated on this smoke). Retiring `m/v1`–`m/v8`. *(Rewritten at UIP-P1 in two places. `/m/v9/` is the running generation since that
+    packet, so `/m/v8/` joins the list of generations an owner may retire, and retiring any of them stays
+    an owner-level decision. And **the GA4 item is gone from this list entirely, by removal rather than by
+    action**: it read "The GA4 surface, which stays until authentication appears at L4", and vault
+    `ADR-043`'s 2026-08-25 annotation (class: reversal) took analytics off the web showcase altogether —
+    there is no surface left for an owner to decide about, and nothing here for anyone to do. See
+    `UIP-DL-001`.)* *(Rewritten at PPR-P3, in three places. The mount item read `m/v1`–`m/v5`
+    and had been carried forward unrevised through two bumps; `/m/v8/` was the running generation since
+    PPR-P2, so `/m/v6/` and `/m/v7/` joined the list.
     The clearing item lost the precondition that made it conditional. And this line listed the
     **analytics-consent surface for the web channel** as still owed and separate work — PPR-P2 built it:
     the banner, the gate that fetches nothing from an analytics origin before an explicit yes, and the
@@ -1273,7 +1413,7 @@ uv tool install "graphifyy[sql]"
 
 The upstream distribution is `graphifyy` (two `y`s); the commands it installs are `graphify` and `graphify-mcp`. Installed version at the time of writing: **0.9.48**.
 
-**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v8/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
+**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v9/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
 
 *(A note on a number that will not reproduce: before `.graphifyignore` landed, the graph held **209** `.sql` nodes across **9** files. Eight of those files were the same `store/schema/001-core.sql`, once per module generation — 7 frozen copies × 26 nodes, plus the live one, plus the dev script. The exclusion removed the duplicates, not the schema.)*
 

@@ -154,12 +154,30 @@ public class WebViewStorageTest {
     }
 
     /**
-     * The analytics half of the same decision (LSC-DL-004).
+     * The analytics half of the same decision (LSC-DL-004), re-armed at UIP-P1.
      *
-     * <p>C4 stripped GA4 from the native channel as a runtime branch. The parity
-     * suite cannot see that branch, and its two analytics assertions — one event
-     * on a successful tick, none on a refused one — are statements about the WEB
-     * branch and remain so. This is where the native claim is settled.
+     * <p>C4 stripped GA4 from the native channel as a runtime BRANCH: the loader
+     * was not injected here and {@code trackEvent} returned early, while the web
+     * channel kept both. UIP-P1 removed analytics from the web showcase as well
+     * (vault ADR-043 annotation 2026-08-25, class: reversal), so there is no
+     * branch left to take — the shell carries no loader, no {@code gtag}, no
+     * {@code dataLayer} and no {@code trackEvent} on either channel.
+     *
+     * <p>THE ASSERTIONS BELOW GOT STRICTER RATHER THAN WEAKER, and one of them
+     * had to be inverted to stay honest. The old anti-vacuity probe required
+     * {@code typeof window.trackEvent === "function"} — correct while the branch
+     * was meant to make the helper a no-op rather than delete it, and false the
+     * moment the helper was deleted. It now requires the opposite, and the
+     * anti-vacuity work it used to do is carried by the {@code IS_NATIVE_SHELL}
+     * probe above it, which is what proves this test reached a real booted shell
+     * rather than an empty page.
+     *
+     * <p>The parity suite serves the same bytes over plain HTTP with no
+     * Capacitor injected, so both of its channels take what used to be the web
+     * path; the static half of the same property is
+     * {@code app/tests/analytics-absence.spec.js} and its executing half on the
+     * web is {@code app/tests/analytics-egress.spec.js}. This is where the claim
+     * is settled for a real WebView inside the APK.
      */
     @Test
     public void the_native_shell_sends_nothing_to_analytics() {
@@ -193,19 +211,30 @@ public class WebViewStorageTest {
                     "0",
                     layer);
 
-            // Anti-vacuity: trackEvent must still EXIST — the branch is meant to
-            // make it a no-op, not to remove the function every surface calls.
+            // The helper is GONE, not quiet (UIP-P1). Until this packet the
+            // assertion here was the opposite — trackEvent had to still EXIST,
+            // because the native branch made it a no-op and every surface
+            // called it. Both halves of that are now false: the shell defines
+            // no such function on any channel, and no surface under the mount
+            // calls one.
             String helper = probe(scenario, "typeof window.trackEvent");
             System.out.println("[probe] typeof trackEvent = " + helper);
-            assertEquals("trackEvent is gone, so the surfaces would throw", "function", helper);
-
-            evaluate(scenario, "trackEvent('probe_event', { probe: 1 }); 'dispatched'");
-            String afterCall = probe(scenario, "String((window.dataLayer || []).length + 1000)");
-            System.out.println("[probe] dataLayer entries after a trackEvent call = " + afterCall);
             assertEquals(
-                    "calling trackEvent on the native channel still queued an event",
-                    "1000",
-                    afterCall);
+                    "the shell still defines trackEvent — analytics left every channel at UIP-P1,"
+                            + " and a helper with no caller is how the surface comes back",
+                    "undefined",
+                    helper);
+
+            // And the gtag shim it pushed through is gone with it. dataLayer was
+            // created unconditionally in the old head block, which is why the
+            // probe above reads a length rather than a type; here the array
+            // itself must never have been created.
+            String layerType = probe(scenario, "typeof window.dataLayer");
+            System.out.println("[probe] typeof dataLayer = " + layerType);
+            assertEquals(
+                    "the shell still creates window.dataLayer — the gtag shim is back",
+                    "undefined",
+                    layerType);
         }
     }
 
