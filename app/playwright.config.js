@@ -173,8 +173,10 @@ module.exports = defineConfig({
       // at runtime, by behavior.spec.js.
       // PPR-P1 adds one: privacy-page, the policy document as a property of the
       // tree — that the image ships it, that it precaches nothing, that it
-      // carries no script and no link, and that it still says what
-      // docs/privacy-policy-v1.0.md says. It is here because all of that is
+      // carries no script, that every link it does carry is on a declared
+      // allowlist and none of them is its own address (UIP-P2, which replaced
+      // the blanket no-<a> rule), and that it still says what the CURRENT
+      // edition — docs/privacy-policy-v1.1.md — says. It is here because all of that is
       // read from files and boots nothing. What a browser does at the address —
       // that the shell is not served there, that no third party is reached, and
       // that the visit leaves the cached shell alone — is privacy-surface.spec.js

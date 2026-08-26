@@ -99,7 +99,10 @@ test.describe('delivery contract — tests/server.js mirrors app/nginx.conf', ()
     // PPR-P4 adds the half this exemption did not cover and did not claim to:
     // the FORM of the Location that redirect sends. See the redirect-form block
     // below — static over app/nginx.conf, executed against the mirror.
-    const exempt = ['/health', '~ /\\.', '^~ /api/', '= /privacy/'];
+    // `= /privacy.html` (UIP-P2) joins it on exactly the same footing: one
+    // `return 301` to the canonical address, no add_header, behaviour asserted
+    // in the live-response block below rather than as an empty header set.
+    const exempt = ['/health', '~ /\\.', '^~ /api/', '= /privacy/', '= /privacy.html'];
     const unknown = declared.filter((l) => !mirrored.includes(l) && !exempt.includes(l));
     expect(
       unknown,
@@ -247,6 +250,19 @@ function redirectTargets(nginxConf) {
 // A target is sound when it is origin-relative (which `absolute_redirect off`
 // then keeps relative on the wire) or an absolute https URL (deliberate
 // cross-origin, untouched by the directive because it does not begin with `/`).
+// Every `location <match> { ... return 30x <target>; ... }` in the config, as
+// [match, target]. Comments are stripped first, so a commented-out block cannot
+// stand in for a shipped one.
+function redirectLocations(nginxConf) {
+  const directives = nginxConf.replace(/#.*$/gm, '');
+  return Array.from(
+    directives.matchAll(/location\s+([^{]+?)\s*\{([^}]*)\}/g)
+  )
+    .map(([, match, body]) => [match.trim(), /return\s+30\d\s+([^;]+);/.exec(body)])
+    .filter(([, m]) => m)
+    .map(([match, m]) => [match, m[1].trim().replace(/^"|"$/g, '')]);
+}
+
 function unsoundRedirectTargets(nginxConf) {
   return redirectTargets(nginxConf).filter(
     (target) => !target.startsWith('/') && !target.startsWith('https://')
@@ -280,6 +296,39 @@ test.describe('redirects stay inside the origin — config shape (PPR-P4)', () =
     // is how a parser that quietly stopped matching would present itself.
     expect(redirectTargets(conf).length, 'no `return 30x` parsed out of app/nginx.conf').toBeGreaterThan(0);
     expect(redirectTargets(conf)).toContain('/privacy');
+  });
+
+  // UIP-P2 — THE DIRECTION NOTHING READ, AND THE MUTATION THAT FOUND IT.
+  // Deleting `location = /privacy.html` from app/nginx.conf left this whole
+  // file green: tests/server.js mirrors the redirect, every live leg runs
+  // against the mirror, and the drift guard above only asks whether nginx grew
+  // a location the MIRROR lacks — never the reverse. That is the same shape
+  // PPR-P4 paid for, one layer over: the mirror is never wrong, so the mirror
+  // cannot be the witness for what the shipped config says. This leg is the
+  // config-shape half, and it names both redirects rather than the new one, so
+  // a future packet cannot delete either in silence.
+  test('the non-canonical spellings redirect in the COMMITTED config, not only in the mirror', () => {
+    const declared = new Map(redirectLocations(conf));
+    for (const location of ['= /privacy/', '= /privacy.html']) {
+      expect(
+        declared.get(location),
+        `app/nginx.conf declares no 30x from \`${location}\` — the mirror in app/tests/server.js would keep every live leg in this file green while production served the document at a second address`
+      ).toBe('/privacy');
+    }
+  });
+
+  test('the redirect-location parser is armed, and proves it on inputs it builds in-run', () => {
+    const TWO =
+      'http { server { location = /a/ { return 301 /a; } location = /b { add_header X 1; } location = /c { return 302 "/c"; } } }';
+    expect(redirectLocations(TWO)).toEqual([
+      ['= /a/', '/a'],
+      ['= /c', '/c'],
+    ]);
+    const COMMENTED = 'http { server {\n# location = /a/ { return 301 /a; }\n } }';
+    expect(
+      redirectLocations(COMMENTED),
+      'a commented-out redirect was read as a shipped one'
+    ).toEqual([]);
   });
 
   test('the scan is armed, and proves it on inputs it builds in-run', () => {
@@ -408,6 +457,36 @@ test.describe('delivery contract — live responses', () => {
       location,
       "the redirect Location carries a port — nginx put its own `listen` port into it, and the container's port is not exposed"
     ).not.toMatch(/:\d+/);
+  });
+
+  // UIP-P2 — the third spelling. The file ships under its own name, so until
+  // this packet `try_files $uri` answered /privacy.html with 200 and the
+  // document had TWO addresses, neither of them declared canonical. The three
+  // form properties are re-asserted here rather than assumed from the leg
+  // above: they are a property of each `return 30x` in the file, and a second
+  // redirect added without them is exactly the regression PPR-P4 paid for.
+  test('/privacy.html redirects to the canonical address (UIP-P2)', async ({ request }) => {
+    const res = await request.get('/privacy.html', { maxRedirects: 0 });
+    expect(res.status()).toBe(301);
+
+    const location = res.headers()['location'];
+    expect(location).toBe('/privacy');
+    expect(location, 'the redirect Location carries a scheme').not.toMatch(/^[a-z][a-z0-9+.-]*:\/\//i);
+    expect(location, 'the redirect Location is not origin-relative').toMatch(/^\//);
+    expect(location, 'the redirect Location carries a port').not.toMatch(/:\d+/);
+  });
+
+  test('the canonical address still answers with the document after the redirect (UIP-P2)', async ({
+    request,
+  }) => {
+    // The failure this pairs against: `location = /privacy` answers through
+    // `try_files /privacy.html =404`, and if that lookup were re-matched against
+    // locations the new redirect would swallow it and /privacy would 301 to
+    // itself forever. It is a filesystem lookup and is not, and this leg is what
+    // says so from outside rather than from reading nginx documentation.
+    const res = await request.get('/privacy', { maxRedirects: 0 });
+    expect(res.status()).toBe(200);
+    expect(await res.text()).toContain('<h1>Политика конфиденциальности TheyGrow</h1>');
   });
 
   // A JavaScript MIME essence is what makes a module script load at all;

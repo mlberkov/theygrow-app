@@ -53,21 +53,28 @@ Three places in this file, and the header comment of all three build-configs, us
 > **Owner GCP action.** Every `gcloud` command below is run by the owner against the live project — Claude Code does not run them. The PWA Cloud Run service `child-tracker-service` and region `europe-west1` are the live-infra identifiers carried in this RUNBOOK (see "Live-infra divergence"); the contract files do not name them.
 
 0. **BEFORE ANYTHING ELSE, WHILE THE UIP MILESTONE IS OPEN: do not promote a revision that carries
-   UIP-P1 without UIP-P2.** UIP-P1 deleted the analytics surface and with it the «Cookie» control in the
-   site footer; `app/privacy.html` §5 and `docs/privacy-policy-v1.0.md` still promise that control by name
-   («Отозвать согласие можно в любое время по ссылке «Cookie» в подвале сайта»). UIP-P2 revises the
-   document to v1.1. **The exposure window opens at PROMOTION, not at merge** — `ADR-020` keeps every push
-   at 0% traffic, so a merged-but-unpromoted revision harms nobody, and a promoted one publishes a policy
-   describing a control that does not exist. **Check, one command:**
-   `grep -c 'Cookie' app/privacy.html` and `grep -c cookieSettingsBtn app/index.html`. **While the first
-   is non-zero and the second is zero, the revision is not promotable** — that pair IS the mismatch: the
-   document promises the control, the shell does not ship it. Both zero means UIP-P2 has landed and the
-   document was revised; both non-zero would mean the control came back, which is not a state this
-   milestone produces. **It is a proxy and is written down as one:** it reads the two files rather than
-   the served bytes, so it cannot tell you what a tagged revision actually serves — step 3's `curl`
-   against `$TAG_URL/privacy` is the only thing in this file that observes that. Delete this step when
-   UIP-P2 has landed and the document says what the product does. *(Added at UIP-P1; the reasoning is
-   `UIP-DL-001` (j) and its **What it hands on**.)*
+   UIP-P1 without UIP-P2. — SATISFIED on `feat/ui-polish` as of UIP-P2, and kept as the tripwire rather
+   than deleted.** UIP-P1 deleted the analytics surface and with it the «Cookie» control in the site
+   footer, while the shipped `app/privacy.html` §5 still promised that control by name («Отозвать
+   согласие можно в любое время по ссылке «Cookie» в подвале сайта»). UIP-P2 published edition **1.1**
+   (`docs/privacy-policy-v1.1.md`, converted into `app/privacy.html`), in which §5 describes no
+   analytics, no consent and no control, so the two packets now travel together on one branch and the
+   condition holds by construction. **The exposure window opens at PROMOTION, not at merge** — `ADR-020`
+   keeps every push at 0% traffic, so a merged-but-unpromoted revision harms nobody, and a promoted one
+   publishes a policy describing a control that does not exist. **Check, one command:**
+   `grep -c 'Cookie' app/privacy.html` and `grep -c cookieSettingsBtn app/index.html`. **Both read `0`
+   since UIP-P2.** While the first is non-zero and the second is zero, the revision is not promotable —
+   that pair IS the mismatch: the document promises the control, the shell does not ship it. Both
+   non-zero would mean the control came back, which is not a state this milestone produces. **It is a
+   proxy and is written down as one:** it reads the two files rather than the served bytes, so it cannot
+   tell you what a tagged revision actually serves — step 3's `curl` against `$TAG_URL/privacy` is the
+   only thing in this file that observes that. *(Added at UIP-P1; the reasoning is `UIP-DL-001` (j) and
+   its **What it hands on**. **Amended at UIP-P2 (`UIP-DL-002`), and the amendment overrides this step's
+   own former instruction to delete itself once UIP-P2 landed.** What the condition is actually about is
+   that the code removal and the policy revision reach a parent in the SAME promotion; that stays true
+   for every promotion while this milestone is open, and a step deleted the moment it first goes green is
+   a tripwire removed at exactly the point it starts being cheap to keep. It is retired at milestone
+   close, with the milestone it belongs to.)*
    **This step is numbered 0 rather than inserted as a new 1** for the reason `PPR-DL-003` (g) recorded:
    the numbering of steps 1–5 in this section carries textual cross-references elsewhere in this file —
    step 3 (the tagged-revision smoke) and step 5 (the installed-client check) are both named by number
@@ -341,9 +348,16 @@ decides the order you do things in.
    `app/m/v{N}/channel/config.js` as `CHANNEL_CONFIG.policyUrl` — today `https://theygrow.app/privacy`.
    It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
    geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
-   download and a pinch-zoom rather than a document. The page is a hand conversion of
-   `docs/privacy-policy-v1.0.md`, and the two are paired by `app/tests/privacy-page.spec.js` heading by
-   heading so a drift is a red test rather than a discovery months later.
+   download and a pinch-zoom rather than a document. The page is a hand conversion of the CURRENT edition
+   — `docs/privacy-policy-v1.1.md` since UIP-P2 — and the two are paired by
+   `app/tests/privacy-page.spec.js` heading by heading so a drift is a red test rather than a discovery
+   months later. **One address, and since UIP-P2 exactly one:** `/privacy/` and `/privacy.html` both
+   answer `301` to `/privacy`, so the document cannot accumulate a second bookmarked address across
+   editions. **Superseded editions stay in `docs/` and are never republished** — `docs/privacy-policy-v1.0.md`
+   (effective date `23.08.2026`) is kept byte-untouched as history, because §10 of the document promises
+   that the address always carries the edition currently in force. **Whether a parent ever read edition
+   1.0 is not a repository fact** — the PPR milestone is merged and NOT promoted — so the history table
+   records the edition and its stated effective date, and claims nothing about a window of force.
 2. **Then declare it. — DONE at PPR-P3.** In `app/index.html`,
    `<meta name="theygrow-privacy-policy" content="published">`. Anything that is not exactly `published` — a
    missing tag, an empty value, a typo, a stale `none` — means "no document", and no link is offered
@@ -367,17 +381,29 @@ decides the order you do things in.
 6. **Re-check the effective date against the day you actually promote, and edit four places if it slipped.**
    The document states the date it comes into force, and a policy whose stated effective date precedes the
    day it became readable was never in force when it said it was (`PPR-DL-001` (f)). The literal lives in
-   **four** places and they must agree — the pairing test requires it:
-   - `docs/privacy-policy-v1.0.md:5` — the header block, «Дата вступления в силу:»
-   - `docs/privacy-policy-v1.0.md:145` — the `1.0` row of the change-history table
-   - `app/privacy.html:103` — the same header block in the page
-   - `app/privacy.html:263` — the same `1.0` row in the page
+   **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
+   step used to carry (`app/privacy.html:103` and `:263`) had already gone stale to `:107` and `:267`
+   by the time anyone read them, which is the failure mode of addressing a moving file by offset:
+   - `docs/privacy-policy-v1.1.md` — the header block, the line beginning `**Дата вступления в силу:**`
+   - `docs/privacy-policy-v1.1.md` — the **top** row of the change-history table, i.e. the row whose
+     first cell is the version the header declares
+   - `app/privacy.html` — the same header block, `<strong>Дата вступления в силу:</strong>`
+   - `app/privacy.html` — the same top row of its change-history table
+
+   **The rows for SUPERSEDED editions are frozen and do not move with the date.** `| 1.0 | 23.08.2026 |`
+   records when edition 1.0 came into force; editing it would rewrite history to make a later promotion
+   look tidy, and the pairing test reds on it in both files.
 
    One token each; change nothing else, and **do not let an editor strip the trailing double-spaces** at
-   `docs/privacy-policy-v1.0.md:3-4` — they are Markdown hard line breaks, which is why that path is
-   excluded from the hygiene hooks. `app/tests/privacy-page.spec.js::the effective date is resolved, and is
-   the same date in both files` reds on a mismatch, but **nothing compares the date to the wall clock** —
-   that judgement is yours, and this step is where it is made. PPR-P3 set it to `23.08.2026`.
+   lines 3–4 of the Markdown source — they are Markdown hard line breaks, which is why `docs/privacy-policy-v`
+   is excluded from the hygiene hooks by version-agnostic prefix, so every future edition inherits it.
+   **What reds on a mismatch, since UIP-P2 (`UIP-P2-INV-001`):** `app/tests/privacy-page.spec.js` reads
+   the version and the date out of the Markdown header, requires the top history row to carry both,
+   requires the page to state both, compares the two change-history tables **row for row**, and requires
+   the current date to appear exactly twice in the page. Any one of the four literals moved alone is red.
+   **Nothing compares the date to the wall clock** — that judgement is yours, and this step is where it
+   is made. PPR-P3 set edition 1.0 to `23.08.2026`; UIP-P2 set edition 1.1 to `26.08.2026`, the day it
+   landed.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
    the document reachable is the obligation; collecting acceptance to the POLICY is not, and is
    deliberately absent. *(Rewritten at PPR-P3: this step also said it "does not build the web channel's
@@ -390,8 +416,9 @@ decides the order you do things in.
    consent answer should live — is closed by there being no answer to record. The two `localStorage` keys
    the retired surface wrote, `analytics_consent` and `ga_debug`, are deliberately NOT cleared from
    visitors' browsers: nothing reads them, and clearing them would be a write with no reason behind it
-   (`UIP-DL-001` (r)). **The document itself still describes the deleted control and is revised in
-   UIP-P2 — see the promotion condition in § Promotion + rollback.**)*
+   (`UIP-DL-001` (r)). **The document was revised at UIP-P2 (`UIP-DL-002`): edition 1.1 describes no
+   analytics on either channel, asks for no consent and names no control, and the promotion condition in
+   § Promotion + rollback records the pair as satisfied.**)*
 
 ## Module mount (owner-run version bump)
 

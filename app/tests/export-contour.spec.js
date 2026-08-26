@@ -632,10 +632,18 @@ test.describe('the interface says the two things it must not soften', () => {
 
         // The price of the exclusion above, and it is deliberately narrower than
         // what it replaces: the document may say where it lives, and it may not
-        // carry a link to anywhere. An href in this file naming the policy
-        // address would be a second link target for the one thing the invariant
-        // is about — which surface offers the parent the policy — and it would
-        // be invisible to the scan above.
+        // LINK there. An href in this file naming the policy address would be a
+        // second link target for the one thing the invariant is about — which
+        // surface offers the parent the policy — and it would be invisible to
+        // the scan above.
+        //
+        // WHAT THIS LEG IS *NOT* SAYING, since UIP-P2. The document carries
+        // links now — back to the app, and out to the four third-party policies
+        // and the supervisory authority it names. None of them is this address,
+        // which is the only property asserted here; the composition of the rest
+        // is app/tests/privacy-page.spec.js's allowlist. When this leg said
+        // "no link to anywhere" it was reading a page that had no <a> at all,
+        // and that sentence is corrected rather than left standing.
         expect(
             SHIPPED,
             'the policy document is not shipped — this leg would pass vacuously'
