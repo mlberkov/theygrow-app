@@ -101,9 +101,31 @@ const cacheKeys = (page) => page.evaluate(() => caches.keys());
 // loads the current build, which every other spec in this suite already covers
 // and which says nothing about an upgrade. Measured, not assumed: running the
 // legs below with the fixture switch never set reds here, at the cache pin.
+// THE STAGED CLIENT CARRIES THE PREVIOUS GENERATION'S STORAGE VOCABULARY, AND
+// THAT IS WHY ONE RETIRED KEY IS WRITTEN OUT AS A LITERAL HERE (UIP-P3).
+//
+// `onboarding_dismissed` left `core/storage.js` and `support/seed.js` with the
+// intro window's auto-open (owner decision 2026-08-25, `UIP-DL-003`). It is dead
+// in `/m/v9/`. It is NOT dead in the generation this fixture stages: a frozen
+// mount is byte-untouchable (`A1-DL-004`), so `/m/v8/` still reads the key and
+// still opens the intro when it is unset — and `/m/v8/openOnboardingModal` calls
+// the `trackEvent()` the shell stopped defining at UIP-P1, which throws.
+//
+// WHAT THAT IS AND IS NOT. It is an artifact of a fixture that is already, on
+// the record, the WEAKER of two things: `support/prev-generation.js` stages the
+// CURRENT shell repointed one generation back, not the shell that generation
+// published. No real client can hold this pair — a client on `/m/v8/` holds the
+// shell that shipped with it, gtag shim included, and the moment it takes the
+// new shell it takes `/m/v9/` with it. So this is not a product defect and the
+// throw is not evidence of one; it is the fixture's known unfaithfulness meeting
+// a key that changed meaning. The repair belongs here, in the fixture, and it is
+// a literal rather than an import precisely because the constant it would import
+// no longer exists — the current mount is right not to have it.
 async function installPreviousGeneration(page, context, baseURL) {
   await context.addCookies([{ name: PREV_GEN_COOKIE, value: '1', url: baseURL }]);
-  await gotoApp(page, { state: STATES.seeded });
+  await gotoApp(page, {
+    state: { ...STATES.seeded, onboarding_dismissed: 'true' },
+  });
   await page.evaluate(() => navigator.serviceWorker.ready);
 
   // expect.poll rather than page.waitForFunction, and the difference is not

@@ -44,7 +44,6 @@ const STORAGE_KEYS = {
   legacy: 'childDevTracker_completed',
   accordion: 'milestones_accordion_states',
   filterZpd: 'milestones_filter_zpd',
-  onboardingDismissed: 'onboarding_dismissed',
 };
 
 // Storage states the suite boots from.
@@ -58,27 +57,38 @@ const STORAGE_KEYS = {
 // no gate, no stored answer, no `trackEvent` and no dataLayer to assert through.
 // The seeds went with them, and so did `gaEvents()` and the route stub that kept
 // the beacon off the network: a request that cannot be made needs no blocking.
+// THE SEEDS NO LONGER DISMISS THE INTRO, BECAUSE THERE IS NOTHING TO DISMISS
+// (UIP-P3). Three of the four states seeded `onboarding_dismissed: 'true'` for
+// one reason: the intro window opened itself on any state that had not, and it
+// would have covered the surface under test in every screenshot and every click
+// in this suite. The owner retired the auto-open (2026-08-25) — the window now
+// opens only from the header control — so the key has no reader, no writer and
+// no home in `core/storage.js` any more, and seeding it would be fixture
+// vocabulary for a mechanism the product does not have.
+//
+// `empty` AND `firstRun` ARE THEREFORE THE SAME STORAGE, and that is stated with
+// one value rather than two literals that happen to match. Both names are kept
+// because each states the question its callers ask — "no profile, so the
+// honest-degradation path" and "a visit with nothing stored at all" — and those
+// are different questions about one state.
+const NOTHING_STORED = {};
+
 const STATES = {
   // No profile at all: the honest-degradation path (A1-P0) lives here.
-  empty: {
-    [STORAGE_KEYS.onboardingDismissed]: 'true',
-  },
+  empty: NOTHING_STORED,
   // The standard seeded family: one profile with a birthdate and four skills done.
   seeded: {
     [STORAGE_KEYS.profiles]: JSON.stringify([PROFILE]),
     [STORAGE_KEYS.current]: PROFILE.id,
-    [STORAGE_KEYS.onboardingDismissed]: 'true',
   },
   // Same, with the ZPD filter already on — exercises restore-from-storage.
   seededFiltered: {
     [STORAGE_KEYS.profiles]: JSON.stringify([PROFILE]),
     [STORAGE_KEYS.current]: PROFILE.id,
-    [STORAGE_KEYS.onboardingDismissed]: 'true',
     [STORAGE_KEYS.filterZpd]: 'true',
   },
-  // Nothing stored at all — onboarding not yet dismissed, no profile, no filter.
-  // What a first visit actually is.
-  firstRun: {},
+  // Nothing stored at all. What a first visit actually is.
+  firstRun: NOTHING_STORED,
 };
 
 const test = base.test.extend({

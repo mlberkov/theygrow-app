@@ -155,15 +155,89 @@ test.describe('reload with seeded localStorage state', () => {
     await expect(page.locator('#profileName')).toContainText(PROFILE.name);
   });
 
-  // WHAT CLOSING THE INTRO MEANS, EXECUTED ON EACH OF ITS THREE DOORS (L3-P3,
-  // FIU-DL-001 debt 14). Until this packet only ONE of the three was ever
-  // executed — the close button with the checkbox ticked — and the other two
-  // silently persisted nothing, which is precisely why a parent who used the ✕
-  // met the window again on every cold start. The checkbox is gone; each door
-  // now means "read it", and each door is driven here.
+  // ─────────────────────────────────────────────────────────────────────────
+  // THE INTRO WINDOW OPENS ON ONE CONTROL AND ON NOTHING ELSE (UIP-P3-INV-001).
   //
-  // The arm is the same for all three: remove `writeOnboardingDismissed()` from
-  // `closeOnboardingModal()` and all three go red on the storage assertion.
+  // The owner retired the automatic opening on 2026-08-25. Before this packet
+  // the window came up by itself on a first run and a close marked it read;
+  // now there is no automatic opening in any state, first run included, and the
+  // header control is the only way in.
+  //
+  // WHY THAT CONTROL'S VISIBILITY IS ASSERTED RATHER THAN ASSUMED. Two things
+  // live inside that window and nowhere else: the privacy-policy link — one of
+  // its exactly two carriers (PDR-035, owner annotation 2026-08-21), the other
+  // being the control itself — and the sentence saying the browser copy has no
+  // backup. A window that cannot be opened makes both unreachable, so "the
+  // control is on screen" is half of this invariant rather than scenery.
+  //
+  // THE TWO HALVES ARE ARMED SEPARATELY, MEASURED RATHER THAN ARGUED (UIP-P3,
+  // both mutations run and reverted on the host, 2026-08-26). The dispositions
+  // differ, which is the property that matters — neither mutation produces the
+  // other's report:
+  //
+  //   (A) the intro opens at boot again (`openOnboardingModal()` in app.js's
+  //       init) — 6 failed / 1 passed. Everything reds EXCEPT *the control that
+  //       opens the intro is offered on a first run*, which is about visibility
+  //       and is untouched by it. *…does not open by itself* reds on its own
+  //       assertion; the door legs red on a click timeout, because the
+  //       auto-opened window is over the control they press — a truthful red
+  //       that names the auto-open as the cause.
+  //
+  //   (B) `#aboutBtn` unwired in surfaces/onboarding.js — 5 failed / 2 passed.
+  //       *…does not open by itself* now passes as well, and that difference is
+  //       exactly what separates the two mutations: A is the only one that can
+  //       falsify it, B is the only one that can falsify *the info control opens
+  //       the intro*. The reachability leg stays green under B on purpose — it
+  //       asks whether the control is OFFERED, and an unwired control still is;
+  //       the leg that asks whether pressing it works is the next one down.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  test('the intro does not open by itself on a first run', async ({ page }) => {
+    // The state that used to open it: nothing stored at all.
+    await gotoApp(page, { state: STATES.firstRun });
+
+    // Anti-vacuity first. "Not shown" is true of a window that is missing, of a
+    // selector typo and of a shell that failed to boot, so: the window IS in the
+    // document, and the page behind it is really built.
+    await expect(page.locator('#onboardingModal')).toHaveCount(1);
+    await expect(page.locator('#tableBody tr[data-skill-id]').first()).toBeVisible();
+
+    await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
+    await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'none');
+  });
+
+  test('the control that opens the intro is offered on a first run', async ({ page }) => {
+    // The reachability half, on the state where it matters most: a visitor who
+    // has just arrived has never seen the window, so if this control were
+    // withheld here the policy document would be unreachable for them.
+    await gotoApp(page, { state: STATES.firstRun });
+    await expect(page.locator('#aboutBtn')).toBeVisible();
+  });
+
+  test('the info control opens the intro, and it is really on screen', async ({ page }) => {
+    await gotoApp(page, { state: STATES.firstRun });
+    await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
+
+    await page.locator('#aboutBtn').click();
+
+    await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+    // Not merely class-toggled: the window is on screen and its text readable.
+    await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
+    await expect(page.locator('#onboardingModal h2')).toBeVisible();
+  });
+
+  // EACH OF THE THREE DOORS, STILL EXECUTED — and the claim behind them has
+  // changed with the mechanism. It used to be "this door records that the
+  // window was read", asserted on `onboarding_dismissed`; the key has no reader
+  // any more and left `core/storage.js` with the auto-open, so a fixture
+  // assertion about it would be about nothing. What each door must do now is
+  // simply close the window and leave it closed — including across a reload,
+  // which is where the old defect (a ✕ that persisted nothing) actually showed
+  // itself.
+  //
+  // The arm is the same for all three: empty `closeOnboardingModal()`'s body in
+  // surfaces/onboarding.js and all three red on the first assertion after the
+  // close.
   for (const [door, close] of [
     ['the close button', (page) => page.locator('#onboardingCloseBtn').click()],
     ['the ✕', (page) => page.locator('#onboardingModalClose').click()],
@@ -171,13 +245,13 @@ test.describe('reload with seeded localStorage state', () => {
     // content, so the click is aimed at a corner outside the card.
     ['the backdrop', (page) => page.locator('#onboardingModal').click({ position: { x: 5, y: 5 } })],
   ]) {
-    test(`the intro closes for good when it is closed with ${door}`, async ({ page }) => {
+    test(`the intro closes, and stays closed, when it is closed with ${door}`, async ({ page }) => {
       await gotoApp(page, { state: STATES.firstRun });
+      await page.locator('#aboutBtn').click();
       await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
 
       await close(page);
       await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
-      expect(await readStorage(page, STORAGE_KEYS.onboardingDismissed)).toBe('true');
 
       await page.reload();
       await page.waitForFunction(
@@ -187,17 +261,14 @@ test.describe('reload with seeded localStorage state', () => {
     });
   }
 
-  // THE LEG THAT MAKES THE «?» MORE THAN MARKUP. The intro now closes forever,
-  // and from L3-P3 it carries the privacy-policy link — so the whole promise
-  // rests on the document being reachable a second time. This drives the real
-  // sequence: dismiss it, reload the page (a fresh boot, where
-  // checkAndShowOnboarding() deliberately does not open it), then press the
-  // control and read the window.
-  //
-  // The arm: unwire `#aboutBtn` in surfaces/onboarding.js and this reds, while
-  // every other leg above stays green.
-  test('the ? control opens the intro again on a later launch', async ({ page }) => {
+  // AND IT OPENS AGAIN AFTERWARDS, ANY NUMBER OF TIMES. The window closing for
+  // good was the L3-P3 property; what has to hold now is stronger and simpler —
+  // the control works on a later launch just as it did on the first, because it
+  // is the only path to the policy document there has ever been since the
+  // auto-open went.
+  test('the control opens the intro again on a later launch', async ({ page }) => {
     await gotoApp(page, { state: STATES.firstRun });
+    await page.locator('#aboutBtn').click();
     await page.locator('#onboardingModalClose').click();
     await expect(page.locator('#onboardingModal')).not.toHaveClass(/show/);
 
@@ -210,7 +281,6 @@ test.describe('reload with seeded localStorage state', () => {
     await expect(page.locator('#aboutBtn')).toBeVisible();
     await page.locator('#aboutBtn').click();
     await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
-    // Not merely class-toggled: the window is on screen and its text readable.
     await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
     await expect(page.locator('#onboardingModal h2')).toBeVisible();
   });

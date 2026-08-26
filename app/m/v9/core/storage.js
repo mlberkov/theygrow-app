@@ -20,6 +20,16 @@
 // reds on a declared door that no longer exists. Either key may still sit in the
 // storage of a browser that saw an older shell; nothing reads either one, and
 // clearing them would be a write this packet has no reason to make.
+//
+// A THIRD KEY JOINS THAT LIST AT UIP-P3, and it left from INSIDE this file
+// rather than from the shell. `onboarding_dismissed` recorded that the intro
+// window had been read, and its only reader was the boot-time auto-open. The
+// owner retired the auto-open (2026-08-25): the window now opens only from the
+// header control, so nothing asks the question the key answered. The reader went
+// first and the writer had to go with it — a key written on every close and read
+// by nobody is a write into a parent's browser with no purpose behind it. The
+// values already sitting in browsers are left exactly where they are, for the
+// same reason as the two above: clearing them is also a write.
 
 // LocalStorage ключи
 const STORAGE_KEY_PROFILES = 'childDevTracker_profiles';
@@ -27,7 +37,6 @@ const STORAGE_KEY_CURRENT = 'childDevTracker_currentProfile';
 const STORAGE_KEY_LEGACY = 'childDevTracker_completed'; // Для миграции
 const STORAGE_KEY_ACCORDION = 'milestones_accordion_states';
 const STORAGE_KEY_FILTER_ZPD = 'milestones_filter_zpd';
-const STORAGE_KEY_ONBOARDING_DISMISSED = 'onboarding_dismissed';
 
 // Б1-P2 leftover, removed on every init (see the caller). Named here so every
 // key this app writes or clears is declared in one file.
@@ -67,14 +76,6 @@ export function readZpdFilterRaw() {
 
 export function writeZpdFilterJson(isActive) {
     localStorage.setItem(STORAGE_KEY_FILTER_ZPD, JSON.stringify(isActive));
-}
-
-export function readOnboardingDismissed() {
-    return localStorage.getItem(STORAGE_KEY_ONBOARDING_DISMISSED);
-}
-
-export function writeOnboardingDismissed() {
-    localStorage.setItem(STORAGE_KEY_ONBOARDING_DISMISSED, 'true');
 }
 
 export function removeOrphanedAgeFilter() {

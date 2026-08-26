@@ -817,3 +817,70 @@ test.describe('NON_SHELL_PAGES covers every navigable page this image ships', ()
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UIP-P3-INV-002 — the shell's tab title is one string, and the promotion smoke
+// greps the one the shell ships.
+//
+// THIS GUARD IS STATIC AND SAYS SO ABOUT ITSELF (AGENTS.md §11). It reads two
+// files and boots nothing. What it carries is an agreement between a shipped
+// literal and a written-down procedure — a property of the tree, which is the
+// admissible kind of static claim. Nothing here observes production; that the
+// tagged revision actually answers with this title is the owner's `curl`, which
+// is precisely the thing being kept honest.
+//
+// WHY IT EXISTS. `docs/RUNBOOK.md` § Promotion + rollback, step 3, greps the
+// shell's <title> against the just-deployed revision, and that grep is the ONLY
+// place the title is checked at all. A literal written down in the RUNBOOK and
+// nowhere else is exactly the shape this repository has already paid for four
+// times over four mount bumps — the same step carries a warning to read the
+// generation out of app/index.html rather than out of its own sentence, because
+// it went stale at /m/v6/, /m/v7/, /m/v8/ and /m/v9/. When the title changed at
+// UIP-P3 (`Child Dev Tracker` -> `TheyGrow`, `UIP-DL-003`) the same hazard
+// arrived on a second literal. The failure it produces is not silent-green but
+// silent-RED: a false failure at promotion, on the one procedure whose whole job
+// is to say whether the revision is sound — which is the fastest way to teach an
+// owner to skip a step.
+//
+// It deliberately does NOT pin the title's VALUE. Renaming the product is a
+// product decision, not a regression; what may not happen is renaming it in one
+// of the two places.
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe('the tab title and the promotion smoke name the same string (UIP-P3-INV-002, static)', () => {
+  const SHELL_SOURCE = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
+  const RUNBOOK = fs.readFileSync(
+    path.resolve(__dirname, '..', '..', 'docs', 'RUNBOOK.md'),
+    'utf8'
+  );
+
+  // Comments are stripped before matching, so this packet's own explanation of
+  // the rename — which quotes the retired title — cannot be mistaken for the
+  // title itself. Same technique as app/tests/install-channel.spec.js.
+  const shellTitle = /<title>([^<]*)<\/title>/.exec(SHELL_SOURCE.replace(/<!--[\s\S]*?-->/g, ''));
+
+  // The literal the RUNBOOK's smoke actually greps, read out of the grep rather
+  // than out of prose: what has to agree with the shell is the string the owner
+  // will run, not a sentence describing it.
+  const runbookTitle = /grep -q '<title>([^<]*)<\/title>'/.exec(RUNBOOK);
+
+  test('both literals were actually found', () => {
+    // Anti-vacuity, and it is the whole guard here: two null matches would make
+    // the comparison below green about nothing, which is the failure shape a
+    // pairing test takes when either side is reworded.
+    expect(shellTitle, 'app/index.html carries no <title> outside a comment').not.toBeNull();
+    expect(
+      runbookTitle,
+      "docs/RUNBOOK.md no longer greps a <title> in the promotion smoke — if the check moved,"
+        + ' move this guard with it rather than deleting it'
+    ).not.toBeNull();
+    expect(shellTitle[1].trim().length, 'the shell ships an empty title').toBeGreaterThan(0);
+  });
+
+  test('the promotion smoke greps the title the shell ships', () => {
+    expect(
+      runbookTitle[1],
+      `app/index.html ships <title>${shellTitle[1]}</title> while docs/RUNBOOK.md step 3 greps`
+        + ` "${runbookTitle[1]}" — the smoke would report a false failure against a sound revision`
+    ).toBe(shellTitle[1]);
+  });
+});

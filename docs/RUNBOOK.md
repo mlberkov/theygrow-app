@@ -87,7 +87,7 @@ Three places in this file, and the header comment of all three build-configs, us
    (the tagged URL has the form `https://sha-<SHORT_SHA>---child-tracker-service-<hash>.europe-west1.run.app`).
 3. **Smoke the tagged revision** (owner/manual, no JS toolchain) — against the tagged URL `$TAG_URL`:
    - Health: `curl -fsS "$TAG_URL/" -o /dev/null -w '%{http_code}\n'` → `200`.
-   - Live-DOM (app shell served): `curl -fsS "$TAG_URL/" | grep -q '<title>Child Dev Tracker</title>'` → exit 0.
+   - Live-DOM (app shell served): `curl -fsS "$TAG_URL/" | grep -q '<title>TheyGrow</title>'` → exit 0. *(Corrected at UIP-P3: the title was «Child Dev Tracker», a working name from the first prototype, while the manifest, the offline page and the pre-install window all said «TheyGrow». **This literal is now paired to the shell by a guard** — `app/tests/delivery-contract.spec.js`, `UIP-P3-INV-002` — because a string written down here and checked nowhere else is the shape that went stale four times in the mount line below. The failure mode is a false RED against a sound revision, on the one procedure whose job is to say whether the revision is sound.)*
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).

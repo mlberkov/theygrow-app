@@ -109,10 +109,16 @@ async function expectNoEgress(page, requests, what) {
 }
 
 test.describe('no visitor state reaches an analytics origin', () => {
-    // The four states the suite boots from, plus a reload. STATES.firstRun is the
+    // The states the suite boots from, plus a reload. STATES.firstRun is the
     // one that matters most and is the one PPR-P2 had to treat specially: a
     // visitor with nothing stored is where a consent gate would have had a
     // decision to make, and it is now indistinguishable from every other state.
+    //
+    // `firstRun` and `empty` ARE THE SAME STORAGE SINCE UIP-P3 — the intro's
+    // dismissal flag was what distinguished them, and it left with the auto-open
+    // (see support/seed.js). Both names are driven anyway rather than one being
+    // dropped: this sweep is about visitor STATES as the product names them, and
+    // the day they diverge again the leg is already here.
     for (const [name, state] of [
         ['a first visit with nothing stored', STATES.firstRun],
         ['a visitor with no profile', STATES.empty],
@@ -183,8 +189,9 @@ test.describe('driving the surfaces that used to emit still reaches nothing', ()
         await gotoApp(page, { state: STATES.seeded });
 
         // The intro window: shown and dismissed (onboarding_shown,
-        // onboarding_dismissed). STATES.seeded has already dismissed it, so it
-        // is reopened through the `?` control the way a parent would.
+        // onboarding_dismissed). Since UIP-P3 the window never opens by itself
+        // in any state, so it is opened through the header control the way a
+        // parent would — which is now the only way it opens at all.
         await page.locator('#aboutBtn').click();
         await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
         await page.locator('#onboardingCloseBtn').click();

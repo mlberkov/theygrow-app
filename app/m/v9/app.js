@@ -30,7 +30,7 @@ import { loadCategoryStates } from './surfaces/accordion.js';
 import { initProfiles, offerProfileIfNone, wireProfile } from './surfaces/profile.js';
 import { restoreZpdFilter, wireZpdFilter } from './surfaces/zpd-filter.js';
 import { buildTableHeader, buildTableBody, setFixedSkillColumnWidth } from './surfaces/table.js';
-import { checkAndShowOnboarding, wireOnboarding } from './surfaces/onboarding.js';
+import { wireOnboarding } from './surfaces/onboarding.js';
 import { wireSkillCompletion } from './surfaces/skill-completion.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
@@ -63,8 +63,18 @@ async function init(storeOutcome) {
     buildTableBody();
     setFixedSkillColumnWidth();
 
-    // Показать онбординг при первом запуске
-    checkAndShowOnboarding();
+    // ВСТУПИТЕЛЬНОГО ОКНА ЗДЕСЬ БОЛЬШЕ НЕТ (UIP-P3, решение владельца
+    // 2026-08-25). Тут стоял checkAndShowOnboarding(): на первом запуске окно
+    // приходило само и ложилось поверх только что собранной таблицы. Автопоказа
+    // нет ни в одном состоянии — окно открывается только кнопкой «i» в шапке
+    // (surfaces/onboarding.js), и это единственный вход. Отсюда обязанность,
+    // которую исполняет UIP-P3-INV-001: кнопка должна быть видима всегда, потому
+    // что за ней лежат политика конфиденциальности и строка о единственной копии.
+    //
+    // Строку не «забыли убрать вместе с импортом» — вместе с ней ушёл и весь
+    // путь ключа onboarding_dismissed из core/storage.js: читать его больше
+    // некому, а писать значение, которого никто не читает, — запись в чужой
+    // браузер без причины.
 
     wireProfile();
     wireZpdFilter();

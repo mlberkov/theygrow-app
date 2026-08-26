@@ -490,14 +490,23 @@ test.describe('the interface says the two things it must not soften', () => {
         expect(visible[1].trim()).toBe(aria[1]);
     });
 
-    test('the download control name is one string in three places', () => {
-        // The same rule the export control carries, for the same reason: the
-        // control is the same at both viewports, so a reworded label that left
-        // the two attributes behind would give the two viewports different names
-        // for the same action. (L3-P3 keeps the label VISIBLE on mobile for this
-        // one control — the web channel offers exactly one action and it must
-        // name itself — so the three strings are now all read by a sighted
-        // parent too, not two of them by assistive technology alone.)
+    test('the install control name is one string, and it names no download', () => {
+        // TWO PLACES SINCE UIP-P3, NOT THREE, AND THE MISSING THIRD IS THE POINT.
+        // L3-P3 kept a VISIBLE label on this one control at both viewports, on
+        // the measured argument that the web channel offers exactly one action
+        // and a bare tile names nothing. The owner reversed that on 2026-08-25
+        // (`UIP-DL-003`): the control is an icon like its neighbours, and its
+        // name lives in `title`/`aria-label` — which is where the accessible
+        // name always lived, so nothing an assistive technology reads changed.
+        // A label span coming back here would be that reversal quietly undone.
+        //
+        // AND THE NAME MUST NOT PROMISE A DOWNLOAD. It said «Скачать APK» while
+        // the control opened a window — on a desktop, a window offering no file
+        // at all. That is the debt `PPR-P2-INV-002`'s Scope carried by name, and
+        // this is where it is closed: the two strings must agree with each other
+        // AND must not claim an action the control does not perform. The file is
+        // offered by <a id="installDownloadLink"> inside the window, which may
+        // say «Скачать APK» because it really does download.
         //
         // A <button>, not an <a>, since L3-P3: the control opens the pre-install
         // window rather than navigating. See the next test.
@@ -505,12 +514,27 @@ test.describe('the interface says the two things it must not soften', () => {
         expect(control, 'the download control is missing').not.toBeNull();
         const aria = /aria-label\s*=\s*"([^"]*)"/.exec(control[0]);
         const title = /title\s*=\s*"([^"]*)"/.exec(control[0]);
-        const visible = /<span class="header-action-label">([^<]*)<\/span>/.exec(control[0]);
         expect(aria).not.toBeNull();
         expect(title).not.toBeNull();
-        expect(visible).not.toBeNull();
         expect(title[1]).toBe(aria[1]);
-        expect(visible[1].trim()).toBe(aria[1]);
+        expect(
+            /<span class="header-action-label">/.test(control[0]),
+            'the install control grew a visible label again — it is an icon control since UIP-P3,'
+                + ' and its name is the title/aria-label pair'
+        ).toBe(false);
+        expect(
+            /скачать/i.test(aria[1]),
+            `the install control is named "${aria[1]}", which promises a download — it opens a window,`
+                + ' and on a desktop there is no file behind it at all (PPR-P2-INV-002 Scope)'
+        ).toBe(false);
+        // Anti-vacuity for the two negatives above: the sibling control that DOES
+        // still carry a visible label proves the span pattern matches something.
+        const archive = /<button[^>]*id="exportBtn"[\s\S]*?<\/button>/.exec(SHELL);
+        expect(archive, 'the export control is missing').not.toBeNull();
+        expect(
+            /<span class="header-action-label">/.test(archive[0]),
+            'the label pattern matches nothing anywhere — the absence above is about the reader'
+        ).toBe(true);
     });
 
     test('the download control ships unrevealed and carries no address of its own', () => {
@@ -777,15 +801,39 @@ test.describe('the interface says the two things it must not soften', () => {
         // confirmed, the browser holds the only copy), and it now sits where a
         // parent meets it without opening anything.
         expect(SHELL, 'the unreachable paragraph is back').not.toContain('id="exportUnavailable"');
-        const note = /<p id="webChannelNote"[\s\S]*?<\/p>/.exec(SHELL);
-        expect(note, 'the web channel says nothing about where the only copy is').not.toBeNull();
+
+        // THE SENTENCE MOVED INTO THE INTRO WINDOW AT UIP-P3, so the slice it is
+        // read out of moved with it. Scoping the scan to the window is what makes
+        // "it is in the intro" an assertion rather than a hope: the same regex
+        // over the whole shell would go on passing if a later packet put the
+        // paragraph back above the table.
+        const introWindow = /<div id="onboardingModal"[\s\S]*?\n    <\/div>/.exec(SHELL);
+        expect(
+            introWindow,
+            'the intro window could not be sliced out of the shell — this leg would scan nothing'
+        ).not.toBeNull();
+
+        const note = /<p id="webChannelNote"[\s\S]*?<\/p>/.exec(introWindow[0]);
+        expect(
+            note,
+            'the web channel says nothing about where the only copy is — the sentence lives inside'
+                + ' the intro window since UIP-P3 (UIP-DL-003)'
+        ).not.toBeNull();
         expect(note[0]).toContain('только в этом браузере');
         expect(note[0]).toContain('резервной копии');
         // Ships unrevealed, like both channel actions: it is the web channel
         // that reveals it, and it must not appear inside the app.
         expect(/\bhidden\b/.test(note[0])).toBeTruthy();
-        // That it is actually on screen in a browser and absent in the app is
-        // app/tests/channel-composition.spec.js — this half is markup.
+        // And exactly once in the shell — a copy left behind above the table
+        // would be the same claim in two places, which is what this repository
+        // spent DIA-P2 removing.
+        expect(
+            (SHELL.match(/id="webChannelNote"/g) || []).length,
+            'the only-copy sentence exists more than once in the shell'
+        ).toBe(1);
+        // That it is actually on screen in a browser once the window is opened,
+        // and absent in the app, is app/tests/channel-composition.spec.js — this
+        // half is markup.
     });
 });
 
