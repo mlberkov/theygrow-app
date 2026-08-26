@@ -318,15 +318,36 @@ test.describe('the config surface carries its provenance', () => {
         ).toBeGreaterThanOrEqual(9);
     });
 
-    test('the app version in the config surface matches the one the shell reports', () => {
-        // The shell's inline GA4 shim carries the same literal and A1-P5
-        // deliberately left it inline. Two copies with a drift guard beats one
-        // copy that required moving a parse-time global.
-        const shell = /const APP_VERSION = '([^']+)'/.exec(SHELL);
+    // RETIRED AT UIP-P1: 'the app version in the config surface matches the one
+    // the shell reports'.
+    //
+    // The shell declared `const APP_VERSION = '1.0.0'` inside the GA4 shim, for
+    // one consumer — enriching every event payload — and this leg paired it with
+    // EXPORT_CONFIG.appVersion so two hand-written copies could not drift. The
+    // shim is gone (vault ADR-043 annotation 2026-08-25) and so is the constant:
+    // nothing in the shell reported a version any more, and a guard pairing a
+    // live knob against a literal with no reader proves only that the dead
+    // literal still says 1.0.0 — a green of exactly the kind AGENTS.md §11
+    // exists to refuse. The property "two copies agree" did not go unenforced;
+    // it ceased to exist. EXPORT_CONFIG.appVersion is now the single home, and
+    // one copy needs no drift gate.
+    test('the app version is declared once, in the config surface', () => {
         const config = /appVersion: '([^']+)'/.exec(CONFIG_SOURCE);
-        expect(shell, 'index.html no longer declares APP_VERSION').not.toBeNull();
         expect(config, 'the export config declares no appVersion').not.toBeNull();
-        expect(config[1]).toBe(shell[1]);
+        // A shape assertion, not a length one. `[^']+` already guarantees a
+        // non-empty capture, so `length > 0` could never have failed — the kind
+        // of assertion that reads as work and is not (AGENTS.md §11).
+        expect(config[1], 'the declared app version is not a version').toMatch(/^\d+\.\d+\.\d+$/);
+        // The shell must not grow a SECOND copy, in any spelling. `const` alone
+        // was the first form of this and matched exactly one: `let`, `var`, a
+        // window property or an object field would each have slipped past it
+        // while re-creating the drift the retired leg existed to gate.
+        const shellCode = SHELL.replace(/<!--[\s\S]*?-->/g, '');
+        expect(
+            shellCode,
+            'the shell declares an app version again — a second hand-written copy needs a drift gate,'
+                + ' which is the leg this one replaced; declare it once, in the export config surface'
+        ).not.toMatch(/\bAPP_VERSION\b|\bappVersion\b/);
     });
 
     test('the launch-options ceiling is the same number on both sides of the bridge', () => {
@@ -641,30 +662,35 @@ test.describe('the interface says the two things it must not soften', () => {
         // has nowhere to live (FIU-DL-003). This is the guard that keeps a later
         // packet from adding one by reflex.
         //
-        // NARROWED AT PPR-P2, AND PAID FOR IN THE SAME BREATH — this is the same
-        // move PPR-DL-001 (d) made on this file's other leg, and it needs saying
-        // out loud because the sentence below used to be written to stop the very
-        // packet that narrowed it.
+        // NARROWED AT PPR-P2, WIDENED BACK AT UIP-P1, AND BOTH MOVES ARE THE
+        // SAME MOVE: the scope follows the object.
         //
         // The subject was, and still is, POLICY ACCEPTANCE. The scan was
-        // shell-wide, which was free while the shell contained no consent control
-        // of any kind. PPR-P2 adds one — for ANALYTICS, which is a different
-        // question with a different answer and a storage home of its own
-        // (PDR-035 §5) — so a shell-wide scan for /consent|accept/ would now be
-        // measuring the wrong thing. It happens that the analytics control is
-        // named after its surface (#cookieBanner, #cookieEnableBtn,
-        // #cookieDeclineBtn, #cookieSettingsBtn) and would slip through the old
-        // pattern untouched. That is exactly why the pattern is narrowed rather
-        // than left standing: a guard that passes because nobody happened to use
-        // a word is a guard that has stopped meaning what its message says, and
-        // the next packet naming a control #analyticsConsentBtn would have gone
-        // red for a reason unrelated to the policy.
+        // shell-wide until PPR-P2, which was free while the shell contained no
+        // consent control of any kind. PPR-P2 added one — for ANALYTICS, a
+        // different question with a different answer and a storage home of its
+        // own — so a shell-wide scan for /consent|accept/ started measuring the
+        // wrong thing, and it was scoped down to the intro window. That
+        // narrowing named its own price out loud: the analytics control happened
+        // to be named after its surface (#cookieBanner, #cookieEnableBtn,
+        // #cookieDeclineBtn, #cookieSettingsBtn) and would have slipped through
+        // the wide pattern untouched, so the wide form was passing because
+        // nobody happened to use a word — and a later packet naming a control
+        // #analyticsConsentBtn would have gone red for a reason unrelated to the
+        // policy.
         //
-        // So the scan is scoped to the intro window — the policy link's one home
-        // (FIU-DL-003) — and the leg gains something STRICTER on that scope in
-        // exchange: the link is gated on the DECLARATION ALONE. Nothing stored,
-        // nothing consented to, nothing remembered stands between a parent and
-        // the document. That is a property the old wide scan never asserted.
+        // UIP-P1 removes analytics from the web showcase entirely (vault ADR-043
+        // annotation 2026-08-25), so the object of the narrowing is gone and the
+        // narrowing goes with it. The scan is shell-wide again — there is no
+        // consent control of any kind for it to collide with, and the intro
+        // window is no longer the only place a policy-acceptance control could
+        // appear without this leg seeing it.
+        //
+        // THE STRICTER PROPERTY PPR-P2 BOUGHT ON THE NARROW SCOPE IS KEPT, not
+        // traded back: the link is still gated on the DECLARATION ALONE, and the
+        // intro-window slice is still asserted, because a shell-wide absence and
+        // a link that depends on nothing stored are two different claims and this
+        // leg makes both.
         const intro = /<a[^>]*id="introPolicyLink"[^>]*>/.exec(SHELL);
         expect(intro, 'the intro carries no policy link').not.toBeNull();
         expect(
@@ -690,6 +716,16 @@ test.describe('the interface says the two things it must not soften', () => {
             'a consent control appeared beside the policy link — reachability is the obligation, acceptance is not'
         ).not.toMatch(/id="[A-Za-z0-9_-]*(?:[Cc]onsent|[Aa]ccept)[A-Za-z0-9_-]*"/);
 
+        // AND NOWHERE ELSE IN THE SHELL EITHER (UIP-P1 — the widening described
+        // above). Comments are stripped first, so the removal can be explained
+        // in the file it happened in without the explanation reading as the
+        // thing it removed.
+        expect(
+            SHELL.replace(/<!--[\s\S]*?-->/g, ''),
+            'a consent control appeared somewhere in the shell — collecting acceptance of the policy'
+                + ' is not an obligation this product has, anywhere on the page'
+        ).not.toMatch(/id="[A-Za-z0-9_-]*(?:[Cc]onsent|[Aa]ccept)[A-Za-z0-9_-]*"/);
+
         // THE STRICTER HALF, AND THE PRICE OF THE NARROWING. The policy link is
         // revealed by the declaration and by nothing else: shouldOfferPolicy()
         // takes one argument, reads no storage and asks no other module. A future
@@ -705,12 +741,18 @@ test.describe('the interface says the two things it must not soften', () => {
             decision[1].split(',').filter((part) => part.trim().length > 0),
             'shouldOfferPolicy grew an argument — the policy link is gated on the declaration alone'
         ).toHaveLength(1);
-        for (const reader of ['readAnalyticsConsent', 'localStorage', 'consentState']) {
-            expect(
-                CHANNEL_SURFACE,
-                `surfaces/channel.js reads ${reader} — the policy link must not depend on any stored answer`
-            ).not.toContain(reader);
-        }
+        // The reader list was ['readAnalyticsConsent', 'localStorage',
+        // 'consentState'] until UIP-P1. Two of those three named a consent gate
+        // that no longer exists anywhere in the tree, so keeping them would be
+        // asserting the absence of a function nothing could import. `localStorage`
+        // is the one that still means something and is the one that mattered:
+        // it is the general form — no stored answer of ANY name gates the
+        // document — and it is the only one of the three a future
+        // "accept to read" packet would have to reach for.
+        expect(
+            CHANNEL_SURFACE,
+            'surfaces/channel.js reads localStorage — the policy link must not depend on any stored answer'
+        ).not.toContain('localStorage');
     });
 
     test('the web channel still says the copy it holds is the only one', () => {

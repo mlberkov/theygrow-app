@@ -266,6 +266,39 @@ test.describe('an installed client on the previous generation reaches the curren
     const requested = [];
     page.on('request', (request) => requested.push(new URL(request.url()).pathname));
 
+    // THE BROWSER HTTP CACHE IS CLEARED HERE, EXPLICITLY, AND THIS LINE IS A
+    // FINDING RATHER THAN A CONVENIENCE (UIP-P1).
+    //
+    // Until this packet the leg passed without it — but not because the property
+    // held under a warm cache. It passed because support/seed.js registered a
+    // page.route() to stub the analytics hosts, and enabling routing in
+    // Playwright DISABLES the browser HTTP cache for the whole context. The
+    // stub was written for hermeticity and had nothing to do with caching; the
+    // cache bypass was an undeclared side effect that this leg silently
+    // depended on. UIP-P1 removed the stub with the analytics surface it was
+    // stubbing, the cache came back, and the leg went red with the staged shell
+    // in the document — which is the fixture finally showing what it had been
+    // hiding.
+    //
+    // WHAT IT WAS HIDING, STATED PLAINLY, BECAUSE THE BOUND IS REAL. The shell
+    // is served `public, max-age=3600, must-revalidate` (app/nginx.conf, and
+    // the mirror copies it). The worker serves navigations network-first, but
+    // network-first means fetch(), and a plain fetch() reads the HTTP cache: an
+    // installed client that opens the app again WITHIN THE HOUR gets its own
+    // cached shell, not the freshly deployed one, however new the worker
+    // parked in `waiting` is. The property this leg asserts — the unaccepting
+    // client lands on the current mount on its next open — is therefore true
+    // once that hour has passed, or once the client accepts the banner (leg 1),
+    // and not before. Clearing the cache here models the first of those without
+    // waiting an hour, and says so instead of arriving as a side effect of an
+    // unrelated stub.
+    //
+    // The alternative — re-registering a pass-through route to get the bypass
+    // back — was rejected: it would restore the green and the concealment
+    // together.
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Network.clearBrowserCache');
+
     // Opening the app again — a navigation, deliberately NOT page.reload(): a
     // reload revalidates the main resource, while opening the app is what an
     // installed client actually does and is subject to the shell's own

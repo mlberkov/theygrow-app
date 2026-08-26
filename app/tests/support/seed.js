@@ -45,50 +45,39 @@ const STORAGE_KEYS = {
   accordion: 'milestones_accordion_states',
   filterZpd: 'milestones_filter_zpd',
   onboardingDismissed: 'onboarding_dismissed',
-  // PPR-P2 — the analytics-consent answer. Declared here for the same reason as
-  // the six above: this fixture writes raw keys, so every key it writes is named
-  // in one place.
-  analyticsConsent: 'analytics_consent',
 };
 
 // Storage states the suite boots from.
 //
-// WHY THE SEEDED STATES CARRY CONSENT (PPR-P2). Until that packet the web channel
-// loaded GA4 unconditionally, so `trackEvent` always ran and fourteen call sites
-// across this suite are asserted through `window.dataLayer` (see gaEvents below).
-// The gate makes `trackEvent` a no-op for anyone who has not consented, so a
-// fixture with no answer stored would silently empty every one of those
-// assertions — the suite would go green about nothing. The seeded states
-// therefore answer the question, which is also what the visitor these states
-// describe has by definition already done. It does not weaken the hermetic
-// property: the page fixture still routes the analytics hosts to an empty stub,
-// so no request leaves the browser either way.
-//
-// `firstRun` deliberately carries NO answer: a visitor with nothing stored is
-// exactly what it means, and the consent surface's own spec seeds its states.
+// THE SEEDED STATES NO LONGER CARRY A CONSENT ANSWER, AND THE REASON THEY DID IS
+// GONE (UIP-P1). PPR-P2 seeded `analytics_consent: 'granted'` into three of the
+// four states because the gate made `trackEvent` a no-op for anyone who had not
+// consented, and a fixture with no answer stored would have silently emptied
+// every dataLayer assertion in this suite — green about nothing. Analytics left
+// the web showcase entirely (vault ADR-043 annotation 2026-08-25), so there is
+// no gate, no stored answer, no `trackEvent` and no dataLayer to assert through.
+// The seeds went with them, and so did `gaEvents()` and the route stub that kept
+// the beacon off the network: a request that cannot be made needs no blocking.
 const STATES = {
   // No profile at all: the honest-degradation path (A1-P0) lives here.
   empty: {
     [STORAGE_KEYS.onboardingDismissed]: 'true',
-    [STORAGE_KEYS.analyticsConsent]: 'granted',
   },
   // The standard seeded family: one profile with a birthdate and four skills done.
   seeded: {
     [STORAGE_KEYS.profiles]: JSON.stringify([PROFILE]),
     [STORAGE_KEYS.current]: PROFILE.id,
     [STORAGE_KEYS.onboardingDismissed]: 'true',
-    [STORAGE_KEYS.analyticsConsent]: 'granted',
   },
   // Same, with the ZPD filter already on — exercises restore-from-storage.
   seededFiltered: {
     [STORAGE_KEYS.profiles]: JSON.stringify([PROFILE]),
     [STORAGE_KEYS.current]: PROFILE.id,
     [STORAGE_KEYS.onboardingDismissed]: 'true',
-    [STORAGE_KEYS.analyticsConsent]: 'granted',
     [STORAGE_KEYS.filterZpd]: 'true',
   },
-  // Onboarding not yet dismissed, and the cookie question not yet answered: the
-  // two things a first visit actually is.
+  // Nothing stored at all — onboarding not yet dismissed, no profile, no filter.
+  // What a first visit actually is.
   firstRun: {},
 };
 
@@ -107,18 +96,7 @@ const test = base.test.extend({
     // 1. Freeze time before any page script evaluates.
     await page.clock.setFixedTime(FIXED_NOW);
 
-    // 2. Block the analytics beacon. Keeps the suite hermetic and means CI
-    //    generates no third-party egress and no telemetry (contract §4).
-    //    trackEvent still pushes to window.dataLayer, which is what we assert on.
-    //    Fulfilled with an empty stub rather than aborted: an abort surfaces as
-    //    a "Failed to load resource" console error, which would collide with the
-    //    console-error guard below. The request never leaves the browser either way.
-    await page.route(
-      /(googletagmanager\.com|google-analytics\.com|analytics\.google\.com)/,
-      (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' })
-    );
-
-    // 3. Fail loudly on unexpected console noise.
+    // 2. Fail loudly on unexpected console noise.
     const errors = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') errors.push(msg.text());
@@ -176,22 +154,6 @@ function readStorage(page, key) {
   return page.evaluate((k) => window.localStorage.getItem(k), key);
 }
 
-// Reads the GA surface without touching it. Since PPR-P2 an event only reaches
-// dataLayer for a visitor who has consented, which every seeded state above is —
-// so a suddenly empty result here means the gate, not a lost event. gtag is an
-// inline shim
-// (app/index.html:37) that pushes into window.dataLayer, so events are
-// observable even though the external googletagmanager script is blocked.
-// This only OBSERVES — production emission is unchanged by this suite.
-async function gaEvents(page) {
-  return page.evaluate(() =>
-    Array.from(window.dataLayer || [])
-      .map((entry) => Array.from(entry))
-      .filter((args) => args[0] === 'event')
-      .map((args) => ({ name: args[1], params: args[2] || {} }))
-  );
-}
-
 module.exports = {
   test,
   expect: base.expect,
@@ -205,5 +167,4 @@ module.exports = {
   seedStorage,
   gotoApp,
   readStorage,
-  gaEvents,
 };

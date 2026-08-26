@@ -31,8 +31,9 @@
                      может стать несколькими разделами, и тогда меняется то, что
                      за кнопкой, а не кнопка.
 
-                     Ни onclick, ни телеметрии здесь нет — как и у соседей
-                     (решение владельца 2026-08-16, гейт D). -->
+                     Ни onclick, ни телеметрии здесь нет — как и у соседей, и с
+                     UIP-P1 её нет вообще нигде (аннотация к ADR-043 от
+                     2026-08-25 развернула гейт D, оставлявший GA4 до L4). -->
                 <button type="button" class="header-help" id="aboutBtn" title="О приложении" aria-label="О приложении">
                     <svg class="header-help-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <circle cx="12" cy="12" r="9">
@@ -81,8 +82,8 @@
                      которого на этом канале не происходит, — ровно тот дефект,
                      который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
 
-                     Ни GA4-события, ни onclick здесь нет (решение владельца
-                     2026-08-16, гейт D). -->
+                     Ни события аналитики, ни onclick здесь нет — и с UIP-P1
+                     аналитики нет ни на одном канале. -->
                 <button type="button" class="header-action" id="diaryBtn" hidden="" title="Дневник" aria-label="Дневник">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z">
@@ -114,8 +115,8 @@
                      «копировать ссылку» для действия, которое никуда не ведёт.
                      Ровно этим предмет в шапке и читался как случайная ссылка.
 
-                     Здесь НЕТ телеметрии — ни события GA4, ни сигнала (решение
-                     владельца 2026-08-16, гейт D). -->
+                     Здесь НЕТ телеметрии. Аналитики нет ни у одной поверхности
+                     с UIP-P1; отсутствие СИГНАЛА — по-прежнему решение. -->
                 <button type="button" class="header-action" id="apkBtn" title="Скачать APK" aria-label="Скачать APK">
                     <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <rect x="6" y="2" width="12" height="20" rx="2">

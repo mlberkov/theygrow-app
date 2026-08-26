@@ -12,7 +12,6 @@ const {
   expect,
   gotoApp,
   readStorage,
-  gaEvents,
   STATES,
   STORAGE_KEYS,
   PROFILE,
@@ -43,12 +42,6 @@ test.describe('main flow — checkbox -> ZPD recompute -> save', () => {
     const stored = JSON.parse(await readStorage(page, STORAGE_KEYS.profiles));
     expect(stored[0].completedSkills).toContain(CHAIN.ready);
 
-    // The action actually happened, so it is reported.
-    const events = await gaEvents(page);
-    expect(
-      events.filter((e) => e.name === 'skill_complete' && e.params.skill_id === CHAIN.ready)
-    ).toHaveLength(1);
-
     // Survives a reload.
     await page.reload();
     await page.waitForFunction(
@@ -71,7 +64,10 @@ test.describe('main flow — checkbox -> ZPD recompute -> save', () => {
 
   // The A1-P0 fix (3e11a1a) this suite exists to baseline: without a profile the
   // write has nowhere to go, so the tick is refused rather than silently lost.
-  test('with no profile a tick is refused honestly and emits nothing', async ({ page }) => {
+  // (The name said "and emits nothing" until UIP-P1, which was about a GA4
+  // event that no longer exists. What the refusal must not do is WRITE, and that
+  // is what the last assertion has always checked.)
+  test('with no profile a tick is refused honestly and writes nothing', async ({ page }) => {
     await gotoApp(page, { state: STATES.empty });
 
     // .click(), not .check(): check() asserts the box ends up checked, and the
@@ -81,9 +77,6 @@ test.describe('main flow — checkbox -> ZPD recompute -> save', () => {
     await expect(checkboxFor(page, CHAIN.ready)).not.toBeChecked();
     await expect(page.locator('#createProfileModal')).toHaveCSS('display', 'block');
     expect(await readStorage(page, STORAGE_KEYS.profiles)).toBeNull();
-
-    const events = await gaEvents(page);
-    expect(events.filter((e) => e.name === 'skill_complete')).toHaveLength(0);
   });
 
   // THE ONE PATH TO A PROFILE, EXECUTED (L3-P2, FIU-DL-002).
@@ -240,11 +233,6 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
     await expect(page.locator('#skillModal')).toHaveCSS('display', 'block');
     await expect(page.locator('#activitiesModal')).toHaveClass(/show/);
     await expect(page.locator('#skillModalBody h2')).toHaveAttribute('data-skill-id', skillId);
-
-    const events = await gaEvents(page);
-    expect(
-      events.filter((e) => e.name === 'activity_skill_open' && e.params.skill_id === skillId)
-    ).toHaveLength(1);
 
     // Closing the skill modal reveals the activities modal still open.
     await page.locator('#skillModalClose').click();
@@ -570,5 +558,58 @@ test.describe('nothing that ships hidden renders (FIU-P3-INV-001)', () => {
       rendered,
       'these elements ship hidden and render anyway — a class rule is beating the hidden attribute, and the parent is being offered something the channel does not do. Give each of them its own `<selector>[hidden] { display: none }` line'
     ).toEqual([]);
+  });
+});
+
+// THE FOOTER, AFTER THE «Cookie» CONTROL LEFT IT (UIP-P1).
+//
+// EXECUTED, NOT READ, AND THE REASON IS THAT THE DEFECT WAS INVISIBLE IN THE
+// CSS. `#activitiesBtn { margin-left: auto }` has held the footer's right edge
+// since L1-P3 and was never touched; PPR-P2 added `.footer-legal-btn` with a
+// SECOND `margin-left: auto`, and flexbox distributes free space equally among
+// auto margins. Both rules read correctly on their own — nothing in either file
+// says "these two now share the gap" — and «Подходящие активности» quietly
+// stopped reaching the edge. A source scan cannot see that; a laid-out box can.
+//
+// This is also why no positional rule was reintroduced when the control was
+// removed: `footer button:nth-child(3)` would re-arm the same trap for the next
+// button added (LSC-DL-003 (s)), and it is not needed — deleting the second auto
+// margin returns the free space to the first.
+test.describe('the footer carries two controls and the second reaches the right edge', () => {
+  test('the control footer holds exactly the two filter buttons', async ({ page }) => {
+    await gotoApp(page, { state: STATES.seeded });
+
+    const ids = await page.evaluate(() =>
+      Array.from(document.querySelector('footer.control-footer').children).map((el) => el.id)
+    );
+    expect(
+      ids,
+      'the footer composition changed — a third control is back, or one of the two is gone'
+    ).toEqual(['zpdFilterToggleBtn', 'activitiesBtn']);
+  });
+
+  test('«Подходящие активности» sits at the footer content edge, measured', async ({ page }) => {
+    await gotoApp(page, { state: STATES.seeded });
+
+    const geometry = await page.evaluate(() => {
+      const footer = document.querySelector('footer.control-footer');
+      const btn = document.getElementById('activitiesBtn');
+      const f = footer.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      const padRight = parseFloat(getComputedStyle(footer).paddingRight);
+      return { contentRight: f.right - padRight, buttonRight: b.right, buttonWidth: b.width };
+    });
+
+    // Anti-vacuity: a button of zero width sitting anywhere would satisfy a
+    // naive edge comparison, and a footer that failed to lay out would give both
+    // rectangles the same collapsed origin.
+    expect(geometry.buttonWidth, 'the activities button has no width — nothing was laid out').toBeGreaterThan(40);
+
+    expect(
+      Math.abs(geometry.buttonRight - geometry.contentRight),
+      `«Подходящие активности» is ${(geometry.contentRight - geometry.buttonRight).toFixed(1)} px`
+        + ' short of the footer content edge — a second auto margin is splitting the free space'
+        + ' again, which is exactly what the «Cookie» control did'
+    ).toBeLessThanOrEqual(1);
   });
 });

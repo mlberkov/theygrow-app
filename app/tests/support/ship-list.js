@@ -84,11 +84,13 @@ function offlineUrls(swSource) {
 }
 
 // Same-origin asset references: every href=/src= value starting with "/".
-// Verified exhaustive against the real shell — the only value this skips is the
-// external gtag script (DIA-P2 removed the Telegram link, and the download
-// control it replaced carries no href in the markup at all: the release address
-// is set at runtime from the declared knob), and there are no data: URIs,
-// relative refs or srcset attributes. Assets referenced from JS string literals
+// Verified exhaustive against the real shell — since UIP-P1 it skips NOTHING,
+// because the shell has no cross-origin reference left at all. It used to skip
+// exactly one, the external gtag loader, and that went with the whole analytics
+// surface (vault ADR-043 annotation 2026-08-25); DIA-P2 had already removed the
+// Telegram link, and the download control carries no href in the markup at all
+// (the release address is set at runtime from the declared knob). There are no
+// data: URIs, relative refs or srcset attributes. Assets referenced from JS string literals
 // (fetch('/kb-v1.json')) are out of reach by construction; see A1-P3-INV-001.
 function htmlAssetRefs(html) {
   return Array.from(html.matchAll(/(?:href|src)\s*=\s*["']([^"']+)["']/g))
@@ -177,7 +179,12 @@ function htmlModuleEntries(html, where) {
   for (const tag of html.matchAll(/<script\b([^>]*)>/gi)) {
     const src = /\bsrc\s*=\s*["']([^"']+)["']/.exec(tag[1]);
     if (!src) continue; // inline script — no delivery surface of its own
-    if (!src[1].startsWith('/')) continue; // cross-origin (the gtag loader)
+    // Cross-origin script entries are skipped: they have no delivery surface in
+    // this image. The shell has carried none since UIP-P1 removed the gtag
+    // loader, so this branch is unreached today; it stays because the walker is
+    // a general reader of a shipped shell, and a skip that silently became an
+    // assertion would be a worse thing to discover later.
+    if (!src[1].startsWith('/')) continue;
     const type = /\btype\s*=\s*["']([^"']+)["']/.exec(tag[1]);
     if (!type || type[1].trim().toLowerCase() !== 'module') {
       throw new Error(

@@ -57,23 +57,32 @@ const STORAGE_ACCESS = /\b(localStorage|sessionStorage|indexedDB|openDatabase)\s
 // (A1-P4), which is what makes it swappable in one place in L1-P2.
 const STORAGE_MODULE = `${MOUNT.prefix}core/storage.js`;
 
-// The access that is NOT behind the door, declared individually rather than by
-// file. It predates the module split and was left inline on purpose
-// (A1-DL-006 (f)): `ga_debug` is read by the inline <head> gtag shim before any
-// module evaluates.
+// The accesses that are NOT behind the door, declared individually rather than
+// by file. SINCE UIP-P1 THE LIST IS EMPTY, for the first time since A1-P4, and
+// an empty list is the strongest state this declaration can be in: every Web
+// Storage key any shipped shell touches now goes through one module.
 //
-// It is not family data — it is a debug flag, losable by definition — so it is
-// not a counter-example to the platform inversion; but it is a door, so it is
-// named.
+// THERE WERE TWO, AND BOTH LEFT THE SAME WAY — their writer was deleted, and the
+// mirror assertion at the foot of this file, "every declared shell exception
+// still exists", obliged the declaration to go with it rather than rot into a
+// permission nobody uses.
 //
-// THERE WERE TWO UNTIL L3-P3. `iosInstallDismissed` belonged to the
-// install-prompt IIFE, which registered `beforeinstallprompt` at parse time —
-// an event no level of the parity suite could observe, so the move to a module
-// could not be proven equivalent. L3-P3 removed the offer, the IIFE and the
-// key's only writer (FIU-DL-003), and the mirror assertion at the foot of this
-// file — "every declared shell exception still exists" — is what obliged the
-// declaration to go with them rather than rot into a permission nobody uses.
-const DECLARED_SHELL_ACCESSES = [{ file: 'index.html', key: 'ga_debug' }];
+//   `iosInstallDismissed` belonged to the install-prompt IIFE, which registered
+//   `beforeinstallprompt` at parse time — an event no level of the parity suite
+//   could observe, so the move to a module could not be proven equivalent
+//   (A1-DL-006 (f)). L3-P3 removed the offer, the IIFE and the key's only writer
+//   (FIU-DL-003).
+//
+//   `ga_debug` was read and written by the inline <head> gtag shim, before any
+//   module evaluated, behind the ?dbg=1|0 switch. UIP-P1 removed analytics from
+//   the web showcase entirely (vault ADR-043 annotation 2026-08-25), and the
+//   shim, the switch and the key's only accessor went with it.
+//
+// Neither was family data and neither is a counter-example to the platform
+// inversion; both were doors, which is why they were named while they existed.
+// Either key may still sit in a browser that saw an older shell — nothing reads
+// them, and clearing them would be a write with no reason behind it.
+const DECLARED_SHELL_ACCESSES = [];
 
 // A declared access, in the exact form the shell uses: a literal string key.
 // A computed key would not match, and would therefore be reported as
@@ -165,6 +174,33 @@ test.describe('storage seam — WebView storage has exactly one door (LSC-P1-INV
     // The mirror direction. A declared exception that no longer appears means
     // the list has rotted into a permission nobody uses — and the next person
     // reads it as sanctioned precedent.
+    //
+    // THE LIST IS EMPTY SINCE UIP-P1, so the loop below does not run — and a leg
+    // whose whole body is a loop over an empty list reports a green for having
+    // done nothing, which is the shape this repository keeps paying for. What
+    // replaces the missing work is not a bare `toEqual([])` on the list itself:
+    // that would red on a legitimately-added future exception before the loop
+    // could ever check it, so the loop would stay dead in both states. Instead
+    // the EMPTY case asserts the stronger property the empty list actually
+    // means — that no shipped shell reaches Web Storage by a literal key at all,
+    // so there is nothing an exception could be needed for. When the list is
+    // non-empty the loop does the checking and this branch stands aside.
+    if (DECLARED_SHELL_ACCESSES.length === 0) {
+      const strays = HTML_SOURCES.flatMap(({ where, source }) =>
+        Array.from(source.matchAll(KEYED_ACCESS)).map((m) => `${where}: ${m[1]}`)
+      );
+      expect(
+        strays,
+        'a shipped shell reaches Web Storage by a literal key while DECLARED_SHELL_ACCESSES is'
+          + ` empty — declare it there with its reason, or move it behind ${STORAGE_MODULE}`
+      ).toEqual([]);
+      // Anti-vacuity for the branch: the scan must be looking at real shells.
+      expect(HTML_SOURCES.length, 'no shipped shell was read').toBeGreaterThan(1);
+      for (const { where, source } of HTML_SOURCES) {
+        expect(source.length, `${where} collapsed to almost nothing`).toBeGreaterThan(2000);
+      }
+    }
+
     for (const { file, key } of DECLARED_SHELL_ACCESSES) {
       const source = fs.readFileSync(path.join(APP_ROOT, file), 'utf8');
       const keys = Array.from(source.matchAll(KEYED_ACCESS)).map((m) => m[1]);

@@ -64,7 +64,22 @@
 // is SMALLER than the one before it: it ships no transfer/ directory and no
 // store/transfer.js, because a copy-forward that omits a file deletes it without
 // touching a frozen byte.
-const CACHE_VERSION = 'v18';
+//
+// changed_in: UIP-DL-001 — v18 -> v19 with the /m/v9/ mount bump, which carries
+// one change: analytics leaves the web showcase entirely (vault ADR-043
+// annotation 2026-08-25, class: reversal), and the consent surface PPR-P2 built
+// to gate it retires with its object rather than staying switched off. Under the
+// mount that is consent/config.js and surfaces/consent.js deleted, the stored
+// answer and its two accessors gone from core/storage.js, thirteen trackEvent()
+// call sites gone from seven surfaces, and the banner and footer-control rules
+// gone from app.css. FORCED for the standing reason: bytes at a published mount
+// URL are never rewritten (A1-DL-004), and /m/v8/ has been published since the
+// PPR merge. The cost is a NINTH generation shipped and served immutable;
+// retiring the early ones stays an owner cleanup (DIA-DL-008 debt 7). /m/v9/ is
+// the second generation SMALLER than the one before it, and for the same reason
+// /m/v8/ was: a copy-forward that omits a file deletes it without touching a
+// frozen byte.
+const CACHE_VERSION = 'v19';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -79,10 +94,10 @@ const OFFLINE_URLS = [
   // done in both directions in one packet rather than swept up later.
   // Versioned module mount (A1-DL-004): the shell references these by URL, so
   // they are precached by name. Content changes ship as a NEW mount version
-  // (/m/v8/...), never as new bytes at these URLs — inside the 30-day immutable
+  // (/m/v9/...), never as new bytes at these URLs — inside the 30-day immutable
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
-  '/m/v8/app.css',
-  '/m/v8/sw-register.js',
+  '/m/v9/app.css',
+  '/m/v9/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
   // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
@@ -92,68 +107,58 @@ const OFFLINE_URLS = [
   // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
   // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
-  '/m/v8/app.js',
-  '/m/v8/core/kb-boot.js',
-  '/m/v8/core/state.js',
-  '/m/v8/core/storage.js',
-  '/m/v8/core/repo-local.js',
-  '/m/v8/core/signals.js',
-  '/m/v8/core/dom-utils.js',
-  '/m/v8/core/format.js',
-  '/m/v8/core/zpd.js',
-  '/m/v8/core/urgency.js',
-  '/m/v8/surfaces/table.js',
-  '/m/v8/surfaces/skill-completion.js',
-  '/m/v8/surfaces/zpd-filter.js',
-  '/m/v8/surfaces/skill-modal.js',
-  '/m/v8/surfaces/profile.js',
-  '/m/v8/surfaces/activities.js',
-  '/m/v8/surfaces/onboarding.js',
-  '/m/v8/surfaces/accordion.js',
+  '/m/v9/app.js',
+  '/m/v9/core/kb-boot.js',
+  '/m/v9/core/state.js',
+  '/m/v9/core/storage.js',
+  '/m/v9/core/repo-local.js',
+  '/m/v9/core/signals.js',
+  '/m/v9/core/dom-utils.js',
+  '/m/v9/core/format.js',
+  '/m/v9/core/zpd.js',
+  '/m/v9/core/urgency.js',
+  '/m/v9/surfaces/table.js',
+  '/m/v9/surfaces/skill-completion.js',
+  '/m/v9/surfaces/zpd-filter.js',
+  '/m/v9/surfaces/skill-modal.js',
+  '/m/v9/surfaces/profile.js',
+  '/m/v9/surfaces/activities.js',
+  '/m/v9/surfaces/onboarding.js',
+  '/m/v9/surfaces/accordion.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the
   // import graph reaches them, and an installed client must not boot offline
   // with a broken graph. The DDL artifact they read
-  // (/m/v8/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // (/m/v9/store/schema/001-core.sql) is deliberately NOT here: only the native
   // channel ever fetches it, and that channel does not use this worker.
   //
   // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
   // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
   // quotes — an apostrophe swallows every entry after it and the guard then
   // reports the icons as unprecached.
-  '/m/v8/store/boot.js',
-  '/m/v8/store/store.js',
-  '/m/v8/store/journal.js',
-  '/m/v8/store/repo-journal.js',
-  '/m/v8/store/import-legacy.js',
+  '/m/v9/store/boot.js',
+  '/m/v9/store/store.js',
+  '/m/v9/store/journal.js',
+  '/m/v9/store/repo-journal.js',
+  '/m/v9/store/import-legacy.js',
   // DIA-P3 — the diary record path. Precached with the rest of the store
   // because the diary is the app shell now, not an extra: a parent who opens
   // the app offline must still be able to write down what happened today.
-  '/m/v8/store/records.js',
-  '/m/v8/store/bridge.js',
-  '/m/v8/store/config.js',
-  '/m/v8/store/errors.js',
+  '/m/v9/store/records.js',
+  '/m/v9/store/bridge.js',
+  '/m/v9/store/config.js',
+  '/m/v9/store/errors.js',
   // DIA-P2 — the channel composition: which of the two header actions this
   // channel offers, and the knobs that decide it.
-  '/m/v8/surfaces/channel.js',
-  '/m/v8/channel/config.js',
-  // PPR-P2 — the analytics-consent gate: the decision and its vocabulary. Both
-  // are precached with the rest of the graph and neither reaches the network:
-  // the module reads one localStorage key through the door and, only for a
-  // visitor who has said yes, calls the seam defined in the shell. The tag it may
-  // then create is NOT precached and never could be — a third-party script is
-  // something this worker deliberately never sees.
-  //
-  // (No apostrophe in this block either — see the trap named below.)
-  '/m/v8/surfaces/consent.js',
-  '/m/v8/consent/config.js',
+  '/m/v9/surfaces/channel.js',
+  '/m/v9/channel/config.js',
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
   // FETCH at runtime are deliberately NOT here: the declaration
-  // (/m/v8/export/declaration.json) plus the two print-layer binaries, the
-  // embedded font and the ICC profile under /m/v8/export/assets/. Only the
+  // (/m/v9/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v9/export/assets/. Only the
   // native channel ever reads them, that channel does not use this worker, and
   // the web channel cannot export at all — so precaching them would spend
   // roughly 443 KB of an installed web client cache budget on bytes it can
@@ -161,19 +166,19 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
-  '/m/v8/surfaces/diary.js',
-  '/m/v8/surfaces/export.js',
-  '/m/v8/export/run.js',
-  '/m/v8/export/build.js',
-  '/m/v8/export/readout.js',
-  '/m/v8/export/sink.js',
-  '/m/v8/export/text.js',
-  '/m/v8/export/readme.js',
-  '/m/v8/export/zip.js',
-  '/m/v8/export/pdf.js',
-  '/m/v8/export/ttf.js',
-  '/m/v8/export/config.js',
-  '/m/v8/export/errors.js',
+  '/m/v9/surfaces/diary.js',
+  '/m/v9/surfaces/export.js',
+  '/m/v9/export/run.js',
+  '/m/v9/export/build.js',
+  '/m/v9/export/readout.js',
+  '/m/v9/export/sink.js',
+  '/m/v9/export/text.js',
+  '/m/v9/export/readme.js',
+  '/m/v9/export/zip.js',
+  '/m/v9/export/pdf.js',
+  '/m/v9/export/ttf.js',
+  '/m/v9/export/config.js',
+  '/m/v9/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

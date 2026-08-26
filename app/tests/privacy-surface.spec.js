@@ -13,8 +13,12 @@
 //      every unknown path, silently, with no error anywhere. A source scan
 //      cannot see it; only a navigation can.
 //   2. The page could pull in a third party. The document states in §3.2 and
-//      §5 that it runs no analytics before consent; a policy page that loaded
-//      gtag while saying so would be the worst possible defect in this file.
+//      §5 that it runs no analytics before consent; a policy page that loaded a
+//      tag while saying so would be the worst possible defect in this file.
+//      (Since UIP-P1 no page of this product loads analytics at all, and the
+//      document's §5 is revised in UIP-P2 to say so. This leg is unchanged
+//      either way: what it asserts is that the POLICY PAGE reaches no third
+//      party, which was true before the removal and stays true after it.)
 //   3. A visit could POISON THE APP SHELL. app/sw.js mirrors every navigation
 //      into the cache keyed '/', which is the shell's offline copy, unless the
 //      path is named in NON_SHELL_PAGES. /privacy is the second real page this
@@ -91,11 +95,11 @@ test.describe('the policy page runs nothing and reaches nobody', () => {
       'the request listener never saw the document itself'
     ).toBe(true);
 
-    // The analytics hosts are stubbed for the whole suite by the page fixture
-    // (support/seed.js) so CI generates no third-party egress. That stub
-    // fulfils requests; it does not hide them — page.on('request') fires for a
-    // routed request exactly as for any other — so an absence asserted here is
-    // a real absence, not an artefact of the harness.
+    // Nothing is stubbed or routed for this navigation. The analytics-host stub
+    // that support/seed.js used to install went with the analytics surface at
+    // UIP-P1 — there is no request left to keep off the network — so an absence
+    // asserted here is a plain absence with no harness standing behind it at
+    // all, which is a stronger reading of the same assertion than before.
     const origin = new URL(page.url()).host;
     expect(
       seen.filter((r) => new URL(r.url).host !== origin),

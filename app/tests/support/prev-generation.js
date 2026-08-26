@@ -28,9 +28,10 @@
 //            packet editing index.html for any other reason turns this into
 //            "the current shell repointed at the previous mount". DIA-P1 was
 //            that packet: it added four delivery hints and the handoff controls
-//            in #importModal — and PPR-P2 has since removed both, added the
-//            cookie banner and the footer control, and changed the head's
-//            analytics block. So the fixture is now the WEAKER of the two
+//            in #importModal — PPR-P2 removed both, added the cookie banner and
+//            the footer control, and changed the head's analytics block — and
+//            UIP-P1 removed the banner, the footer control and the analytics
+//            block outright. So the fixture is now the WEAKER of the two
 //            things, deliberately and on the record — still the right fixture
 //            for the MECHANISM, no longer the historical bytes, and the spec
 //            states that bound too.
@@ -57,12 +58,13 @@
 //            re-deriving it from the staged shell, i.e. reimplementing the
 //            worker instead of rewriting it.
 //
-//            THE OPPOSITE CASE ARRIVES WITH PPR-P2 AND IS HARMLESS BY
-//            CONSTRUCTION: /m/v8/ ships FEWER modules than /m/v7/, and this
-//            fixture builds the previous worker from the CURRENT list, so a file
-//            the previous generation had and the current one does not is simply
-//            never named. The fixture can under-represent the previous
-//            generation; it cannot invent it.
+//            THE OPPOSITE CASE ARRIVED WITH PPR-P2 AND AGAIN WITH UIP-P1, AND IS
+//            HARMLESS BY CONSTRUCTION: /m/v8/ shipped fewer modules than /m/v7/
+//            and /m/v9/ ships fewer than /m/v8/, and this fixture builds the
+//            previous worker from the CURRENT list, so a file the previous
+//            generation had and the current one does not is simply never named.
+//            The fixture can under-represent the previous generation; it cannot
+//            invent it.
 //
 // WHAT IT IS NOT. It is not the bytes any PARTICULAR live client holds. A live
 // client holds whatever generation was current when it last updated, and its
@@ -154,10 +156,14 @@ function previousGeneration(appRoot) {
   // what happened: DIA-P1 added the handoff page and its three modules, and the
   // rewrite produced a previous-generation worker precaching /m/v{prev}/transfer/…
   // — paths that generation never carried and never listed. It threw with the
-  // path, as designed, and the mystery was avoided. PPR-P2 is the same shape
-  // again from the other side of the same list: /m/v8/ adds consent/config.js
-  // and surfaces/consent.js, which /m/v7/ never had, and they are dropped here
-  // for the same reason.
+  // path, as designed, and the mystery was avoided. PPR-P2 was the same shape
+  // again from the other side of the same list: /m/v8/ added consent/config.js
+  // and surfaces/consent.js, which /m/v7/ never had, and they were dropped here
+  // for the same reason. UIP-P1 removes those two again, so the /m/v9/ -> /m/v8/
+  // rewrite drops NOTHING — every current path exists in the previous generation
+  // — and this branch is quiet for the first time since DIA-P1. That is the
+  // fixture being right rather than idle: the drop list is returned rather than
+  // swallowed, and an empty one is a fact the spec prints.
   //
   // The right repair is to make the fixture FAITHFUL rather than to relax it: the
   // previous generation's worker did not precache what the previous generation

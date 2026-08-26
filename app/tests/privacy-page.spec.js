@@ -115,7 +115,7 @@ test.describe('the policy page loads nothing and links nowhere', () => {
   // declared once, in CHANNEL_CONFIG, and the document quotes it rather than
   // offering it.
   const FORBIDDEN = [
-    ['<script', 'the page carries a script — including analytics, which this document says it does not run'],
+    ['<script', 'the page carries a script — the document is inert, and since UIP-P1 nothing on any page of this product loads analytics either'],
     ['rel="stylesheet"', 'the page links a stylesheet — its style is inline so it survives a mount bump'],
     ['rel="modulepreload"', 'the page hints a module — it evaluates none'],
     ['rel="manifest"', 'the page offers itself as an installable app'],
