@@ -349,13 +349,14 @@ decides the order you do things in.
    It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
    geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
    download and a pinch-zoom rather than a document. The page is a hand conversion of the CURRENT edition
-   — `docs/privacy-policy-v1.1.md` since UIP-P2 — and the two are paired by
+   — `docs/privacy-policy-v1.2.md` since UIP-P8 — and the two are paired by
    `app/tests/privacy-page.spec.js` heading by heading so a drift is a red test rather than a discovery
    months later. **One address, and since UIP-P2 exactly one:** `/privacy/` and `/privacy.html` both
    answer `301` to `/privacy`, so the document cannot accumulate a second bookmarked address across
    editions. **Superseded editions stay in `docs/` and are never republished** — `docs/privacy-policy-v1.0.md`
-   (effective date `23.08.2026`) is kept byte-untouched as history, because §10 of the document promises
-   that the address always carries the edition currently in force. **Whether a parent ever read edition
+   (effective date `23.08.2026`) and `docs/privacy-policy-v1.1.md` (`27.08.2026`) are kept byte-untouched as
+   history, because §10 of the document promises that the address always carries the edition currently in
+   force. **An edition freezes the moment the next one is written**, which is what UIP-P8 did to 1.1. **Whether a parent ever read edition
    1.0 is not a repository fact** — the PPR milestone is merged and NOT promoted — so the history table
    records the edition and its stated effective date, and claims nothing about a window of force.
 2. **Then declare it. — DONE at PPR-P3.** In `app/index.html`,
@@ -384,8 +385,8 @@ decides the order you do things in.
    **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
    step used to carry (`app/privacy.html:103` and `:263`) had already gone stale to `:107` and `:267`
    by the time anyone read them, which is the failure mode of addressing a moving file by offset:
-   - `docs/privacy-policy-v1.1.md` — the header block, the line beginning `**Дата вступления в силу:**`
-   - `docs/privacy-policy-v1.1.md` — the **top** row of the change-history table, i.e. the row whose
+   - `docs/privacy-policy-v1.2.md` — the header block, the line beginning `**Дата вступления в силу:**`
+   - `docs/privacy-policy-v1.2.md` — the **top** row of the change-history table, i.e. the row whose
      first cell is the version the header declares
    - `app/privacy.html` — the same header block, `<strong>Дата вступления в силу:</strong>`
    - `app/privacy.html` — the same top row of its change-history table
@@ -406,7 +407,9 @@ decides the order you do things in.
    `26.08.2026` on the same reasoning, and that reasoning was **wrong**: edition 1.1 had reached no reader
    — the milestone was merged and not promoted (`ADR-020`) — so the day the packet landed was not the day
    it came into force. UIP-P6 set it to `27.08.2026`, **the day of promotion**, before publication rather
-   than after. **The date this step names is the day the revision reaches a parent, not the day it was
+   than after. UIP-P8 set edition 1.2 to `28.08.2026` on the same rule and for the same reason — the day
+   it is promoted, chosen before publication; if the promotion slips to another day, the four literals
+   move together **before** you promote, not after. **The date this step names is the day the revision reaches a parent, not the day it was
    written**, and a merged-but-unpromoted revision is corrected here rather than superseded by a new
    edition.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
