@@ -91,7 +91,7 @@ Three places in this file, and the header comment of all three build-configs, us
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
-   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v9/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v9/app.js"` and `curl -fsSI "$TAG_URL/m/v9/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v9/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at four closes now (`/m/v6/` → `/m/v7/` → `/m/v8/` → `/m/v9/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18), and again at UIP-P1 for the bump to `/m/v9/` (`CACHE_VERSION` v19).
+   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v10/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v10/app.js"` and `curl -fsSI "$TAG_URL/m/v10/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v10/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at five closes now (`/m/v6/` → `/m/v7/` → `/m/v8/` → `/m/v9/` → `/m/v10/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18), at UIP-P1 for the bump to `/m/v9/` (`CACHE_VERSION` v19), and at NAV-P1 for the bump to `/m/v10/` (`CACHE_VERSION` v20).
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
    - **The privacy policy is served, and served as a document** (added at PPR-P3, `PPR-DL-001` (k); two of the four lines repaired at PPR-P4, `PPR-DL-004`). Nothing in this repository runs the real nginx image — the parity suite drives `app/tests/server.js`, a hand-written mirror — so this is the only place the production response for `/privacy` is ever observed, and the in-app link is not to be trusted until it has been. **That is also why these lines themselves have to be right: two of them were not.** One reported a false red on a clean page and one accepted a `301` without reading where it pointed — which is how `/privacy/` shipped a redirect to an address that does not answer:
      - `curl -sI "$TAG_URL/privacy"` → `200`, `content-type: text/html`, `cache-control: public, max-age=3600, must-revalidate`, and **not** `immutable`. The document is versioned by its own text and effective date, at one address; an immutable cache class would strand a redaction.
@@ -370,10 +370,14 @@ decides the order you do things in.
    rollback**. The shell is ALSO what the APK carries, so on a **phone** it reaches nobody until the next
    release build is produced and installed (**Release build + APK distribution** above). Until then the app
    on a parent's phone correctly shows no link.
-4. **Check it, in the place it lives.** Open the app, press the round **«?»** in the header, scroll to the
-   bottom of the greeting: «Политика конфиденциальности» must be there and must open the real page. It is
-   the only home the link has, on both channels, and «?» is the only way back into that window once the
-   greeting has been closed.
+4. **Check it, in the place it lives.** Open the greeting and scroll to the bottom: «Политика
+   конфиденциальности» must be there and must open the real page. It is the only home the link has, on both
+   channels, and since the greeting stopped opening by itself (`UIP-P3`) the control below is the only way
+   into that window at all. **The control is not the same one on both channels since `NAV-P1`** — it is
+   named rather than drawn here on purpose, because the sign on it has already changed twice while the name
+   has not, and the published policy quotes the name (vault `PDR-035`, annotation 2026-08-27):
+   - **on the web** — the header control **«О приложении»**;
+   - **in the app** — the header menu (three bars), then the row **«О приложении»**.
 5. **Ordering is the whole point, exactly as it is for the release.** Flipping the token before the
    document exists puts a parent on a 404 under the word "privacy" — a promise about their family's data
    with nothing behind it. Nothing in CI can catch that: the token is a statement by you, and
@@ -755,14 +759,21 @@ buildless, as `native/package.json` says.
    - **since L3-P1, check what BACKGROUNDING does — this is the step that tells a parent's device from a test's.** With the device attached and `adb logcat -s TheyGrowSignal` running: press **Home**, or lock the screen. Within a second a `[signal] store.close outcome=complete failure_class=none close_ms=…` must appear. Then reopen the app **and touch something that reads the store** — open the diary — and a second `[signal] store.open …` must appear carrying **`previous_run_clean=true`**. Those two lines together are the whole of `FIU-P1-INV-001` as a parent's phone performs it, and `previous_run_clean=true` is the one that says the `PRAGMA integrity_check` at every launch is over. **If the close line never appears**, this handset's WebView does not deliver the visibility change at `onStop` and the park needs the native belt `FIU-DL-001` alternative 3 describes — record the handset and its Android version, because that is the finding.
    - **and check the return, which is a UX step and not a log step.** Open the diary or the activities window, press **Home**, come back. The app must be where you left it, with **nothing** over it. *(Rewritten at L3-P2. This step used to name the «Перенести историю» screen, and added that getting it once at a cold start was still shipped behaviour with P2 as its address. That has happened: the transfer offer is removed from the product outright, so on no launch and no return is there a transfer screen to get. What to look for now is the general form — a return must add nothing to the screen — because that is what `FIU-P1-INV-001`'s off-device leg was rewritten to assert too.)*
    - **since L3-P2, check what a FIRST launch does, on a device with no child yet.** Install onto a handset that has never held this app (or clear its data), open it, and close the greeting. The app must ask you to create a child's profile by itself — the create-profile window, with a name and a birthdate. **There must be no offer to move anything from a browser, at any point.** Fill it in: the header must then carry the child's name, and ticking a skill must stick. That whole path is `FIU-P2-INV-001`, and this is the only place it is observed on a real handset; the browser channel's half of it runs on every push.
-   - **since L3-P3, check that the greeting closes FOR GOOD, and that you can get it back.** On a first
-     launch, close the greeting with the **✕** (not the «Закрыть» button — the ✕ is the one that used to
-     forget). Force-stop the app and open it again: the greeting must **not** appear. Then press the round
-     **«?»** in the header: the same window must open, and it must open again every time you press it. That
-     pair is `FIU-DL-001` debt 14 as a parent's phone performs it — a text read once, reachable always.
-   - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** Open the
-     greeting with «?» and scroll to the bottom: «Политика конфиденциальности» must be there, and pressing
-     it must open the document — the real page, in a new tab, not a 404 and not the skills table. *(Rewritten
+   - **since UIP-P3, check that the greeting does NOT come up by itself, and that you can still get to it.**
+     On a first launch the greeting must **not** appear — not on that launch and not on any later one; the
+     auto-open is gone, and with it the whole «close it with ✕ and see whether it stays closed» check this
+     step used to carry (that check was written for `FIU-DL-001` debt 14 and stopped being performable when
+     `UIP-P3` removed what it was about). Then open the **menu** in the header — the control with three
+     horizontal bars, the only one on the right besides the profile and the diary — and press
+     **«О приложении»**: the greeting must open, and it must open again every time you press it. That is
+     the same debt as a parent's phone performs it today — a text that never interrupts, reachable always.
+   - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** With the
+     greeting open, scroll to the bottom: «Политика конфиденциальности» must be there, and pressing it must
+     open the document — the real page, in a new tab, not a 404 and not the skills table.
+   - **since NAV-P1, check the menu itself.** It must carry exactly **two** rows — «О приложении» and
+     «Сохранить архив» — and choosing either must close the menu and open its window. Pressing the archive
+     row must reach the same archive window the header button used to open; nothing about the archive
+     itself changed. *(Rewritten
      at PPR-P3. This step used to say the opposite — that there must be **no** link there yet, because the
      document was not published and the declaration fails closed. Both halves have happened: PPR-P1 put the
      document at `/privacy` and PPR-P3 set `content="published"`.)* **On a phone this checks the build in
@@ -1299,9 +1310,10 @@ not a case the parent can fix and not one this procedure has a command for.
    in place, so through that milestone `CACHE_VERSION` stayed **v16** and the mount checks addressed `/m/v6/`.
    *(Corrected at L3-P1, `FIU-DL-001`: that sentence was written while `/m/v6/` was still unpublished, and it
    stopped describing the tree the moment L2 merged. L3-P1 bumped the mount to `/m/v7/` with `CACHE_VERSION`
-   **v17**, PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, and UIP-P1 bumped it to
-   `/m/v9/` with `CACHE_VERSION` **v19**, so the checks in step 3 address `/m/v9/` — as the corrected
-   lines there now do, corrected a second time at PPR-P3. The rule the L2
+   **v17**, PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, UIP-P1 bumped it to
+   `/m/v9/` with `CACHE_VERSION` **v19**, and NAV-P1 bumped it to `/m/v10/` with `CACHE_VERSION` **v20**,
+   so the checks in step 3 address `/m/v10/` — as the corrected lines there now do, corrected a third time
+   at NAV-P1. The rule the L2
    note is an instance of, and the one to apply at every future close, is `Module mount` item 1: read the
    current values out of `app/index.html` and `app/sw.js` rather than out of this sentence.)*
 9. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
@@ -1327,9 +1339,9 @@ not a case the parent can fix and not one this procedure has a command for.
     done**: nothing in the code removes, rewrites or marks the source consumed, no transfer exists to
     confirm, and the browser copy is therefore the only copy of a family's history with no path off it. The
     decision and the moment stay the owner's, and the honest default is *not yet*. Removing the install
-    prompt (PDR-034 §3, gated on this smoke). Retiring `m/v1`–`m/v8`. *(Rewritten at UIP-P1 in two places. `/m/v9/` is the running generation since that
-    packet, so `/m/v8/` joins the list of generations an owner may retire, and retiring any of them stays
-    an owner-level decision. And **the GA4 item is gone from this list entirely, by removal rather than by
+    prompt (PDR-034 §3, gated on this smoke). Retiring `m/v1`–`m/v9`. *(Rewritten at UIP-P1 in two places and extended at NAV-P1. `/m/v10/` is the
+    running generation since that packet, so `/m/v9/` joins the list of generations an owner may retire, and
+    retiring any of them stays an owner-level decision. And **the GA4 item is gone from this list entirely, by removal rather than by
     action**: it read "The GA4 surface, which stays until authentication appears at L4", and vault
     `ADR-043`'s 2026-08-25 annotation (class: reversal) took analytics off the web showcase altogether —
     there is no surface left for an owner to decide about, and nothing here for anyone to do. See
@@ -1421,7 +1433,7 @@ uv tool install "graphifyy[sql]"
 
 The upstream distribution is `graphifyy` (two `y`s); the commands it installs are `graphify` and `graphify-mcp`. Installed version at the time of writing: **0.9.48**.
 
-**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v9/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
+**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v10/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
 
 *(A note on a number that will not reproduce: before `.graphifyignore` landed, the graph held **209** `.sql` nodes across **9** files. Eight of those files were the same `store/schema/001-core.sql`, once per module generation — 7 frozen copies × 26 nodes, plus the live one, plus the dev script. The exclusion removed the duplicates, not the schema.)*
 
@@ -1456,7 +1468,7 @@ Each prints a number; an absence of output is not evidence. A non-zero count in 
 
 **5. Corpus exclusions.**
 
-`.graphifyignore` at the repository root (`ADR-051` p.7) keeps the frozen module generations `app/m/v1…v7` out of the graph; without it they are 323 of 556 scanned files and 48.5% of all nodes, and navigation lands in a frozen copy instead of the live mount. **Maintenance action, one line:** when a new generation goes live, add the one it replaces to that file.
+`.graphifyignore` at the repository root (`ADR-051` p.7) keeps the frozen module generations out of the graph; without them excluded they are 323 of 556 scanned files and 48.5% of all nodes, and navigation lands in a frozen copy instead of the live mount. **The list is `app/m/v1` through `app/m/v8` today** — this sentence said `v1…v7` for two bumps after `v8` was added to the file, which is the same drift the mount line in step 3 warns about, so it now names the range instead of a fixed end. **Maintenance action, one line:** when a new generation goes live, add the one it replaces to that file — open at NAV-P1, where `/m/v10/` becomes the shell's mount but nothing is live until the owner promotes.
 
 Changing `.graphifyignore` makes the next incremental run prune the now-excluded nodes by itself. If stale nodes survive a run, force a full re-scan:
 

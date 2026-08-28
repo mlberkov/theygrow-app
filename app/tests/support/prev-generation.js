@@ -159,11 +159,13 @@ function previousGeneration(appRoot) {
   // path, as designed, and the mystery was avoided. PPR-P2 was the same shape
   // again from the other side of the same list: /m/v8/ added consent/config.js
   // and surfaces/consent.js, which /m/v7/ never had, and they were dropped here
-  // for the same reason. UIP-P1 removes those two again, so the /m/v9/ -> /m/v8/
-  // rewrite drops NOTHING — every current path exists in the previous generation
-  // — and this branch is quiet for the first time since DIA-P1. That is the
-  // fixture being right rather than idle: the drop list is returned rather than
-  // swallowed, and an empty one is a fact the spec prints.
+  // for the same reason. UIP-P1 removed those two again, so the /m/v9/ -> /m/v8/
+  // rewrite dropped NOTHING — every path of that generation existed in the one
+  // before it — and this branch was quiet for exactly one bump. NAV-P1 brings it
+  // back: /m/v10/ adds surfaces/menu.js, which /m/v9/ never had, so the rewrite
+  // names a path that does not resolve and it is dropped here. Either way the
+  // fixture is being right rather than idle: the drop list is returned rather
+  // than swallowed, and the spec prints it — an empty one included.
   //
   // The right repair is to make the fixture FAITHFUL rather than to relax it: the
   // previous generation's worker did not precache what the previous generation

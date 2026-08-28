@@ -607,9 +607,12 @@ test.describe('nothing that ships hidden renders (FIU-P3-INV-001)', () => {
   //
   // TWO COMPOSITIONS FOR FREE. This file runs in `behavior` (web branch,
   // desktop) and in `native` (Capacitor asset root, mobile). The hidden SET
-  // differs between them — the web branch hides the archive and the diary, the
-  // native branch hides the download offer — so both channel compositions are
-  // swept, at both viewports, by the same eight lines.
+  // differs between them — the web branch hides the archive, the diary and,
+  // since NAV-P1, the header menu; the native branch hides the download offer
+  // and the header's own about control, whose entry moved into that menu — so
+  // both channel compositions are swept, at both viewports, by the same eight
+  // lines. The web composition is nineteen elements, measured at NAV-P1: the
+  // menu joined it and nothing left it.
   //
   // SOUNDNESS, MEASURED. Deleting `.header-action[hidden] { display: none }`
   // from the mount's app.css reds this with exactly two violations,

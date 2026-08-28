@@ -104,6 +104,34 @@ async function simulateNativeShell(page) {
     });
 }
 
+/**
+ * Opens the intro window through whichever entry THIS channel offers (NAV-P1).
+ *
+ * WHY A BRANCH IS SOUND HERE AND WOULD NOT BE ANYWHERE ELSE. The entry moved
+ * per channel: the web keeps the header control #aboutBtn, the app reaches the
+ * same window through the header menu. A leg about the POLICY LINK or the
+ * BROWSER-ONLY SENTENCE is not a leg about where the door is, and hard-coding
+ * one door would make those legs red for a reason they are not about.
+ *
+ * The branch is only safe because the composition itself is asserted elsewhere,
+ * per channel and without a branch — see the NAV-P1 block below, which pins that
+ * the app offers the menu and NOT the header control, and the web the reverse.
+ * Without those, this helper would happily pass on a channel showing both doors.
+ */
+async function openIntroWindow(page) {
+    if (await page.locator('#headerMenu').isVisible()) {
+        // Pressing the toggle unconditionally would CLOSE a panel a caller had
+        // already opened, and the failure would read as "the row is not visible"
+        // rather than as "this helper shut it".
+        if (!(await page.locator('#headerMenuPanel').isVisible())) {
+            await page.locator('#menuBtn').click();
+        }
+        await page.locator('#menuAboutBtn').click();
+        return;
+    }
+    await page.locator('#aboutBtn').click();
+}
+
 test.describe('the web channel offers what it can deliver, and nothing else', () => {
     test('the archive control is not offered in a browser', async ({ page }) => {
         await gotoApp(page, { state: STATES.seeded });
@@ -440,7 +468,16 @@ test.describe('the native branch offers the archive, and its modal is actually v
     test('the archive control is offered, and the download control is not', async ({ page }) => {
         await gotoApp(page, { state: STATES.seeded });
 
+        // NAV-P1: the archive is offered BEHIND THE MENU on this channel, so the
+        // offer is now two facts rather than one — the menu is there, and the
+        // archive is inside it. Asserted in that order: a menu that failed to
+        // open would otherwise read as an archive that was never offered.
+        await expect(page.locator('#headerMenu')).toBeVisible();
+        await expect(page.locator('#exportBtn')).toBeHidden();
+
+        await page.locator('#menuBtn').click();
         await expect(page.locator('#exportBtn')).toBeVisible();
+
         await expect(page.locator('#apkBtn')).toBeHidden();
 
         // The browser-only sentence does not follow the app inside: on this
@@ -452,7 +489,7 @@ test.describe('the native branch offers the archive, and its modal is actually v
         // `toBeHidden()` true for the wrong reason — an element inside a
         // `display: none` modal is hidden whatever the channel gate decided.
         // Opening it puts the channel branch back in front of the assertion.
-        await page.locator('#aboutBtn').click();
+        await openIntroWindow(page);
         await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
         await expect(page.locator('#webChannelNote')).toHaveCount(1);
         await expect(page.locator('#webChannelNote')).toBeHidden();
@@ -467,6 +504,10 @@ test.describe('the native branch offers the archive, and its modal is actually v
 
         await expect(page.locator('#exportModal')).toBeHidden();
 
+        // NAV-P1 put the control inside the menu; the handler behind it is the
+        // same listener surfaces/export.js has always installed, which is the
+        // point of the relocation being a relocation.
+        await page.locator('#menuBtn').click();
         await page.locator('#exportBtn').click();
 
         await expect(page.locator('#exportModal')).toBeVisible();
@@ -475,6 +516,176 @@ test.describe('the native branch offers the archive, and its modal is actually v
         await page.locator('#exportModalClose').click();
         await expect(page.locator('#exportModal')).toBeHidden();
         await expect(page.locator('#exportModal')).toHaveCSS('display', 'none');
+    });
+});
+
+test.describe('the header menu is the app\'s entry and the web has none (NAV-P1-INV-001)', () => {
+    // WHAT THIS BLOCK IS FOR. NAV-P1 moved two controls without changing what
+    // either of them does, and "without changing" is exactly the kind of claim
+    // that passes by inspection and fails in the hand. So every leg here RUNS
+    // the product: a real page loads, a real control is pressed, and the window
+    // that comes up is the one the handler was always wired to.
+    //
+    // IT ALSO PINS THE PACKET BOUNDARY. The panel carries exactly two rows. The
+    // «Обновление» item belongs to the next packet, together with the first
+    // network call this channel makes and edition v1.3 of the policy (vault
+    // ADR-052 §1); a placeholder row landing early would red here rather than
+    // ship a control that promises something nothing does.
+
+    test.describe('the web channel', () => {
+        test('keeps the header control and is offered no menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            // ANTI-VACUITY: both entries are IN the document on both channels —
+            // one build, one set of bytes (LSC-P1-INV-002). What differs is
+            // which one this channel reveals.
+            await expect(page.locator('#aboutBtn')).toHaveCount(1);
+            await expect(page.locator('#headerMenu')).toHaveCount(1);
+            await expect(page.locator('#menuAboutBtn')).toHaveCount(1);
+
+            await expect(page.locator('#aboutBtn')).toBeVisible();
+            await expect(page.locator('#headerMenu')).toBeHidden();
+            // The hidden attribute is only worth having if the class does not
+            // defeat it — the fourth case of the rule .header-help[hidden]
+            // announced in advance. A missing .header-menu[hidden] rule shows up
+            // here as a menu standing open on the showcase.
+            await expect(page.locator('#headerMenu')).toHaveCSS('display', 'none');
+        });
+
+        test('the header control still opens the intro, unchanged', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#onboardingModal')).toBeHidden();
+            await page.locator('#aboutBtn').click();
+            await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+            await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
+        });
+    });
+
+    test.describe('the native channel', () => {
+        test.beforeEach(async ({ page }) => {
+            await simulateNativeShell(page);
+        });
+
+        test('took the native branch', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+            expect(await page.evaluate(() => window.IS_NATIVE_SHELL)).toBe(true);
+        });
+
+        test('offers the menu and not the header control, with the panel shut', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#headerMenu')).toBeVisible();
+            await expect(page.locator('#menuBtn')).toBeVisible();
+
+            await expect(page.locator('#aboutBtn')).toHaveCount(1);
+            await expect(page.locator('#aboutBtn')).toBeHidden();
+            await expect(page.locator('#aboutBtn')).toHaveCSS('display', 'none');
+
+            // Shut by default, and said so where a screen reader reads it.
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+        });
+
+        test('pressing it opens exactly two named rows, and no third', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+
+            await expect(page.locator('#headerMenuPanel')).toHaveClass(/show/);
+            await expect(page.locator('#headerMenuPanel')).toHaveCSS('display', 'block');
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'true');
+
+            const rows = page.locator('#headerMenuPanel button');
+            await expect(rows).toHaveCount(2);
+            await expect(rows.nth(0)).toHaveAttribute('aria-label', 'О приложении');
+            await expect(rows.nth(1)).toHaveAttribute('aria-label', 'Сохранить архив');
+
+            // The rows are readable, not only reachable: in a list an unlabelled
+            // row says nothing, so the archive's caption is visible here even on
+            // the narrow layout where the header row hides it.
+            await expect(rows.nth(0)).toBeVisible();
+            await expect(rows.nth(1)).toBeVisible();
+            await expect(page.locator('.header-menu-item-label')).toBeVisible();
+            await expect(page.locator('#exportBtn .header-action-label')).toBeVisible();
+        });
+
+        test('«О приложении» opens the intro and closes the menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#onboardingModal')).toBeHidden();
+
+            await page.locator('#menuBtn').click();
+            await page.locator('#menuAboutBtn').click();
+
+            // The same window the web control opens, by the same handler.
+            await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+            await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
+            await expect(page.locator('#onboardingModal h2')).toBeVisible();
+
+            // And the list gets out of the way of what it opened.
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+        });
+
+        test('«Сохранить архив» opens the archive window and closes the menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#exportModal')).toBeHidden();
+
+            await page.locator('#menuBtn').click();
+            await page.locator('#exportBtn').click();
+
+            await expect(page.locator('#exportModal')).toBeVisible();
+            await expect(page.locator('#exportModal')).toHaveCSS('display', 'block');
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+        });
+
+        test('Escape closes the menu and hands the focus back', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            await expect(page.locator('#headerMenuPanel')).toHaveClass(/show/);
+
+            await page.keyboard.press('Escape');
+
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+            // Closing with the keyboard must not lose the place: without the
+            // focus return the next Tab starts from the top of the document.
+            await expect(page.locator('#menuBtn')).toBeFocused();
+        });
+
+        test('a click outside closes the menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            await expect(page.locator('#headerMenuPanel')).toHaveClass(/show/);
+
+            await page.locator('header h1').click({ force: true });
+
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+        });
+    });
+
+    test('the two channels name the intro entry with the SAME string', async ({ page }) => {
+        // THE POLICY QUOTES THIS STRING (vault PDR-035, annotation 2026-08-27),
+        // and app/tests/privacy-page.spec.js reads it off #aboutBtn. If the app's
+        // row drifted from the web control's name, that guard would stay green
+        // while the document named a control half the readers cannot find. This
+        // leg is the half that guard cannot see: it compares the two entries to
+        // each other, in the running page.
+        await gotoApp(page, { state: STATES.seeded });
+
+        const names = await page.evaluate(() => [
+            document.getElementById('aboutBtn').getAttribute('aria-label'),
+            document.getElementById('menuAboutBtn').getAttribute('aria-label'),
+        ]);
+
+        expect(names[0], 'the web control lost its accessible name').toBeTruthy();
+        expect(names[1], 'the menu row lost its accessible name').toBeTruthy();
+        expect(names[1], 'the two channels now name the same window differently').toBe(names[0]);
     });
 });
 
@@ -634,8 +845,10 @@ test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)
             ).toBe(POLICY_PUBLISHED_VALUE);
 
             // The window opens on the control since UIP-P3 — the intro no longer
-            // comes up by itself on a first run, on either channel.
-            await page.locator('#aboutBtn').click();
+            // comes up by itself on a first run, on either channel. Since NAV-P1
+            // the control is not the same one on both: the web keeps the header
+            // button, the app reaches it through the menu.
+            await openIntroWindow(page);
             await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
 
             const link = page.locator('#introPolicyLink');
