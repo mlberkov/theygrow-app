@@ -438,3 +438,137 @@ test.describe('the document is published AND announced (PPR-P3)', () => {
     expect(POLICY_URL.endsWith(ROUTE)).toBe(true);
   });
 });
+
+// THE DOCUMENT NAMES THE CONTROL BY ITS NAME, NOT BY THE SIGN PAINTED ON IT
+// (UIP-P7).
+//
+// Section 1 of the policy tells a parent where the link to the document lives,
+// and one of the two places is a control in the header. Until this packet both
+// sentences named it «?» — the glyph. UIP-P3 changed that glyph to «i» while
+// the control's id, handler, window and accessible name stayed byte-unchanged
+// (`UIP-DL-003` (j)), and the published document went on describing a button
+// that no longer existed under that name for a month.
+//
+// The wording was corrected in place inside edition 1.1 (owner gate decision
+// 2026-08-27) and is now GLYPH-INDEPENDENT: it quotes «О приложении», which is
+// the control's `title`/`aria-label` and the one part of it the product has
+// committed to keeping — the name was deliberately chosen wider than today's
+// contents so that a change BEHIND the button does not change the button.
+//
+// That commitment lived in a decision-log entry and in nothing executable, and
+// this milestone has now been bitten twice by exactly that shape: the effective
+// date at UIP-P6, this control's name here. So the coupling is made a DERIVED
+// one instead of a remembered one, the same move UIP-P2 made for the four date
+// literals. The name is read out of the shell's own markup, and both files must
+// quote that string — rename the control and this reds; edit one file and not
+// the other and this reds too.
+//
+// The second leg is the one that closes a hole this file's pairing has always
+// had: the describe above pairs HEADINGS, the edition block and the history
+// table, and compares no body text at all. The two sentences UIP-P7 edited are
+// body text, so nothing here would have caught them diverging. Rather than
+// pinning them as literals — which would force a test edit on every legitimate
+// reword — the sentences are DERIVED from the Markdown by the name they carry,
+// and each must appear verbatim in the page.
+
+// The tag the shell gives the control that opens the intro window.
+function aboutControlTag(shell) {
+  const tag = /<button\b[^>]*\bid="aboutBtn"[^>]*>/.exec(shell);
+  if (!tag) throw new Error('privacy-page: no #aboutBtn in the shell — the control the policy names is gone');
+  return tag[0];
+}
+
+// Its accessible name, which is what the document quotes.
+function aboutControlName(shell) {
+  const label = /\baria-label="([^"]+)"/.exec(aboutControlTag(shell));
+  if (!label) throw new Error('privacy-page: #aboutBtn carries no aria-label — the document quotes a name the control does not have');
+  return label[1];
+}
+
+// Every sentence of the source document that names the control, in source order.
+// Derived rather than pinned: a reword stays green as long as it lands in BOTH
+// files, and reds the moment it lands in only one.
+function sentencesNaming(source, name) {
+  const quoted = `«${name}»`;
+  return source
+    .split('\n')
+    .flatMap((line) => line.split('. '))
+    .filter((part) => part.includes(quoted))
+    .map((part) => (part.endsWith('.') ? part : `${part}.`));
+}
+
+test.describe('the document names the header control by its name, not its glyph (UIP-P7)', () => {
+  const NAME = aboutControlName(SHELL);
+  const QUOTED = `«${NAME}»`;
+  // The glyph the control carried until UIP-P3, and which both sentences used
+  // to name. Kept as a literal on purpose: it is the defect, not the state.
+  const RETIRED_GLYPH = '«?»';
+
+  test('the shell still carries the control, and it still has the name', () => {
+    // Anti-vacuity for everything below: both legs are comparisons against a
+    // string read out of the shell, and an empty string is contained by
+    // everything.
+    expect(NAME.length, 'the control has an empty accessible name').toBeGreaterThan(0);
+    expect(aboutControlTag(SHELL)).toContain('id="aboutBtn"');
+  });
+
+  test('both files quote the name the control actually carries, twice each', () => {
+    // Counted rather than merely found: section 1 names the control in two
+    // separate paragraphs, and a conversion that dropped one of them would
+    // still contain the string.
+    for (const [what, text] of [[SOURCE_NAME, MARKDOWN], ['app/privacy.html', PAGE_CODE]]) {
+      const occurrences = text.split(QUOTED).length - 1;
+      expect(
+        occurrences,
+        `${what} quotes ${QUOTED} ${occurrences} time(s); section 1 names the control twice. Either the control was renamed in app/index.html and the document was not, or one of the two paired files was edited alone`
+      ).toBe(2);
+    }
+  });
+
+  test('neither file names the control by the glyph UIP-P3 retired', () => {
+    // The negative half, and it is the whole point of the packet: the document
+    // must survive the NEXT change of sign. Comments are stripped from the
+    // page, so its head comment may explain this history without the
+    // explanation reading as the defect.
+    for (const [what, text] of [[SOURCE_NAME, MARKDOWN], ['app/privacy.html', PAGE_CODE]]) {
+      expect(
+        text,
+        `${what} names the header control by a painted character (${RETIRED_GLYPH}) instead of by its accessible name — that is the UIP-P7 defect returning`
+      ).not.toContain(RETIRED_GLYPH);
+    }
+  });
+
+  test('every sentence that names the control says the same thing in both files', () => {
+    // The body-text pairing the describe above does not do, scoped to the
+    // sentences this coupling actually covers.
+    const sentences = sentencesNaming(MARKDOWN, NAME);
+    expect(
+      sentences.length,
+      'no sentence of the source document names the control — the derivation stopped covering anything'
+    ).toBe(2);
+    for (const sentence of sentences) {
+      expect(
+        PAGE_CODE,
+        `the source document says "${sentence}" and app/privacy.html does not — the two files diverged in body text, which the heading pairing cannot see`
+      ).toContain(sentence);
+    }
+  });
+
+  test('the derivation is armed, and proves it on inputs it builds in-run', () => {
+    // Self-proving rather than argued: the same extractors the legs above use
+    // are run over fragments written here, so no shipped file is mutated and
+    // each detector is shown catching the shape it exists for.
+    const SHELL_RENAMED = '<button type="button" id="aboutBtn" aria-label="Справка">x</button>';
+    const SHELL_UNNAMED = '<button type="button" id="aboutBtn">x</button>';
+
+    expect(aboutControlName(SHELL_RENAMED), 'the extractor did not read the name off the tag').toBe('Справка');
+    expect(() => aboutControlName(SHELL_UNNAMED), 'a control with no accessible name passed').toThrow(/no aria-label/);
+    expect(() => aboutControlName('<p>no control here</p>'), 'a shell without the control passed').toThrow(/no #aboutBtn/);
+
+    expect(
+      sentencesNaming(`А. Б ${QUOTED} в. Г.`, NAME),
+      'the sentence extractor did not isolate the sentence carrying the name'
+    ).toEqual([`Б ${QUOTED} в.`]);
+    expect(sentencesNaming('nothing here.', NAME), 'the extractor invented a sentence').toEqual([]);
+  });
+});
