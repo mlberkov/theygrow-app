@@ -3,7 +3,7 @@
 // The privacy policy page, as a property of the tree (PPR-P1).
 //
 // WHAT THIS FILE IS FOR. app/privacy.html is a CONVERSION of the CURRENT
-// edition of the document — docs/privacy-policy-v1.1.md since UIP-P2 — written
+// edition of the document — docs/privacy-policy-v1.2.md since UIP-P8 — written
 // by hand because this repository is buildless by contract: there is no
 // renderer to trust and no build step to blame. A conversion drifts silently:
 // someone fixes a sentence in one file, the other keeps saying the old thing,
@@ -65,7 +65,7 @@ const ROUTE = '/privacy';
 
 // The edition this page converts. Named once; every leg below derives from it,
 // and the "no newer edition on disk" leg is what stops it going stale silently.
-const EDITION = '1.1';
+const EDITION = '1.2';
 const DOCS_DIR = path.join(REPO_ROOT, 'docs');
 const SOURCE_NAME = `privacy-policy-v${EDITION}.md`;
 const SOURCE_DOCUMENT = path.join(DOCS_DIR, SOURCE_NAME);
@@ -570,5 +570,216 @@ test.describe('the document names the header control by its name, not its glyph 
       'the sentence extractor did not isolate the sentence carrying the name'
     ).toEqual([`Б ${QUOTED} в.`]);
     expect(sentencesNaming('nothing here.', NAME), 'the extractor invented a sentence').toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE DOCUMENT SAYS THE APP CANNOT ERASE ONE RECORD, AND THAT IS COUPLED TO THE
+// CODE RATHER THAN REMEMBERED (UIP-P8).
+//
+// Edition 1.1 told a parent, in four places, that they could delete an
+// individual family record in the app, and one of those places named the
+// control to press. No such control exists: surfaces/diary.js states the
+// deferral and its reason, store/records.js says the same thing one layer down,
+// and the shell carries no delete affordance at all. Edition 1.2 corrects the
+// description. What it must not do is go stale in the OTHER direction — the day
+// someone builds the delete surface, this document becomes the last thing
+// anyone remembers instead of the first thing that reds.
+//
+// So the claim is DERIVED from the code that would have to change to falsify
+// it. Every write a surface can perform passes through one door — the mount's
+// store/boot.js export block, which the storage-seam scan already walks — and
+// its web-channel twin core/repo-local.js, whose writers are declared in one
+// place. If a record- or profile-deleting operation ever appears in either, the
+// legs below red and name the document.
+//
+// The second half is the body-text pairing, and it exists because the edition
+// pairing above compares HEADINGS, the edition block and the history table and
+// no body text at all. UIP-P7 measured that hole on two sentences; this is the
+// same measurement on the sentences that carry a data-subject-facing promise.
+// The statements are derived from the Markdown by the stems any wording of them
+// must contain, rather than pinned as literals, so a legitimate reword stays
+// green as long as it lands in BOTH files.
+
+// The mount's store door, as the set of names it exports.
+function doorExports(source, where) {
+  const block = /\bexport\s*\{([^}]*)\}/.exec(source);
+  if (!block) throw new Error(`${where}: no \`export { ... }\` block — the store door cannot be read`);
+  const names = block[1]
+    .split(',')
+    .map((part) => part.trim().split(/\s+as\s+/).pop().trim())
+    .filter(Boolean);
+  if (names.length === 0) throw new Error(`${where}: the store door exports nothing`);
+  return names;
+}
+
+// The web-channel repository's declared writers and readers, by name.
+function declaredFunctions(source, where) {
+  const names = Array.from(source.matchAll(/^export\s+(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm)).map(
+    (m) => m[1]
+  );
+  if (names.length === 0) throw new Error(`${where}: no exported functions — the web repository cannot be read`);
+  return names;
+}
+
+// A name that would put an erasure operation on either surface. Kept as a
+// vocabulary rather than a list of two spellings: the defect is "the app grew a
+// way to erase one thing", and it does not matter what the verb is called.
+const ERASING_OPERATION = /(delete|remove|erase|purge|wipe|destroy|drop|clear|forget)/i;
+
+function erasingOperations(names) {
+  return names.filter((name) => ERASING_OPERATION.test(name));
+}
+
+// Every sentence of the source document that carries one of these stems, in
+// source order. Same extractor shape as sentencesNaming() above, and the same
+// reason: derive the promise, do not pin its wording.
+//
+// TABLE ROWS ARE SKIPPED, and that is not a convenience — it was measured. The
+// change-history row for edition 1.2 describes the same change in the same
+// words, and its Markdown carries the `| version | date |` cells that the page
+// spells as <td>, so pairing it as prose compares two spellings of one row that
+// markdownHistory()/pageHistory() above already compare cell for cell. What is
+// derived here is the document's PROSE promise; the table is somebody else's leg.
+function sentencesWithStem(source, stem) {
+  return source
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('|'))
+    .flatMap((line) => line.split('. '))
+    .filter((part) => part.includes(stem))
+    .map((part) => (part.endsWith('.') ? part : `${part}.`));
+}
+
+test.describe('the document says what the app can erase, and the code is what says it (UIP-P8)', () => {
+  const MOUNT_V9 = currentMount(SHELL);
+  const DOOR_PATH = path.join(APP_ROOT, 'm', MOUNT_V9.dir, 'store', 'boot.js');
+  const WEB_REPO_PATH = path.join(APP_ROOT, 'm', MOUNT_V9.dir, 'core', 'repo-local.js');
+  const DOOR = doorExports(fs.readFileSync(DOOR_PATH, 'utf8'), `m/${MOUNT_V9.dir}/store/boot.js`);
+  const WEB_REPO = declaredFunctions(
+    fs.readFileSync(WEB_REPO_PATH, 'utf8'),
+    `m/${MOUNT_V9.dir}/core/repo-local.js`
+  );
+
+  // The stems the promise is derived by. Deletion is stated in three sections
+  // and the child's own fields in one; each stem is a phrase any honest wording
+  // of that statement has to contain.
+  const NO_RECORD_DELETE = ['отдельной записи', 'отдельную запись'];
+  const NO_CHILD_FIELD_EDIT = 'дата его рождения';
+
+  // The claim shapes edition 1.1 shipped, and which UIP-DL-007 (k) measured as
+  // false. Literals on purpose: they are the defect, not the state.
+  const RETIRED_CLAIMS = [
+    'используйте действие удаления',
+    'удалите их в приложении',
+    'экспортируете и удаляете',
+    'экспорт и удаление',
+    'исправлении, экспорте и удалении',
+    'до их удаления вами в приложении',
+    'удаления пользователем в приложении',
+  ];
+
+  test('both code surfaces were parsed, and they are the ones that would have to change', () => {
+    // Anti-vacuity, and it is not decoration: every leg below is a NEGATIVE —
+    // "no erasing operation is exported" is true of an empty list, of a file
+    // that moved, and of a regex that stopped matching. So the two parsers are
+    // required to have found the operations that are known to be there.
+    expect(DOOR, 'the store door does not export the diary write path — this guard is reading the wrong file').toEqual(
+      expect.arrayContaining(['createRecord', 'overwriteRecord', 'loadRecords', 'appendMark', 'appendChild'])
+    );
+    expect(
+      WEB_REPO,
+      'the web repository does not declare its known writers — this guard is reading the wrong file'
+    ).toEqual(expect.arrayContaining(['createChild', 'markSkill', 'saveHistory']));
+  });
+
+  test('neither the store door nor the web repository offers a way to erase one record or one child', () => {
+    // The property the document states, read off the code that states it. When
+    // the delete surface lands (surfaces/diary.js defers it to L5, with its
+    // reason), this is the leg that reds, and it names the sentences to revisit.
+    for (const [what, names] of [
+      [`m/${MOUNT_V9.dir}/store/boot.js`, DOOR],
+      [`m/${MOUNT_V9.dir}/core/repo-local.js`, WEB_REPO],
+    ]) {
+      expect(
+        erasingOperations(names),
+        `${what} exports an erasure operation, and the published policy says the app has none. Either the document is now false, or the operation is not meant to be on this surface — §3.4 and §8 of ${SOURCE_NAME} are what have to move`
+      ).toEqual([]);
+    }
+  });
+
+  test('both files state the absence, in the same words, and state it where a parent will find it', () => {
+    // Body text, which the edition pairing above does not compare at all.
+    const deletion = NO_RECORD_DELETE.flatMap((stem) => sentencesWithStem(MARKDOWN, stem));
+    expect(
+      deletion.length,
+      `${SOURCE_NAME} states the absence of a per-record deletion in ${deletion.length} sentence(s); the summary, section 3.4 and section 8 each carry one, and a parent who reads only one of the three still has to be told`
+    ).toBeGreaterThanOrEqual(3);
+
+    const childFields = sentencesWithStem(MARKDOWN, NO_CHILD_FIELD_EDIT);
+    expect(
+      childFields.length,
+      `${SOURCE_NAME} does not say what happens to the child's name and birthdate after the profile is created`
+    ).toBeGreaterThanOrEqual(1);
+
+    for (const sentence of [...deletion, ...childFields]) {
+      expect(
+        PAGE_CODE,
+        `the source document says "${sentence}" and app/privacy.html does not — the two files diverged on a data-subject-facing promise, which the heading pairing cannot see`
+      ).toContain(sentence);
+    }
+  });
+
+  test('neither file still carries the claim edition 1.1 shipped', () => {
+    // The negative half. Comments are stripped from the page, so its head
+    // comment may narrate this history without the narration reading as the
+    // defect returning.
+    for (const [what, text] of [[SOURCE_NAME, MARKDOWN], ['app/privacy.html', PAGE_CODE]]) {
+      for (const claim of RETIRED_CLAIMS) {
+        expect(
+          text,
+          `${what} still says "${claim}" — that is the UIP-DL-007 (k) defect returning: the app offers no such action`
+        ).not.toContain(claim);
+      }
+    }
+  });
+
+  test('the derivation is armed, and proves it on inputs it builds in-run', () => {
+    // Self-proving rather than argued: the same parsers and the same detector
+    // are run over fragments written here, so no shipped file is mutated and
+    // each one is shown catching the shape it exists for.
+    const DOOR_WITH_DELETE = 'export {\n  createRecord,\n  deleteRecord,\n  loadRecords,\n};\n';
+    const REPO_WITH_DELETE = 'export function createChild(a) {}\nexport async function removeChild(b) {}\n';
+
+    expect(doorExports(DOOR_WITH_DELETE, 'fixture'), 'the door parser did not read the export block').toEqual([
+      'createRecord',
+      'deleteRecord',
+      'loadRecords',
+    ]);
+    expect(
+      erasingOperations(doorExports(DOOR_WITH_DELETE, 'fixture')),
+      'a store door carrying deleteRecord passed the detector'
+    ).toEqual(['deleteRecord']);
+    expect(
+      erasingOperations(declaredFunctions(REPO_WITH_DELETE, 'fixture')),
+      'a web repository carrying removeChild passed the detector'
+    ).toEqual(['removeChild']);
+    expect(erasingOperations(DOOR), 'the detector fires on the real door, which has no erasure').toEqual([]);
+
+    expect(() => doorExports('const x = 1;\n', 'fixture'), 'a file with no export block passed').toThrow(
+      /no `export \{ \.\.\. \}` block/
+    );
+    expect(() => declaredFunctions('const x = 1;\n', 'fixture'), 'a file with no exports passed').toThrow(
+      /no exported functions/
+    );
+
+    expect(
+      sentencesWithStem('А. Удаления отдельной записи в приложении нет. Г.', 'отдельной записи'),
+      'the sentence extractor did not isolate the sentence carrying the stem'
+    ).toEqual(['Удаления отдельной записи в приложении нет.']);
+    expect(sentencesWithStem('nothing here.', 'отдельной записи'), 'the extractor invented a sentence').toEqual([]);
+    expect(
+      sentencesWithStem('| 1.2 | 28.08.2026 | удаления отдельной записи в приложении нет |', 'отдельной записи'),
+      'a change-history row was pulled into the prose pairing'
+    ).toEqual([]);
   });
 });

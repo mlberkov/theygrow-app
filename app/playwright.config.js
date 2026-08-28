@@ -176,7 +176,7 @@ module.exports = defineConfig({
       // carries no script, that every link it does carry is on a declared
       // allowlist and none of them is its own address (UIP-P2, which replaced
       // the blanket no-<a> rule), and that it still says what the CURRENT
-      // edition — docs/privacy-policy-v1.1.md — says. It is here because all of that is
+      // edition — docs/privacy-policy-v1.2.md — says. It is here because all of that is
       // read from files and boots nothing. What a browser does at the address —
       // that the shell is not served there, that no third party is reached, and
       // that the visit leaves the cached shell alone — is privacy-surface.spec.js
