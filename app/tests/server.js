@@ -81,11 +81,23 @@ const HEADER_RULES = [
     // PPR-P1. Ordered here, ahead of `static` and `root`, for the reason the
     // comment on resolveHeaders() gives: exact locations are matched before the
     // prefix one, and `root` matches everything.
+    //
+    // POL-P1 moved the class off the shell's `public, max-age=3600,
+    // must-revalidate` and onto one no cache may store, for a measured reason
+    // written out in app/nginx.conf: the shell class let the edge and the
+    // browser hold the document for an hour AFTER a release, so a parent could
+    // read edition N while running the app of edition N+1. This value is a
+    // MIRROR of that decision and nothing more — it is the shipped
+    // app/nginx.conf that serves a parent, and the mirror can never witness
+    // what the shipped config does. What pairs them is the drift guard in
+    // app/tests/delivery-contract.spec.js; what observes production is the
+    // owner's curl and the promotion check (docs/RUNBOOK.md § Promotion +
+    // rollback, steps 3 and 4).
     id: 'privacy',
     nginxLocation: '= /privacy',
     test: (p) => p === '/privacy',
     headers: {
-      'Cache-Control': 'public, max-age=3600, must-revalidate',
+      'Cache-Control': 'no-store, max-age=0',
       Vary: 'Accept-Encoding',
     },
   },

@@ -94,13 +94,39 @@ Three places in this file, and the header comment of all three build-configs, us
    - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v10/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v10/app.js"` and `curl -fsSI "$TAG_URL/m/v10/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v10/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at five closes now (`/m/v6/` → `/m/v7/` → `/m/v8/` → `/m/v9/` → `/m/v10/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18), at UIP-P1 for the bump to `/m/v9/` (`CACHE_VERSION` v19), and at NAV-P1 for the bump to `/m/v10/` (`CACHE_VERSION` v20).
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
    - **The privacy policy is served, and served as a document** (added at PPR-P3, `PPR-DL-001` (k); two of the four lines repaired at PPR-P4, `PPR-DL-004`). Nothing in this repository runs the real nginx image — the parity suite drives `app/tests/server.js`, a hand-written mirror — so this is the only place the production response for `/privacy` is ever observed, and the in-app link is not to be trusted until it has been. **That is also why these lines themselves have to be right: two of them were not.** One reported a false red on a clean page and one accepted a `301` without reading where it pointed — which is how `/privacy/` shipped a redirect to an address that does not answer:
-     - `curl -sI "$TAG_URL/privacy"` → `200`, `content-type: text/html`, `cache-control: public, max-age=3600, must-revalidate`, and **not** `immutable`. The document is versioned by its own text and effective date, at one address; an immutable cache class would strand a redaction.
+     - `curl -sI "$TAG_URL/privacy"` → `200`, `content-type: text/html`, `cache-control: no-store, max-age=0`, and **not** `immutable`. **The class changed at POL-P1, and the class it replaced is the reason:** this line used to read `public, max-age=3600, must-revalidate`, which let the edge and the browser keep the document for an hour AFTER a release — a parent reading edition N while running the app of edition N+1. `no-store` forbids storing at all, in every cache including the edge; `max-age=0` is the explicit expiration that stops a cache mishandling `no-store` from computing heuristic freshness off `Last-Modified` (whose value here is the image build). The document is still versioned by its own text and effective date, at one address; an immutable cache class would strand a redaction. **A response with NO `cache-control` at all is a DIFFERENT failure and is read as one:** `add_header` does not apply to the `=404` branch of `try_files /privacy.html =404`, so an unheadered answer means the image shipped **without the document**, not that the cache class failed to apply — check the status line before the header. **Transition:** a copy stored under the OLD class stays fresh for its hour after this promotion too, so the guarantee begins about an hour after the promotion that carries POL-P1, not at the moment of it.
      - `curl -s "$TAG_URL/privacy" | perl -0777 -pe 's/<!--.*?-->//gs' | grep -c '<script'` → `0`. **The comment strip is load-bearing, not tidiness.** `app/privacy.html:14` explains, in the page's own head comment, that the document carries no `<script>` — so the naive `grep -c '<script'` counts that explanation and returns **1** on a perfectly clean page. Measured at PPR-P4 against the tagged revision; the line is corrected, not the page. The static guard does the same strip for the same reason (`app/tests/privacy-page.spec.js:54`), and this line did not. *(No `perl` on the machine? `curl -s "$TAG_URL/privacy" | python3 -c "import re,sys; print(len(re.findall(r'<script', re.sub(r'<!--.*?-->', '', sys.stdin.read(), flags=re.S))))"` counts the same thing.)*
      - `curl -s "$TAG_URL/privacy" | grep -q 'mainTable'` → **no match**. A hit means the catch-all `location /` answered and a parent is reading the skills table under the word «конфиденциальность» — the failure this address had for as long as it was declared and undocumented.
      - `curl -sI "$TAG_URL/privacy/"` → `301` with **`location: /privacy`** — exactly that, origin-relative: no scheme, no host, no `:8080`. **What this line used to say, and what production actually returned (PPR-P4).** It said «`301` to `/privacy`» and accepted the status without reading the address. The tagged revision `sha-e68dc2a` sent `location: http://sha-e68dc2a---child-tracker-service-<hash>-ew.a.run.app:8080/privacy`: nginx composes an absolute `Location` from the request `Host` plus its own `listen` port unless told not to, the scheme it knows behind Cloud Run is `http`, and port 8080 is not exposed — so the spelling a visitor is most likely to type by hand landed nowhere, under the word «конфиденциальность». `absolute_redirect off;` in `app/nginx.conf`'s server block is the repair, and this line is how you see it took.
      - **And that it lands:** `curl -sIL "$TAG_URL/privacy/" | grep -Ei '^(HTTP/|location:|content-type:)'` → a `301` with its relative `location`, then a `200` with `content-type: text/html`. A `301` whose `Location` is unreachable still prints `301` on the line above; following it is the only check that separates the two, and a reachable policy address is what ADR-050 §5 gates the closed test on.
-4. **Promote.** Shift 100% traffic to the just-smoked revision:
-   `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
+4. **Promote — and then MEASURE that the promotion happened.** Shifting traffic is 4.1, one command; **4.2 and 4.3
+   are what say it took**, and they exist because on 2026-08-29 nothing did.
+   1. **Shift 100% traffic to the just-smoked revision:**
+      `gcloud run services update-traffic child-tracker-service --to-latest --region europe-west1`.
+   2. **Read the split back, and check the tag against the merge** (POL-P1):
+      `gcloud run services describe child-tracker-service --region europe-west1 --format 'value(status.traffic)'`
+      — the row carrying **100%** must be the revision tagged `sha-<SHORT_SHA of the merge you just deployed>`.
+      **A brand-new revision sitting at 0% is the DESIGNED deploy state** (`ADR-020`, step 1 above) **and not a
+      fault; the fault is nobody looking.** Measured on 2026-08-29: the `NAV` merge (`22631a5`) created revision
+      `child-tracker-service-00074-dep`, tag `sha-22631a5`, two minutes after the merge at **0%** traffic, while
+      100% stayed on `child-tracker-service-00072-feg` (tag `sha-73115a2`, the pre-merge revision) for about an
+      hour — so the live site served the previous build, **including policy edition 1.2**, while the repository,
+      the merge and the APK all said 1.3. The revision was fine; the promotion had simply not been made, and
+      nothing measured that.
+   3. **Check the LIVE policy document against the image, one command** (POL-P1):
+      `node scripts/check-live-policy-edition.js --origin "$SERVICE_URL" --edge https://theygrow.app/privacy`,
+      where `$SERVICE_URL` is the service's own untagged URL —
+      `gcloud run services describe child-tracker-service --region europe-west1 --format 'value(status.url)'`.
+      Run it **from the revision you promoted**, i.e. with the repository checked out at that merge: it reads the
+      edition out of `app/privacy.html` and the cache class out of `app/nginx.conf`, fetches both addresses, and
+      compares. **Exit `0`** — the live document is the edition this tree ships, in a class no cache may store.
+      **Exit `1`** — it is not: a different edition, a class that permits a stored copy, or the app shell
+      answering the policy address. Do not walk away from a `1`. **Exit `2`** — a tier could not be measured:
+      Cloudflare answers a non-browser client at the apex with a challenge, and **a challenge is not a pass** —
+      open `https://theygrow.app/privacy` in a browser and read «Версия» with your own eyes. The `--origin` tier
+      answers «did the promotion happen» (it bypasses the CDN); the `--edge` tier answers «is the edge still
+      holding an older copy». The check's own failure modes — stale, challenged, shell — are executed on every
+      push by `app/tests/live-policy-check.spec.js`, so what reds here is the tool working, not the tool guessing.
 5. **Check an actually-installed client — not the tagged URL in a fresh browser.** Steps 3–4 smoke a revision from a browser with nothing cached. That is the wrong client for the question this step asks: the people the deploy is *for* already have the app installed, holding a previous generation's shell behind `public, immutable, max-age=2592000`, and whether the new bytes reach them is a property of the update path rather than of the revision. `app/tests/upgrade-path.spec.js` (`EMV-P3-INV-001`) executes that path on every push, but against a **staged** generation assembled from the repo's own bytes — it cannot see which generation a real device is on, or how much of its immutable window has elapsed. This step is the only evidence about those bytes. Perform it at every promotion that ships a new mount version or a new `CACHE_VERSION`.
    1. **Find a qualifying client:** a phone, desktop or browser profile that **had the app installed or opened before this deploy**. A fresh browser does not qualify — it has nothing cached, so it passes whatever the state of the update path.
       **If no such client exists, write `no installed client existed at promotion time` in the promotion note and continue to step 6.** Do not tick this step and do not skip it silently: an unperformable check that leaves no trace is indistinguishable from one that passed.
@@ -403,8 +429,10 @@ decides the order you do things in.
    6. **Re-stage the APK web root** — `node native/tools/stage-webdir.js`. `app/privacy.html` ships in
       both channels and `LSC-P1-INV-002` compares them byte for byte, so an edition published without
       re-staging is red on the native channel and green on the web one.
-   7. **Then step 6 below, before you promote**, because the date you have just written is a guess until
-      the promotion day is chosen. And `docs/INVARIANTS.md` is deliberately NOT edited: `UIP-P2-INV-001`
+   7. **Then step 6 below, before you promote — to VERIFY the four literals, not to pick a day.**
+      *(Rewritten at POL-P1.)* The date you have just written is the edition's own: an edition is written and
+      merged on a day, and that day is what it states. It is not a placeholder waiting for a promotion date,
+      so nothing below re-picks it. And `docs/INVARIANTS.md` is deliberately NOT edited: `UIP-P2-INV-001`
       names no edition filename, by design, so that a new edition costs no invariant edit.
    **The edition and the code it describes go out in ONE promotion, and that is a rule rather than a
    habit** (vault `ADR-020`: nothing reaches people before promotion; vault `ADR-052` §4 states the pairing
@@ -443,10 +471,12 @@ decides the order you do things in.
    with nothing behind it. Nothing in CI can catch that: the token is a statement by you, and
    `FIU-P3-INV-002` checks only that the code obeys it. **If the document is ever withdrawn or moved, set
    this back to `none`** before anything else.
-6. **Re-check the effective date against the day you actually promote, and edit four places if it slipped.**
-   The document states the date it comes into force, and a policy whose stated effective date precedes the
-   day it became readable was never in force when it said it was (`PPR-DL-001` (f)). The literal lives in
-   **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
+6. **Verify the four effective-date literals agree. The edition ALREADY carries its date — this step does
+   not pick one.** *(Rewritten at POL-P1, `POL-DL-001`; what it said before is kept at the end of this step,
+   because the rule changed and a rule that changes silently is the thing this section keeps being bitten by.)*
+   The date belongs to the edition, and is written when the edition is written — the day it is authored and
+   merged. Promotion no longer sets it, so there is nothing here to decide and nothing to edit unless the four
+   literals disagree with each other. The literal lives in **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
    step used to carry (`app/privacy.html:103` and `:263`) had already gone stale to `:107` and `:267`
    by the time anyone read them, which is the failure mode of addressing a moving file by offset:
    - `docs/privacy-policy-v1.3.md` — the header block, the line beginning `**Дата вступления в силу:**`
@@ -466,20 +496,24 @@ decides the order you do things in.
    the version and the date out of the Markdown header, requires the top history row to carry both,
    requires the page to state both, compares the two change-history tables **row for row**, and requires
    the current date to appear exactly twice in the page. Any one of the four literals moved alone is red.
-   **Nothing compares the date to the wall clock** — that judgement is yours, and this step is where it
-   is made. PPR-P3 set edition 1.0 to `23.08.2026`, the day that packet landed. UIP-P2 set edition 1.1 to
-   `26.08.2026` on the same reasoning, and that reasoning was **wrong**: edition 1.1 had reached no reader
-   — the milestone was merged and not promoted (`ADR-020`) — so the day the packet landed was not the day
-   it came into force. UIP-P6 set it to `27.08.2026`, **the day of promotion**, before publication rather
-   than after. UIP-P8 set edition 1.2 to `28.08.2026` on the same rule and for the same reason — the day
-   it is promoted, chosen before publication; if the promotion slips to another day, the four literals
-   move together **before** you promote, not after. **NAV-P2 wrote `29.08.2026` into edition 1.3 as a
-   value it could not know**: the `NAV` milestone opens a PR at its close, so the promotion day was not
-   fixed when the edition was written. Treat that literal as unset until you have picked the day —
-   this step is where it is picked, and edition 1.3 is the first one written several packets before
-   its own promotion rather than in the packet that promotes. **The date this step names is the day the revision reaches a parent, not the day it was
-   written**, and a merged-but-unpromoted revision is corrected here rather than superseded by a new
-   edition.
+   **Nothing compares the date to the wall clock, and since POL-P1 nothing needs to.** **The rule, and how it
+   got here.** PPR-P3 set edition 1.0 to `23.08.2026`, the day that packet landed. UIP-P2 set edition 1.1 to
+   `26.08.2026` on the same reasoning, and that reasoning was judged **wrong** at the time: edition 1.1 had
+   reached no reader — the milestone was merged and not promoted (`ADR-020`) — so the day the packet landed
+   was held not to be the day it came into force. UIP-P6 moved it to `27.08.2026`, **the day of promotion**,
+   and UIP-P8 set edition 1.2 to `28.08.2026` on that same rule; NAV-P2 then wrote `29.08.2026` into edition
+   1.3 several packets before its own promotion, and this step told you to treat that literal as unset until
+   you had picked the day. **POL-P1 ends that.** The promotion-day rule made four literals a thing a human had
+   to move at exactly the right moment, which is the shape this milestone exists to remove — and it was
+   already unpicked in practice: edition 1.3 states `29.08.2026`, the day it was written and merged, and that
+   is the day it is. **What the date names is the EDITION** — when this version of the promise was written —
+   **and what makes it reach a parent is the promotion**, which is now measured rather than remembered
+   (§ *Promotion + rollback*, step 4). **The cost is named rather than hidden:** if a promotion slips past the
+   day the edition states, the document is readable a day after the date it carries. `PPR-DL-001` (f) is what
+   worried about that, and the answer is the measurement — a promotion that lags is now visible on the day it
+   lags, in step 4.2, instead of being paid for by re-dating a document nobody has read yet. **Do not re-date
+   a merged edition to tidy a slipped promotion**: an edition edited after it was written is an edition whose
+   history table no longer records what happened.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
    the document reachable is the obligation; collecting acceptance to the POLICY is not, and is
    deliberately absent. *(Rewritten at PPR-P3: this step also said it "does not build the web channel's
@@ -1477,9 +1511,16 @@ under your thumb, so use it as a parent would rather than as a checklist.
    at NAV-P1. The rule the L2
    note is an instance of, and the one to apply at every future close, is `Module mount` item 1: read the
    current values out of `app/index.html` and `app/sw.js` rather than out of this sentence.)*
-9. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
-   That step asks about a client that had the app *before* this deploy; a fresh browser does not qualify and
-   the honest answer, if no such client exists, is to write that in the note.
+9. **Promote 100% traffic, then MEASURE the promotion**, and perform the installed-client check —
+   **Promotion + rollback**, steps 4–5. That step asks about a client that had the app *before* this deploy; a
+   fresh browser does not qualify and the honest answer, if no such client exists, is to write that in the note.
+   **Two of step 4's sub-steps are not optional and are named here because this sequence used to reach neither**
+   (POL-P1): **4.2** reads the traffic split back and checks that the 100% revision carries the merge's own
+   `sha-` tag — the merge deploys at 0% by design (`ADR-020`), so an unpromoted revision looks exactly like a
+   promoted one from the repository — and **4.3** runs `node scripts/check-live-policy-edition.js`, which
+   compares the LIVE policy document with the edition in the image and fails loudly when they differ. On
+   2026-08-29 the live site served the previous build, policy edition 1.2 included, for about an hour after the
+   `NAV` merge, and nothing in this sequence would have said so.
 10. **The on-device smoke.** *(Rewritten at L3-P4, because L3-P2 removed the premise of the old ordering.)*
    This step used to read "the **transfer** first, then the **diary** — the order is load-bearing, because the
    diary needs a child profile and the transfer is what puts one there". **The in-app transfer offer is gone**
