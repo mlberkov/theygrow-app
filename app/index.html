@@ -108,18 +108,23 @@
     <link rel="stylesheet" href="/m/v10/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v10/ graph — FORTY-TWO today. The count is written here as a series
-         because the series is the point: fifteen at A1-P6, twenty-one once
-         L1-P2 added the native store, forty-six once DIA-P3 added the diary,
-         forty-five once L3-P2 deleted the transfer offer's surface,
+         /m/v10/ graph — FORTY-SEVEN today. The count is written here as a
+         series because the series is the point: fifteen at A1-P6, twenty-one
+         once L1-P2 added the native store, forty-six once DIA-P3 added the
+         diary, forty-five once L3-P2 deleted the transfer offer's surface,
          forty-three once PPR-P2 retired the transfer mechanism (four out) and
          added the consent gate (two in), forty-one once UIP-P1 retired
-         analytics and the consent gate with it (two out), and forty-two since
-         NAV-P1 added the header menu (one in). It had
-         been left at twenty-one through four packets, which read as a claim
-         about the list below rather than as the history it is; the number is
-         only worth carrying if it is the current one, so it is corrected in
-         every packet that moves it rather than left to drift.
+         analytics and the consent gate with it (two out), forty-two since
+         NAV-P1 added the header menu (one in), forty-three once NAV-P2 added
+         the update surface (one in), and forty-seven since NAV-P3 added the
+         surface pager, the hardware back button and the two nav/ declarations
+         they share (four in). It had been left at twenty-one through four
+         packets, which read as a claim about the list below rather than as the
+         history it is; the number is only worth carrying if it is the current
+         one, so it is corrected in every packet that moves it rather than left
+         to drift. (It drifted once more all the same: NAV-P2 added a module and
+         left the word at forty-two, so this line named forty-two over
+         forty-three tags until NAV-P3 counted them.)
 
          Nobody needs to count by hand to check it: app/tests/delivery-contract.
          spec.js asserts this set EQUALS the walked import graph in both
@@ -174,6 +179,10 @@
     <link rel="modulepreload" href="/m/v10/surfaces/channel.js">
     <link rel="modulepreload" href="/m/v10/channel/config.js">
     <link rel="modulepreload" href="/m/v10/surfaces/diary.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/pager.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/back.js">
+    <link rel="modulepreload" href="/m/v10/nav/config.js">
+    <link rel="modulepreload" href="/m/v10/nav/overlays.js">
     <link rel="modulepreload" href="/m/v10/surfaces/export.js">
     <link rel="modulepreload" href="/m/v10/export/run.js">
     <link rel="modulepreload" href="/m/v10/export/build.js">
@@ -288,38 +297,6 @@
                         <path d="M12 11v5"/>
                         <path d="M12 7.5h.01"/>
                     </svg>
-                </button>
-                <!-- Дневник (DIA-P3). Иконка — раскрытая тетрадь с пером:
-                     «записать своими словами», в отличие от галочки в таблице,
-                     которая утверждает про ребёнка. Это разные объекты: отметка
-                     — приписанное утверждение и живёт в неизменяемом журнале,
-                     запись дневника — собственный текст родителя и правится
-                     перезаписью (PDR-026 §4, правило 1).
-
-                     Приходит СКРЫТОЙ и раскрывается только на нативном канале
-                     (surfaces/channel.js): дневник пишется в устройственное
-                     хранилище, а в браузере его нет вообще — store/bridge.js там
-                     инертен по построению (LSC-P1-INV-001). Предлагать действие,
-                     которого на этом канале не происходит, — ровно тот дефект,
-                     который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
-
-                     Ни события аналитики, ни onclick здесь нет — и с UIP-P1
-                     аналитики нет ни на одном канале. -->
-                <button type="button"
-                        class="header-action"
-                        id="diaryBtn"
-                        hidden
-                        title="Дневник"
-                        aria-label="Дневник">
-                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round"
-                         aria-hidden="true" focusable="false">
-                        <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/>
-                        <path d="M20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/>
-                        <path d="M16 3l2 2-4 4h-2V7z"/>
-                    </svg>
-                    <span class="header-action-label">Дневник</span>
                 </button>
                 <!-- Приложение для Android (DIA-P2, ADR-047). Единственный канал
                      распространения — прямой APK со страницы релизов, не
@@ -604,6 +581,51 @@
              второй строки, которую читают все и каждый раз. Правила
              .header-subtitle ушли из app.css вместе с ней: класс без предмета
              — это следующий пакет, который «почему-то не применяется». -->
+        <!-- ПЕРЕКЛЮЧАТЕЛЬ РАЗДЕЛОВ (NAV-P3). ЗДЕСЬ КОНЧАЕТСЯ КНОПКА «ДНЕВНИК»
+             И НАЧИНАЕТСЯ СПИСОК ЭКРАНОВ. До этого пакета дневник был действием
+             в шапке — значок справа, рядом с архивом. Теперь это второй ЭКРАН
+             упорядоченного списка, и попасть в него можно двумя способами:
+             ведением пальца влево по таблице навыков и этими кнопками.
+
+             ЭТИ КНОПКИ — НЕ УКРАШЕНИЕ И НЕ ПОДПИСЬ К ЖЕСТУ. Жест недостижим ни
+             с клавиатуры, ни диктором; приложение, у которого вход в раздел
+             только один и он — движение пальцем, для части родителей просто не
+             имеет этого раздела. Поэтому здесь настоящие <button> в обычном
+             порядке обхода: Tab идёт по ним, Enter и Пробел нажимают, диктор
+             называет их кнопками. Объявлено ровно то, что исполняется.
+
+             ПОРЯДОК СЛЕВА НАПРАВО — ЭТО И ЕСТЬ ПОРЯДОК ЭКРАНОВ, и он один и тот
+             же здесь и в surfaces/pager.js. Самый левый — начальный. Целевая
+             навигация владельца — три экрана, Спросить / Навыки / Дневник, со
+             «Спросить» как начальным; когда третий появится, он встанет СЛЕВА
+             от «Навыков», и ни эта разметка, ни механизм от этого не
+             переписываются. Заготовки «Спросить» здесь нет: строка, которая
+             ничего не делает, — обещание, а не подготовка (тот же довод, по
+             которому NAV-P1 отказался ставить «Обновление» заранее).
+
+             Приходит СКРЫТЫМ и раскрывается только на нативном канале
+             (surfaces/channel.js, shouldOfferSurfacePager): дневник пишется в
+             устройственное хранилище, а в браузере его нет вообще.
+
+             role="tablist"/"tab" здесь НЕ объявлены — по тому же доводу, по
+             которому surfaces/menu.js отказался от role="menu": роль вкладок
+             обещает диктору стрелочную навигацию и одну остановку Tab на весь
+             список, и исполнять это обещание пришлось бы кодом переноса фокуса.
+             Текущий раздел называется через aria-current="page", который
+             surfaces/pager.js ставит там же, где меняет экран.
+
+             Ни onclick, ни телеметрии: счётчика переходов между разделами нет
+             ни на одном канале, и его отсутствие — решение (ADR-013 /
+             контракт §4.7). -->
+        <nav class="surface-nav" id="surfaceNav" hidden aria-label="Разделы приложения">
+            <button type="button"
+                    class="surface-nav-item"
+                    id="surfaceSkillsBtn"
+                    aria-current="page">Навыки</button>
+            <button type="button"
+                    class="surface-nav-item"
+                    id="surfaceDiaryBtn">Дневник</button>
+        </nav>
     </header>
 
 
@@ -886,7 +908,38 @@
     <!-- Модальное окно деталей навыка -->
     <div id="skillModal" class="skill-modal">
         <div class="skill-modal-content">
-            <span class="skill-modal-close" id="skillModalClose">↩</span>
+            <!-- ОДИН КОНТРОЛ С ДВУМЯ СОСТОЯНИЯМИ (NAV-P3, решение владельца
+                 2026-08-29). Здесь стояла стрелка ↩, и она делала два разных
+                 дела под одним знаком: с посещёнными карточками за спиной —
+                 возвращала на предыдущую, без них — закрывала окно. Пакет
+                 убирал стрелки «назад» внутри окон, потому что они
+                 существовали ради неработавшей аппаратной кнопки; здесь
+                 решение иное и принято после того, как механика была измерена:
+                 у этого окна стрелка была ЕДИНСТВЕННЫМ контролом, а на
+                 веб-канале аппаратной кнопки нет, так что простое закрытие
+                 отняло бы шаг назад совсем.
+
+                 Поэтому контрол один и на том же месте, а ЗНАК И ДОСТУПНОЕ ИМЯ
+                 переключаются вместе с тем, что он сделает: × «Закрыть», пока
+                 след пуст, и ↩ «К предыдущей карточке», пока в нём что-то есть
+                 (surfaces/skill-modal.js). В разметке лежит состояние по
+                 умолчанию — окно всегда открывается с пустым следом.
+
+                 СЛЕД — ЭТО ПОСЕЩЁННЫЕ КАРТОЧКИ, а не цепочка предпосылок: в
+                 него попадает каждый переход по любой из трёх разновидностей
+                 ссылок — «Требуемые навыки», «Открывает дальше» и «Откроется,
+                 когда», — то есть он может вести вниз по графу так же, как
+                 вверх.
+
+                 role и tabindex — минимум, который делает объявленное имя
+                 достижимым: имя, которого нельзя достичь и нажать, не имя.
+                 Ни один другой крестик в этом файле не тронут. -->
+            <span class="skill-modal-close"
+                  id="skillModalClose"
+                  role="button"
+                  tabindex="0"
+                  title="Закрыть"
+                  aria-label="Закрыть">&times;</span>
             <div id="skillModalBody"></div>
         </div>
     </div>

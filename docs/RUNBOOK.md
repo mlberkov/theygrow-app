@@ -828,7 +828,8 @@ buildless, as `native/package.json` says.
      auto-open is gone, and with it the whole «close it with ✕ and see whether it stays closed» check this
      step used to carry (that check was written for `FIU-DL-001` debt 14 and stopped being performable when
      `UIP-P3` removed what it was about). Then open the **menu** in the header — the control with three
-     horizontal bars, the only one on the right besides the profile and the diary — and press
+     horizontal bars, and since `NAV-P3` the only one on the right besides the profile, the diary having
+     left the header for the surface switcher below it — and press
      **«О приложении»**: the greeting must open, and it must open again every time you press it. That is
      the same debt as a parent's phone performs it today — a text that never interrupts, reachable always.
    - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** With the
@@ -961,7 +962,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 
 **Diary smoke (owner-run, after installing the APK — DIA-P3).** The instrumented gate presses these same controls, but on a fresh emulator image with an engine that was made full on purpose. What no test can do is read the sentences as a parent reads them, so read them.
 
-1. Open the app and press **Дневник** in the header. On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Press **«Создать профиль»** there and fill it in. **Since UIP-P4 what follows is the packet's whole subject, so read it as a parent would:** the entry form must open **by itself**, with the cursor already in the text field, and it must be the **only** thing on screen — the create window closed, nothing stacked behind or above it. Press **«Закрыть»** (the form's second button says exactly that, and here it closes the window rather than returning to a list): you must be back on the table, with the child's name in the header and nothing else open, and **no entry must have been written**. Now press **Дневник** again: the list is empty and says «Записей пока нет», and «Новая запись» is where it always was. *(The old wording of this step — «Create a profile, reopen: the list is empty…» — described the app before UIP-P4, when nothing happened after a profile was created; it is the symptom the owner found on a device.)* **And when you add a SECOND child later** — the dropdown, «+ Создать новый профиль» — the same form appears for them; write two words and press «Сохранить», then check the entry stands in the **new** child's diary and that the first child's is untouched. Off-device that is `app/tests/diary-save.spec.js`; on a phone it is the only place the real store answers.
+1. Open the app and press **«Дневник»** in the surface switcher under the header. *(Rewritten at `NAV-P3`: the diary was a header button until that packet and is now the second SURFACE of an ordered pager, reached by the switcher or by a left swipe from the skills table. The step named a control that no longer exists.)* On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Press **«Создать профиль»** there and fill it in. **Since UIP-P4 what follows is the packet's whole subject, so read it as a parent would:** the entry form must open **by itself**, with the cursor already in the text field, and it must be the **only** thing on screen — the create window closed, nothing stacked behind or above it. Press **«Закрыть»** (the form's second button says exactly that, and here it closes the window rather than returning to a list): you must be back on the table, with the child's name in the header and nothing else open, and **no entry must have been written**. Now press **«Дневник»** in the switcher again: the list is empty and says «Записей пока нет», and «Новая запись» is where it always was. *(The old wording of this step — «Create a profile, reopen: the list is empty…» — described the app before UIP-P4, when nothing happened after a profile was created; it is the symptom the owner found on a device.)* **And when you add a SECOND child later** — the dropdown, «+ Создать новый профиль» — the same form appears for them; write two words and press «Сохранить», then check the entry stands in the **new** child's diary and that the first child's is untouched. Off-device that is `app/tests/diary-save.spec.js`; on a phone it is the only place the real store answers.
 2. Press **Новая запись**. The day defaults to today. **Set it back a few days** — this is the one product claim the smoke exists for: a parent writes in the evening about the morning, and the entry belongs to the day it is about.
 3. Write two or three sentences and press **Сохранить**. **Three things must happen together:** the window stays open, the list comes back, and the new entry is at the top of it with the day you chose. The window not closing is deliberate (`DIA-DL-005` (g)) — the list is the confirmation.
 4. Press **Изменить** on that entry, change a word and the day, and save again. The list must show **one** entry, corrected. A second entry appearing means an edit has become an append and the diary has silently become a journal — stop and report it.
@@ -1191,7 +1192,7 @@ milestone* step 10 withdrew at L3-P4 and which PPR-P2 made impossible outright b
 mechanism. The current order is: the diary and its search, then the export archive, whose step 9 reads
 the diary entry back out of the archive.)*
 
-1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. *(Since UIP-P4 there is a
+1. **Write an entry.** Press **«Дневник»** in the surface switcher under the header, or swipe left from the skills table. The diary surface opens on the list. *(Rewritten at `NAV-P3`, which took the diary out of the header — see the swipe-and-back smoke below.)* *(Since UIP-P4 there is a
    second way in, and on a fresh install you meet it first: creating the profile opens the entry form by itself.
    That flow has its own step — see the Дневник smoke below — and this one starts after it has been closed.)*
    Press **Новая запись**,
@@ -1245,6 +1246,50 @@ query, so the parent sees their entry rather than an explanation (`DIA-DL-008` (
 them about it; `rebuilt=true` in the signal line above is where an operator reads that it happened. If a
 search that should hit keeps missing across a full restart of the app, that is the case to report — it is
 not a case the parent can fix and not one this procedure has a command for.
+
+### Swiping between surfaces, and the hardware back button — NAV-P3 (owner-run)
+
+**Run this on the phone, after installing the APK, and run it BEFORE the diary smoke below it** — that
+smoke now starts by reaching the diary, and this is the step that says the two ways of reaching it work.
+The instrumented gate presses these same things (`BackButtonTest`), and the parity suite drives the same
+gesture off-device with a mouse; what neither can do is tell you whether it feels like a page turning
+under your thumb, so use it as a parent would rather than as a checklist.
+
+1. **The header no longer has a diary button, and that is the first thing to confirm.** On the right you
+   have the profile and the menu (three bars), and **nothing else**. Under the header there is a row with
+   two names: **Навыки** and **Дневник**, with «Навыки» marked as the one you are on. If you still see a
+   notebook icon in the header, you are running an older build.
+2. **Swipe left on the skills table.** The diary arrives from the right. Swipe **right** anywhere on the
+   diary: you are back on the table, and the switcher's mark has moved back to «Навыки». Do it a few
+   times; nothing should accumulate, and nothing should be left half-open.
+3. **Check that the gesture does not eat the content, which is the half worth being slow about.**
+   Scroll the table **up and down** with an ordinary drag — it must scroll, and must not turn the page,
+   even when your thumb is not perfectly vertical. **Tap** a skill — the card must open, not a page turn.
+   Then open the diary, put the cursor in a text field and drag sideways inside it: you must be selecting
+   text, not leaving the diary.
+4. **The non-gesture way must work too, and for some parents it is the only way.** Press **«Дневник»** in
+   the switcher: the diary opens. Press **«Закрыть»** at the foot of the diary: you are back. If you have
+   a keyboard attached, Tab to those two names and press Enter — both must work, because the swipe reaches
+   nobody who does not use a finger.
+5. **The hardware back button, three presses, in this order — this is the packet.**
+   - Open **«О приложении»** from the menu and press **back**: the window closes, and you are still in the
+     app, still on the skills table.
+   - Open the **diary** and press **back**: you are back on the skills table, and the app is still open.
+   - Now, on the skills table with nothing open, press **back**: the app goes to the background, exactly
+     as any other app does. **There must be no «press again to exit», no confirmation dialog and no
+     toast** — if you meet one, it did not come from this product.
+6. **Open a skill card and follow a link inside it — «Требуемые навыки», «Открывает дальше» or
+   «Откроется, когда», any of the three.** The control in the card's top-right corner changes from **×**
+   to **↩** as soon as there is a card behind you: it says what it will do next. Press **back** (or that
+   control): you return to the previous card, and the sign goes back to **×**. Press **back** again: the
+   card closes. **The trail is of cards you have visited, not of prerequisites** — following «Открывает
+   дальше» puts a card on it just the same, which is what the owner observed and what the measurement
+   confirmed.
+7. **What this smoke cannot reach.** Whether some other handset's WebView cancels a pointer gesture for
+   reasons Chromium on this one does not — the recogniser treats a cancelled pointer as «the browser took
+   this gesture», deliberately, because that is what makes scrolling win. If a page turn ever fails to
+   register on a particular phone, the switcher still works and that is the finding to report, with the
+   handset and its Android version.
 
 ### Closing a milestone: the owner sequence, end to end (L2 / DIA-P4; step 4 added at L3 / FIU-P4)
 
@@ -1358,6 +1403,24 @@ not a case the parent can fix and not one this procedure has a command for.
    `shell-seeded`, `shell-zpd-empty-state`, `shell-zpd-filtered`.
    Expected to come back GREEN, all four: `visual-desktop/header.png`, `visual-mobile/header.png`,
    `visual-mobile/modal-create-profile.png`, `visual-mobile/modal-skill.png`.
+
+   **FOR THE NAV MILESTONE THE SET IS DIFFERENT AND IS ALREADY MEASURED, so do not read the UIP list
+   above as this milestone's expectation.** `NAV-P3` ran both visual projects in the pinned container
+   before handing over: **18 passed, 2 failed** — `visual-desktop/modal-skill.png` and
+   `visual-mobile/modal-skill.png`, and nothing else. Both move for one glyph: the skill window's single
+   control now ships `×` «Закрыть» in its resting state instead of `↩`. Both `header.png` shots came back
+   **GREEN**, which is the load-bearing half of that measurement — `#diaryBtn` left the shell and
+   `#surfaceNav` arrived in the same packet, and both are `display: none` on the web channel, so the
+   rendered header is unchanged. **A finding rather than a re-bless for this milestone:** any third PNG
+   moving, either `header.png` moving, or any red outside the two visual projects. **For `NAV-P3` this step
+   is already DONE and needs no owner run:** both diffs were decoded before re-blessing and each marks a
+   single **23×15 px** region at the skill window's top-right corner — 80 marked pixels at x 946-968,
+   y 89-103 on desktop, 74 at x 347-369, y 46-60 on mobile — which is the control and nothing else, with
+   both canvases unchanged in size, so there is no layout movement anywhere. The two PNGs were re-blessed
+   in the pinned container and both visual projects then came back **20 passed / 0 failed**. The move is an
+   expected consequence of an owner decision (the skill window's control now rests at `×` «Закрыть»), so
+   there was nothing to adjudicate; a **checkpoint is taken only on a clean state**, which is why it was
+   not left open.
 
    **The DOM baselines are NOT part of this step and were re-blessed by the agent at UIP-P1**, because they
    are neither viewport- nor font-metric-dependent and run on the host. **Four moved, in two pairs.**

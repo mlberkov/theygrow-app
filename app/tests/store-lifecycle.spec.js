@@ -144,7 +144,7 @@ test.describe('coming back from the background leaves the parent where they were
         // sees.
         await bootWithStore(page);
         expect(await sqliteCalls(page)).toContain('createConnection');
-        await expect(page.locator('#diaryBtn')).toBeVisible();
+        await expect(page.locator('#surfaceDiaryBtn')).toBeVisible();
     });
 
     test('a return to visibility puts nothing over the parent\u2019s work', async ({ page }) => {
@@ -153,7 +153,7 @@ test.describe('coming back from the background leaves the parent where they were
         // The parent is IN something when the phone locks — the state the
         // owner's report was actually about. A leg that backgrounded an idle
         // table could not tell "nothing opened" from "nothing was there".
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryModal')).toBeVisible();
 
         await goToBackground(page);
@@ -255,7 +255,7 @@ test.describe('the store closes when the page goes away, and comes back when it 
 
         // A parent taps the diary. Nothing about that path knows the store was
         // parked, which is the point: the gate reopens it underneath.
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryModal')).toBeVisible();
         await expect(
             page.locator('#diaryNewBtn'),

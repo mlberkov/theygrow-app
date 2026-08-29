@@ -75,7 +75,7 @@ async function write(page, entry) {
 /** Opens the diary and writes both entries. */
 async function withTwoEntries(page) {
     await bootWithStore(page);
-    await page.locator('#diaryBtn').click();
+    await page.locator('#surfaceDiaryBtn').click();
     await expect(page.locator('#diaryNewBtn')).toBeVisible();
     await write(page, FIRST);
     await write(page, SECOND);
@@ -121,7 +121,7 @@ test.describe('the search narrows the same list, in the same window', () => {
         // found" — a sentence that reads as a fault when the truth is that
         // nothing has been written yet.
         await bootWithStore(page);
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryEmpty')).toBeVisible();
         await expect(page.locator('#diarySearchForm')).toBeHidden();
 
@@ -244,7 +244,7 @@ test.describe('the three empty cases are three different sentences', () => {
 
     test('an empty diary says the source condition and offers no search', async ({ page }) => {
         await bootWithStore(page);
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryEmpty')).toBeVisible();
         await expect(page.locator('#diarySearchEmpty')).toBeHidden();
         await expect(page.locator('#diarySearchStatus')).toBeHidden();

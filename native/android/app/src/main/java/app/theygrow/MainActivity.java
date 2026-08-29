@@ -23,6 +23,13 @@ public class MainActivity extends BridgeActivity {
      * same reason: a plugin registered after the bridge has started is invisible
      * to the WebView that has already loaded.
      *
+     * <p>NAV-P3 ADDS THE THIRD. {@link BackButtonPlugin} intercepts the hardware
+     * back button and hands each press to the page, which is the only place that
+     * knows whether a window is open and which surface the parent is on. Same
+     * rule and same place as the two above, and before {@code super.onCreate} for
+     * the same reason. It ships DISARMED — until the page calls its {@code arm}
+     * method, Back behaves exactly as it did before this packet.
+     *
      * <p>THERE WAS ANOTHER ONE, AND PPR-P2 RETIRED IT. {@code
      * HistoryTransferPlugin} received the browser-to-native history handoff and
      * consumed its Intent here, before the WebView could see it. It is gone with
@@ -35,6 +42,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ExportSinkPlugin.class);
         registerPlugin(BuildInfoPlugin.class);
+        registerPlugin(BackButtonPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

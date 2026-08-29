@@ -82,9 +82,49 @@ function getReadinessHtml(skill, completedSkills) {
     return `<h3>Почему сейчас</h3><p class="readiness readiness-blocked">Откроется, когда будут освоены: ${spans.join(', ')}.</p>`;
 }
 
-// История навигации между модальными окнами навыков (профиль и текущий
+// ИСТОРИЯ ПОСЕЩЁННЫХ КАРТОЧЕК, а не «цепочка предпосылок» (профиль и текущий
 // профиль живут в core/state.js).
-let skillModalHistory = []; // История навигации между модальными окнами навыков
+//
+// ЧТО ЗДЕСЬ НАКАПЛИВАЕТСЯ, ИЗМЕРЕНО, А НЕ ПРЕДПОЛОЖЕНО (NAV-P3). Сюда кладётся
+// КАЖДЫЙ переход с карточки на карточку, по любой из ТРЁХ разновидностей
+// ссылок, которые рисуются одним и тем же классом .prerequisite-skill:
+// «Требуемые навыки» (data-relation=prerequisite), «Открывает дальше»
+// (downstream) и «Откроется, когда» (readiness). То есть след — это посещённые
+// КАРТОЧКИ, и он может вести вниз по графу так же, как вверх. Называть его
+// «шагом по цепочке предпосылок» неверно: владелец наблюдал переход по
+// «Открывает дальше», и чтение обработчика ниже это подтверждает.
+let skillModalHistory = [];
+
+// ОДИН КОНТРОЛ С ДВУМЯ СОСТОЯНИЯМИ (NAV-P3, решение владельца 2026-08-29).
+//
+// Пакет убирал «стрелки назад внутри окон» — они существовали потому, что
+// аппаратная кнопка «назад» не работала, а теперь работает. Здесь решение
+// владельца иное и принято после того, как механика была измерена: у этого окна
+// стрелка была ЕДИНСТВЕННЫМ контролом и делала ДВА разных дела. Заменить её
+// простым закрытием значило бы отнять у веб-канала шаг назад по посещённым
+// карточкам вовсе — на вебе аппаратной кнопки нет. Поэтому контрол остаётся
+// один и на том же месте, но честно называет то, что сделает СЕЙЧАС: знак и
+// доступное имя переключаются вместе.
+const STEP_BACK_GLYPH = '↩';
+const CLOSE_GLYPH = '×';
+const STEP_BACK_NAME = 'К предыдущей карточке';
+const CLOSE_NAME = 'Закрыть';
+
+/**
+ * Приводит контрол окна в состояние, соответствующее следу посещённых карточек.
+ *
+ * Знак и имя ставятся ОДНОЙ функцией и всегда парой: знак, обещающий возврат,
+ * над обработчиком, который закроет окно, — это ровно тот разрыв между видимым
+ * и исполняемым, который стрелка здесь и создавала.
+ */
+function refreshSkillModalControl() {
+    const control = document.getElementById('skillModalClose');
+    if (!control) return;
+    const stepsBack = skillModalHistory.length > 0;
+    control.textContent = stepsBack ? STEP_BACK_GLYPH : CLOSE_GLYPH;
+    control.setAttribute('aria-label', stepsBack ? STEP_BACK_NAME : CLOSE_NAME);
+    control.setAttribute('title', stepsBack ? STEP_BACK_NAME : CLOSE_NAME);
+}
 
 // Модальное окно деталей навыка
 export function openSkillModal(skill, addToHistory = true, source = 'unknown') {
@@ -132,6 +172,7 @@ export function openSkillModal(skill, addToHistory = true, source = 'unknown') {
             `;
 
     modal.style.display = 'block';
+    refreshSkillModalControl();
 }
 
 /**
@@ -148,22 +189,54 @@ export function closeSkillModal(action = 'backdrop') {
     const modal = document.getElementById('skillModal');
     modal.style.display = 'none';
     skillModalHistory = []; // Очистить историю при закрытии
+    // Следующее открытие начинается с пустого следа, значит с «Закрыть». Знак
+    // ставится здесь, а не только при открытии: окно закрывают и щелчком по
+    // фону, и аппаратной кнопкой, и после них контрол не должен остаться
+    // стрелкой до следующего открытия.
+    refreshSkillModalControl();
 }
 
-function navigateBackOrCloseSkillModal() {
+/**
+ * ЕДИНСТВЕННОЕ ДЕЙСТВИЕ КОНТРОЛА ОКНА, и то же самое, что аппаратная кнопка
+ * «назад» делает с этим окном.
+ *
+ * Семантика не изменилась с DIA-времён: есть посещённые карточки — вернуться на
+ * предыдущую; нет — закрыть окно. Изменилось то, что контрол теперь ГОВОРИТ,
+ * какая из двух веток сейчас исполнится (refreshSkillModalControl выше).
+ *
+ * Экспортируется не ради второго вызывающего в продукте, а потому, что
+ * app/tests/behavior.spec.js проверяет обе ветки как поведение; сама
+ * аппаратная кнопка приходит сюда иначе — она НАЖИМАЕТ этот контрол
+ * (nav/overlays.js), поэтому у окна нет второго пути закрытия.
+ */
+export function navigateBackOrCloseSkillModal() {
     if (skillModalHistory.length > 0) {
-        // Есть история — вернуться к предыдущему навыку
+        // Есть след — вернуться к предыдущей ПОСЕЩЁННОЙ карточке; openSkillModal
+        // сама переставит знак, когда след укоротится.
         const previousSkill = skillModalHistory.pop();
         openSkillModal(previousSkill, false, 'back_navigation');
     } else {
-        // История пуста — закрыть модальное окно
+        // След пуст — закрыть окно
         closeSkillModal('close_button');
     }
 }
 
 export function wireSkillModal() {
     // Обработчики модального окна деталей навыка
-    document.getElementById('skillModalClose').addEventListener('click', navigateBackOrCloseSkillModal);
+    const windowControl = document.getElementById('skillModalClose');
+    windowControl.addEventListener('click', navigateBackOrCloseSkillModal);
+    // КЛАВИАТУРА. Контрол — <span>, а не <button>, и таким он приехал из самой
+    // ранней разметки этого продукта. Пока он был безымянным знаком, это было
+    // просто упущение; с NAV-P3 у него есть ДОСТУПНОЕ ИМЯ, которое меняется, —
+    // а имя, которого нельзя достичь и нажать, не имя. role + tabindex + эти
+    // две клавиши — минимум, который делает объявленное исполнимым. Ни один
+    // другой крестик этим пакетом не тронут.
+    windowControl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        navigateBackOrCloseSkillModal();
+    });
+    refreshSkillModalControl();
     document.getElementById('skillModal').addEventListener('click', (e) => {
         if (e.target.id === 'skillModal') {
             closeSkillModal();

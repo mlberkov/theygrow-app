@@ -43,6 +43,8 @@ import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
 import { wireChannel } from './surfaces/channel.js';
 import { offerFirstEntry, wireDiary } from './surfaces/diary.js';
+import { refreshSurfaceNav, wirePager } from './surfaces/pager.js';
+import { wireBack } from './surfaces/back.js';
 import { wireExport } from './surfaces/export.js';
 import { initNativeStore } from './store/boot.js';
 
@@ -92,7 +94,18 @@ async function init(storeOutcome) {
     wireActivities();
     wireOnboarding();
     wireMenu();
-    wireDiary();
+    // ТРЕТЬЕ ИНЖЕКТИРОВАННОЕ ДЕЙСТВИЕ, И ОНО ТОГО ЖЕ ВИДА, ЧТО ДВА ВЫШЕ
+    // (NAV-P3): обратное ребро графа. surfaces/pager.js импортирует
+    // surfaces/diary.js — он открывает и закрывает дневник, — поэтому импорт
+    // обратно замкнул бы настоящий цикл. Дневник получает переставлятель
+    // отметки разделов параметром и не знает, чей он.
+    wireDiary(refreshSurfaceNav);
+    // ЛИСТАТЕЛЬ ПОСЛЕ ДНЕВНИКА, А КНОПКА «НАЗАД» ПОСЛЕ ЛИСТАТЕЛЯ, и это не
+    // вкус. wirePager() спрашивает у дневника, какой экран сейчас; wireBack()
+    // вооружает нативный перехватчик, и с этого мгновения нажатие обязано
+    // застать в странице того, кто его разберёт.
+    wirePager();
+    wireBack();
     wireExport();
     wireSkillCompletion();
 

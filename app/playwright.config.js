@@ -191,7 +191,7 @@ module.exports = defineConfig({
       // Its executing twin — when the request happens and what it is made of,
       // read off the network log of a real page — is update-check.spec.js in
       // `behavior`, and both files say so about each other on purpose.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence|update-contour)\.spec\.js/,
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence|update-contour|overlay-coverage)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -286,7 +286,20 @@ module.exports = defineConfig({
       // the argument diary-save.spec.js records: that project serves a different
       // web root, and a leg that also simulates the shell would vary two things
       // at once.
-      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress|update-check)\.spec\.js/,
+      // NAV-P3 adds surface-pager and back-button, and both are here for the
+      // same reason and by the same argument as the two above them. The pager
+      // claim is a PAIR — the same synthesized drag turns the page inside the
+      // app and does nothing at all in a browser — and «a browser started
+      // nothing» is a fact about listeners that ran and a screen that did or did
+      // not change, which no source scan can carry. The back-button claim is
+      // what the shipped handler does with the very event the plugin sends;
+      // whether a real KEYCODE_BACK produces that event, and whether the third
+      // case actually leaves the app, is BackButtonTest on android-instrumented,
+      // and both files say so about themselves. Neither is in `native` below,
+      // on the argument diary-save.spec.js records: that project serves a
+      // different web root, and a leg that also simulates the shell would vary
+      // two things at once.
+      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress|update-check|surface-pager|back-button)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

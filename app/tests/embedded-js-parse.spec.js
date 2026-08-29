@@ -159,7 +159,11 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DiaryEntryTest.java',
-        line: 1063,
+        // Moved from 1063 by NAV-P3, which replaced the diary control probe in
+        // openCompose() with the surface switcher and its comment. The line is
+        // asserted rather than trusted, so a drift like this one reds and gets
+        // re-read.
+        line: 1068,
         argument: '"window." + slot',
         reason:
             'a chain with a non-literal operand: the async slot name is a Java variable. C3'
@@ -168,9 +172,24 @@ const DECLARED_SKIPS = Object.freeze([
     },
     {
         file: 'DiaryEntryTest.java',
-        line: 1071,
+        // Moved from 1071 by NAV-P3, for the same reason as the entry above.
+        line: 1076,
         argument: 'expression',
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
+    },
+    {
+        file: 'BackButtonTest.java',
+        line: 197,
+        argument: 'expression',
+        reason:
+            "the suite's own pollFor() plumbing, same as BridgeSmokeTest's — this one takes"
+            + ' the expected value as well, and the expression is still the caller argument',
+    },
+    {
+        file: 'BackButtonTest.java',
+        line: 210,
+        argument: 'expression',
+        reason: "the suite's own pollForNonNull() plumbing, same as BridgeSmokeTest's",
     },
     {
         file: 'ExportSinkTest.java',

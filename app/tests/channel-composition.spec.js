@@ -1025,3 +1025,97 @@ test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)
         });
     }
 });
+
+test.describe('the surface switcher belongs to the channel that has a second surface (NAV-P3)', () => {
+    // WHAT THIS BLOCK IS FOR. NAV-P3 removed #diaryBtn from the shell and put
+    // the diary behind a pager whose non-gesture entry is #surfaceNav. That is
+    // a composition change of exactly the kind this file is about: one channel
+    // gains a control, the other must not, and both facts are read off a
+    // rendered page rather than out of the markup.
+    //
+    // WHAT IS NOT HERE, DELIBERATELY. That the GESTURE is unreachable on the
+    // web, and that it turns the page on the app, is
+    // app/tests/surface-pager.spec.js — a claim about pointer events rather
+    // than about composition. That the hardware back button resolves in three
+    // cases is app/tests/back-button.spec.js off-device and BackButtonTest on a
+    // device. Splitting them keeps each file answering one question.
+
+    test('the diary control is gone from the shell entirely', async ({ page }) => {
+        await gotoApp(page, { state: STATES.seeded });
+
+        // ANTI-VACUITY FIRST: a shell that failed to boot would make every
+        // count zero, so a control that IS expected is counted in the same shot.
+        await expect(page.locator('#surfaceNav')).toHaveCount(1);
+        // Not hidden — ABSENT. The button was not folded into the menu and was
+        // not left behind hidden: the gesture and the switcher replace it.
+        await expect(page.locator('#diaryBtn')).toHaveCount(0);
+    });
+
+    test('the web channel is offered no switcher', async ({ page }) => {
+        await gotoApp(page, { state: STATES.seeded });
+
+        await expect(page.locator('#surfaceSkillsBtn')).toHaveCount(1);
+        await expect(page.locator('#surfaceDiaryBtn')).toHaveCount(1);
+
+        await expect(page.locator('#surfaceNav')).toBeHidden();
+        // The hidden attribute is only worth having if the class does not defeat
+        // it — the fifth case of the rule .header-help[hidden] announced in
+        // advance. A missing .surface-nav[hidden] rule shows up here as a
+        // showcase offering a section it does not have.
+        await expect(page.locator('#surfaceNav')).toHaveCSS('display', 'none');
+        await expect(page.locator('#diaryModal')).toBeHidden();
+    });
+
+    test.describe('the native channel', () => {
+        test.beforeEach(async ({ page }) => {
+            await simulateNativeShell(page);
+        });
+
+        test('took the native branch', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+            expect(await page.evaluate(() => window.IS_NATIVE_SHELL)).toBe(true);
+        });
+
+        test('is offered the switcher, and it names the surfaces in order', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#surfaceNav')).toBeVisible();
+
+            // THE ORDER IS THE MECHANISM, NOT DECORATION: leftmost is the start
+            // surface, and the third surface the owner has converged on arrives
+            // by INSERTION at the left end. Pinning the order here is what makes
+            // a rewrite of that list visible.
+            const names = await page.locator('#surfaceNav button').allInnerTexts();
+            expect(names).toEqual(['Навыки', 'Дневник']);
+
+            // Exactly two, and no third: a row that promises a surface which
+            // does not exist is the shape NAV-P1 refused for the update row.
+            await expect(page.locator('#surfaceNav button')).toHaveCount(2);
+        });
+
+        test('the switcher opens the diary and comes back, by pointer and by keyboard', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#diaryModal')).toBeHidden();
+            await expect(page.locator('#surfaceSkillsBtn')).toHaveAttribute('aria-current', 'page');
+
+            await page.locator('#surfaceDiaryBtn').click();
+            await expect(page.locator('#diaryModal')).toBeVisible();
+            await expect(page.locator('#surfaceDiaryBtn')).toHaveAttribute('aria-current', 'page');
+            expect(await page.locator('#surfaceSkillsBtn').getAttribute('aria-current')).toBeNull();
+
+            // Back out through the window's own control, which the pager does
+            // not own and must not desync from: the switcher's mark has to
+            // follow it.
+            await page.locator('#diaryCloseBtn').click();
+            await expect(page.locator('#diaryModal')).toBeHidden();
+            await expect(page.locator('#surfaceSkillsBtn')).toHaveAttribute('aria-current', 'page');
+
+            // AND BY KEYBOARD, which is the whole reason this control exists:
+            // the gesture reaches nobody who does not use one.
+            await page.locator('#surfaceDiaryBtn').focus();
+            await page.keyboard.press('Enter');
+            await expect(page.locator('#diaryModal')).toBeVisible();
+        });
+    });
+});

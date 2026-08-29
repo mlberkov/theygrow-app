@@ -194,6 +194,15 @@ const OFFLINE_URLS = [
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
   '/m/v10/surfaces/diary.js',
+  // NAV-P3 — the surface pager, the hardware back button and the two nav/
+  // declarations they share. Precached with the rest of the graph, not because
+  // the web channel runs any of it (nothing arms the pager there) but because
+  // the import graph reaches them from the entry: an installed client must
+  // never boot offline with a broken graph, and cache.addAll is atomic.
+  '/m/v10/surfaces/pager.js',
+  '/m/v10/surfaces/back.js',
+  '/m/v10/nav/config.js',
+  '/m/v10/nav/overlays.js',
   '/m/v10/surfaces/export.js',
   '/m/v10/export/run.js',
   '/m/v10/export/build.js',

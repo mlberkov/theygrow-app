@@ -13,7 +13,11 @@
 // described and consent/config.js took its place — and UIP-P1 changes the count:
 // analytics leaves the web showcase entirely, consent/config.js retires with it,
 // and the THREE surfaces shipped under this mount are store/, export/ and
-// channel/. The typed versioned surface of ADR-013 is
+// channel/ — FOUR since NAV-P3, which added nav/config.js for the navigation
+// knobs rather than putting a gesture threshold on a surface whose declared
+// subject is the channel composition. (This sentence is corrected here, in a
+// packet that adds no knob to this file, because leaving a count that the same
+// packet falsifies would leave the next reader counting wrong.) The typed versioned surface of ADR-013 is
 // api/theygrow_api/parameters.py, which is server-side and untouched by a
 // device-local packet.
 //

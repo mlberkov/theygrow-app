@@ -239,7 +239,7 @@ test.describe('nothing leaves this app until the row is pressed (NAV-P2-INV-001)
         await page.locator('#exportModalClose').click();
 
         await openMenu(page);
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryModal')).toBeVisible();
         await page.locator('#diaryModalClose').click();
 

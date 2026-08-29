@@ -57,6 +57,23 @@ function el(id) {
 // Запись, которую сейчас правят, или null — тогда «Сохранить» создаёт новую.
 let editingRecordId = null;
 
+// ЧЕМ СООБЩИТЬ ЛИСТАТЕЛЮ, ЧТО ЭКРАН СМЕНИЛСЯ (NAV-P3).
+//
+// Инжектируется из app.js, а не импортируется: surfaces/pager.js импортирует
+// ЭТОТ модуль (он открывает и закрывает дневник), и импорт обратно замкнул бы
+// настоящий цикл. Тот же приём и по той же причине, что у initProfiles() —
+// см. GRAPH SHAPE в app.js.
+//
+// ЗАЧЕМ ВООБЩЕ СООБЩАТЬ. У листателя нет собственного состояния: он вычисляет
+// текущий экран. Но ОТМЕТКУ текущего раздела в переключателе надо переставить
+// в тот момент, когда видимость изменилась, — а меняют её здесь, и четыре из
+// пяти путей (✕, «Закрыть», щелчок по фону, форма первой записи) листателя не
+// зовут вовсе.
+//
+// По умолчанию — пустая функция: на веб-канале переключателя нет, и дневник
+// тоже недостижим, но модуль обязан оставаться исполнимым без него.
+let announceSurfaceChange = () => {};
+
 // Открыто ли это окно ради ПЕРВОЙ записи — сразу после создания профиля (UIP-P4).
 // В этом режиме вторая кнопка формы закрывает ОКНО, а не возвращает к списку:
 // списка за ней нет, он ни разу не отрисовывался, и родитель встретил бы почти
@@ -401,16 +418,29 @@ function showForm({
 export async function openDiaryModal() {
     showList();
     el('diaryModal').classList.add('show');
+    // Класс ставится ДО await — на нём и держится вычисление текущего экрана в
+    // surfaces/pager.js: goTo() зовёт эту функцию и сразу переставляет отметку,
+    // не дожидаясь списка.
+    announceSurfaceChange();
     // clearSearch, а не renderList: окно открывается на всём дневнике, а не на
     // фильтре, который родитель набрал в прошлый раз и уже не видит.
     await clearSearch();
 }
 
-function closeDiaryModal() {
+/**
+ * Закрывает экран дневника.
+ *
+ * ЭКСПОРТИРУЕТСЯ С NAV-P3, и это единственное, что с ней сделал этот пакет:
+ * переход на экран навыков — это и есть закрытие дневника, и листатель зовёт
+ * ЭТУ функцию, а не снимает класс сам. Иначе режим первой записи ниже пережил
+ * бы переход, и кнопка формы значила бы не то, что на ней написано.
+ */
+export function closeDiaryModal() {
     el('diaryModal').classList.remove('show');
     // Режим первой записи не переживает закрытие окна: ✕ и клик по фону — тоже
     // выходы, и после них кнопка формы обязана снова значить «Отмена».
     closesWindow = false;
+    announceSurfaceChange();
 }
 
 /**
@@ -446,6 +476,10 @@ function closeDiaryModal() {
 export function offerFirstEntry() {
     if (whyNotWritable()) return;
     el('diaryModal').classList.add('show');
+    // Пятый путь, меняющий видимость дневника мимо листателя (NAV-P3): форма
+    // приходит сама, за созданием профиля. Отметка раздела переставляется здесь
+    // же, иначе переключатель называл бы экран, с которого родителя уже увели.
+    announceSurfaceChange();
     showForm({ standalone: true });
 }
 
@@ -639,13 +673,19 @@ function startEdit(event) {
     });
 }
 
-export function wireDiary() {
+export function wireDiary(onSurfaceChange = null) {
     // Одно имя — один id, и это не стиль: сканер покрытия .show-правил
     // (app/tests/show-rule-coverage.spec.js) разрешает вызовы по привязкам и
     // отказывается работать, если одно имя связано с двумя элементами.
-    const openButton = el('diaryBtn');
-    if (!openButton) return;
-    openButton.addEventListener('click', openDiaryModal);
+    //
+    // ОХРАНА ПЕРЕЕХАЛА С КНОПКИ НА САМО ОКНО (NAV-P3). До этого пакета она
+    // стояла на #diaryBtn, и это было верно ровно пока кнопка была
+    // единственным входом. Кнопки больше нет — вход теперь жест и переключатель
+    // разделов, — а обязанность у этой функции прежняя: не вешать слушателей на
+    // разметку, которой нет.
+    const diarySurface = el('diaryModal');
+    if (!diarySurface) return;
+    if (onSurfaceChange) announceSurfaceChange = onSurfaceChange;
     el('diaryModalClose').addEventListener('click', closeDiaryModal);
     el('diaryCloseBtn').addEventListener('click', closeDiaryModal);
     el('diaryNewBtn').addEventListener('click', () => showForm());
