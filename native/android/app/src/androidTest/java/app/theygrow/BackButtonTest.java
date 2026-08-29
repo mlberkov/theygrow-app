@@ -55,6 +55,30 @@ import org.junit.runner.RunWith;
  * the foreground. Restating the platform's own rule here would be the second
  * copy of it that the plugin refuses to keep.
  *
+ * <p>WHAT THE FIRST OBSERVATION OF THIS LEG MEASURED, AND WHY THE GATE MOVED
+ * (NAV-P5). Run 33251376412, on PR #36, is the only time this file has ever run
+ * on CI, and it observed NONE of the three cases: it failed in SETUP, before the
+ * first {@link #pressBack()}. The gate was {@code #surfaceNav}, which {@code
+ * wireChannel()} un-hides in the {@code DOMContentLoaded} handler — PHASE ONE,
+ * before any data. What the leg then drives is {@code #menuAboutBtn}, whose
+ * listener {@code wireMenu()} attaches inside {@code init()} — PHASE TWO, behind
+ * {@code await Promise.all([kbReady, initNativeStore()])}. A cold SQLite open put
+ * 2405 ms between the two, so the clicks landed about 1.7 s before {@code init()}
+ * began, on a menu nothing had been wired to; {@code pollFor} then polled the
+ * assertion for thirty seconds without ever repeating the act. The gate did not
+ * gate what the leg drives.
+ *
+ * <p>SO THE GATE IS THE BOOT SENTINEL, AND THAT IS AN ARGUMENT RATHER THAN A
+ * PREFERENCE. {@code buildTableBody()} runs at {@code app.js:75}, {@code
+ * wireMenu()} at {@code :96} and {@code wirePager()} at {@code :107}, and there
+ * is NO {@code await} between them — the whole wiring block is one synchronous
+ * continuation, and an {@code evaluateJavascript} probe cannot observe the
+ * document in the middle of it. If the poller can see a row, everything this leg
+ * presses has already been wired. NOTHING IS RELAXED BY THE MOVE: the timeout is
+ * not raised, no act is retried, and no failure is caught. A retry loop would
+ * have made this leg tolerate a menu that is never wired at all, which is the one
+ * thing this repair must not be.
+ *
  * <p>And, as everywhere in this directory: the emulator is not the family's
  * phone. This is one image, and {@code android-instrumented} is not a per-push
  * gate, so a regression here can arrive several commits after its cause.
@@ -64,6 +88,27 @@ public class BackButtonTest {
 
     private static final long TIMEOUT_MS = 30_000;
     private static final long POLL_MS = 250;
+
+    /**
+     * The boot sentinel: a DOM fact the app's OWN modules produce (EMV-DL-006).
+     *
+     * <p>Deliberately identical to the spelling in {@code BridgeSmokeTest},
+     * {@code DiaryEntryTest}, {@code ExportTransferTest}, {@code
+     * StoreLifecycleTest} and {@code WebViewStorageTest}, and deliberately
+     * duplicated rather than extracted: pulling it into a shared helper would
+     * edit five tests that pass in order to repair one that does not. The copies
+     * point at each other, and retiring the duplication stays where {@code
+     * EMV-DL-006} left it.
+     *
+     * <p>Rows carry {@code data-skill-id} from {@code surfaces/table.js}, and
+     * {@code app.js} renders them only after {@code Promise.all([kbReady,
+     * initNativeStore()])} resolves — so a row proves the module graph EVALUATED
+     * and the store's own boot call already returned. {@code document.readyState}
+     * would not do: it says the parser finished, and the parser finishing is not
+     * the app having run.
+     */
+    private static final String BOOTED =
+            "document.querySelectorAll('#tableBody tr[data-skill-id]').length > 0";
 
     /** True while the greeting window is on screen. */
     private static final String GREETING_OPEN =
@@ -81,24 +126,54 @@ public class BackButtonTest {
                     "function",
                     pollForNonNull(scenario, "typeof window.Capacitor.nativePromise"));
 
-            // The app booted far enough to have a pager at all: the switcher is
-            // rendered, which only happens on the native branch.
+            // THE READINESS GATE, AND IT IS A PHASE-TWO FACT (NAV-P5; see the
+            // class comment). Not `#surfaceNav`, which is true of a document
+            // whose modules have not run yet.
+            assertEquals(
+                    "the app never finished booting: no skill row was ever rendered",
+                    "true",
+                    pollFor(scenario, BOOTED, "true"));
+
+            // The pager exists at all — READ ONCE, as a check on the channel
+            // rather than as a wait. The sentinel above already establishes the
+            // time; what this still carries and the sentinel does not is that
+            // `surfaces/channel.js` revealed the switcher, which it does only on
+            // the native branch. A browser-shaped build reds here by name.
             assertEquals(
                     "the surface switcher never rendered, so this is not the app under test",
                     "true",
-                    pollFor(
+                    evaluate(
                             scenario,
-                            "document.getElementById('surfaceNav').offsetParent !== null",
-                            "true"));
+                            "document.getElementById('surfaceNav').offsetParent !== null"));
+
+            // THE DOCUMENT IS CLEARED OF WHAT THE APP OPENED BY ITSELF, AND
+            // THE STATE IS ASSERTED RATHER THAN ASSUMED (NAV-P5). A fresh
+            // install has no child, so `offerProfileIfNone()` opens
+            // #createProfileModal at the end of init() — measured on the
+            // emulator, not deduced. That window is DECLARED (nav/overlays.js
+            // row 5) and the greeting is row 1, and `topmostOpenOverlay()` scans
+            // the table backwards: with both open, the first press closes the
+            // create-profile window and the greeting stays put. The leg would
+            // then red at «back did not close the open window» — accusing a
+            // product that had done exactly what NAV-P3-INV-001 says. Case one
+            // says «a window is open»; it has to be THIS window and no other.
+            assertEquals(
+                    "something the app opened by itself is still on screen, so the first press"
+                            + " would be answered by the wrong window",
+                    "clear",
+                    clearWhatTheAppOpenedByItself(scenario));
 
             // ---- CASE ONE: a window is open -------------------------------
-            evaluate(
-                    scenario,
-                    "(function () {"
-                        + "document.getElementById('menuBtn').click();"
-                        + "document.getElementById('menuAboutBtn').click();"
-                        + "return 'opened';"
-                        + "})()");
+            //
+            // THE ACT REPORTS WHETHER IT WAS PERFORMED, on the shape
+            // DiaryEntryTest.openCompose() already uses. Without it an unwired
+            // menu reds as «the greeting never opened» — an accusation aimed at
+            // openOnboardingModal(), which is the wrong file, and is exactly what
+            // run 33251376412 printed about a menu that had not been wired yet.
+            assertEquals(
+                    "the menu never led to the greeting",
+                    "pressed",
+                    openGreetingFromTheMenu(scenario));
             assertEquals("the greeting never opened", "true", pollFor(scenario, GREETING_OPEN, "true"));
             assertEquals(
                     "the diary was already open before the first press",
@@ -122,7 +197,10 @@ public class BackButtonTest {
                     scenario.getState());
 
             // ---- CASE TWO: off the start surface --------------------------
-            evaluate(scenario, "document.getElementById('surfaceDiaryBtn').click(); 'pressed'");
+            assertEquals(
+                    "the surface switcher offered no way to the diary",
+                    "pressed",
+                    openTheDiarySurface(scenario));
             assertEquals(
                     "the diary surface never came up",
                     "true",
@@ -156,6 +234,97 @@ public class BackButtonTest {
                     Lifecycle.State.RESUMED,
                     scenario.getState());
         }
+    }
+
+    // --- the acts a parent performs -----------------------------------------
+
+    /**
+     * Opens the header menu and presses «О приложении», saying which step failed
+     * when one does.
+     *
+     * <p>FOUR ANSWERS, NOT TWO, and the middle one is the reason. The panel is
+     * {@code display: none} until it carries {@code .show}, so before the toggle
+     * fires {@code #menuAboutBtn.offsetParent} is null whatever the cause — a row
+     * missing from the shell and a toggle whose listener never attached are
+     * indistinguishable at that instant. Checking the toggle's EFFECT in between
+     * separates them: {@code menu-shut} is a handler defect and {@code no-about}
+     * is a composition defect, and they are repaired in different files.
+     *
+     * <p>It is performed ONCE. Pressing again until the greeting appears would
+     * turn this leg into one that passes against an app whose menu is wired
+     * eventually, or never.
+     */
+    private String openGreetingFromTheMenu(ActivityScenario<MainActivity> scenario) {
+        return evaluate(
+                scenario,
+                "(function () {"
+                    + "var toggle = document.getElementById('menuBtn');"
+                    + "if (!toggle || toggle.offsetParent === null) { return 'no-menu'; }"
+                    + "toggle.click();"
+                    + "var panel = document.getElementById('headerMenuPanel');"
+                    + "if (!panel || panel.offsetParent === null) { return 'menu-shut'; }"
+                    + "var about = document.getElementById('menuAboutBtn');"
+                    + "if (!about || about.offsetParent === null) { return 'no-about'; }"
+                    + "about.click();"
+                    + "return 'pressed';"
+                    + "})()");
+    }
+
+    /**
+     * Presses the close control of the window a FRESH INSTALL opens by itself,
+     * and reports what is still open afterwards.
+     *
+     * <p>Dismissed through the shell's OWN control — {@code #cancelProfile}, the
+     * closer {@code nav/overlays.js} declares for that window — rather than by
+     * stripping a class off an element: a fixture that reached into the DOM
+     * would leave the module's own state saying the window is open, and the next
+     * press would be answered by it anyway.
+     *
+     * <p>NOT by seeding a child to stop the window appearing. That would put a
+     * store write in a leg that has nothing to do with the store, and it would
+     * make the premise depend on a fixture rather than on an observation.
+     *
+     * <p>The answer names every element still carrying the reveal class, so a
+     * red says WHICH window stood in the way instead of leaving the next reader
+     * to take a logcat apart for it. The selector is {@code .show} rather than
+     * {@code .modal.show} because the greeting is an {@code .onboarding-modal}
+     * and would be missed by the narrower one.
+     */
+    private String clearWhatTheAppOpenedByItself(ActivityScenario<MainActivity> scenario) {
+        return evaluate(
+                scenario,
+                "(function () {"
+                    + "var offered = document.getElementById('createProfileModal');"
+                    + "var cancel = document.getElementById('cancelProfile');"
+                    + "if (offered && offered.classList.contains('show') && cancel) {"
+                    + " cancel.click(); }"
+                    + "var open = Array.prototype.map.call(document.querySelectorAll('.show'),"
+                    + " function (element) { return element.id || element.className; });"
+                    + "return open.length ? 'open:' + open.join(',') : 'clear';"
+                    + "})()");
+    }
+
+    /**
+     * Presses the diary entry in the surface switcher.
+     *
+     * <p>Self-reporting for the same reason as the act above, and it is the same
+     * defect one case further down: the old form pressed the element
+     * unconditionally, so an absent control threw inside the WebView and the leg
+     * red two assertions later at «the diary surface never came up» — a surface
+     * accused of not opening by a press that never happened. The probe asks
+     * whether the control is RENDERED rather than whether it carries {@code
+     * hidden}, because its container carries the attribute and it does not
+     * (DiaryEntryTest.openCompose()).
+     */
+    private String openTheDiarySurface(ActivityScenario<MainActivity> scenario) {
+        return evaluate(
+                scenario,
+                "(function () {"
+                    + "var open = document.getElementById('surfaceDiaryBtn');"
+                    + "if (!open || open.offsetParent === null) { return 'not-offered'; }"
+                    + "open.click();"
+                    + "return 'pressed';"
+                    + "})()");
     }
 
     // --- the platform press -------------------------------------------------
