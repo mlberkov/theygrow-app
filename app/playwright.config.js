@@ -176,12 +176,22 @@ module.exports = defineConfig({
       // carries no script, that every link it does carry is on a declared
       // allowlist and none of them is its own address (UIP-P2, which replaced
       // the blanket no-<a> rule), and that it still says what the CURRENT
-      // edition — docs/privacy-policy-v1.2.md — says. It is here because all of that is
+      // edition — docs/privacy-policy-v1.3.md — says. It is here because all of that is
       // read from files and boots nothing. What a browser does at the address —
       // that the shell is not served there, that no third party is reached, and
       // that the visit leaves the cached shell alone — is privacy-surface.spec.js
       // in `behavior`, deliberately not this one.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence)\.spec\.js/,
+      // NAV-P2 adds one: update-contour, the static half of the packet that gives
+      // this app its first outbound request. Two of its claims are ABSENCES over
+      // the tree, which is the admissible static kind (AGENTS.md §11) and is why
+      // it is here — that the update surface has ONE address and no second
+      // request primitive, and that it writes no text at all, so a message
+      // carrying anything about the family has nowhere to come from. A running
+      // page could only show that the messages it happened to display were clean.
+      // Its executing twin — when the request happens and what it is made of,
+      // read off the network log of a real page — is update-check.spec.js in
+      // `behavior`, and both files say so about each other on purpose.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence|update-contour|overlay-coverage)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -261,7 +271,52 @@ module.exports = defineConfig({
       // observer must record a request that IS expected, or a zero means only
       // that the instrument saw nothing. Its static half — that the vocabulary
       // is absent from the tree — is in `contract` as analytics-absence.
-      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress)\.spec\.js/,
+      // NAV-P2 adds update-check, and it is the packet's real deliverable: this
+      // app now makes ONE outbound request, and both halves of that — that it
+      // happens on a press and nowhere else, and that it carries no credential
+      // and no identifier — are claims about a request a browser did or did not
+      // make. That is the definition of a claim no source scan can carry, and it
+      // is the instrument vault ADR-052 §4 names, borrowed from analytics-egress
+      // above. Every leg carries its own anti-vacuity assertion on the same
+      // observer: the document and the knowledge base must both have been
+      // recorded, or a zero means only that the instrument saw nothing. Nothing
+      // in it dials out — one catch-all route over every off-origin address
+      // either fulfils the answer the leg is about or aborts, and the RECORDING
+      // is the evidence rather than the abort. It is NOT in `native` below, on
+      // the argument diary-save.spec.js records: that project serves a different
+      // web root, and a leg that also simulates the shell would vary two things
+      // at once.
+      // NAV-P3 adds surface-pager and back-button, and both are here for the
+      // same reason and by the same argument as the two above them. The pager
+      // claim is a PAIR — the same synthesized drag turns the page inside the
+      // app and does nothing at all in a browser — and «a browser started
+      // nothing» is a fact about listeners that ran and a screen that did or did
+      // not change, which no source scan can carry. The back-button claim is
+      // what the shipped handler does with the very event the plugin sends;
+      // whether a real KEYCODE_BACK produces that event, and whether the third
+      // case actually leaves the app, is BackButtonTest on android-instrumented,
+      // and both files say so about themselves. Neither is in `native` below,
+      // on the argument diary-save.spec.js records: that project serves a
+      // different web root, and a leg that also simulates the shell would vary
+      // two things at once.
+      // NAV-P4 adds profile-gate, and it is here for the reason its own header
+      // gives. Its subject is a pair of doors — the activities control and a
+      // skill mark, with no child — and the claim is that they open the SAME
+      // window and that nothing on the screen answers «Все навыки освоены» when
+      // there is no child to say it about. Which element became visible, and
+      // that exactly one of it exists, are facts about a rendered page and
+      // handlers that ran; a source scan can see the call and cannot see either.
+      // Its static half — that the surface REUSES the shipped opener rather than
+      // carrying a second copy of the reveal — lives in the same file rather
+      // than in `contract`, labelled as static where it stands, because the two
+      // halves are about one decision and splitting them across projects would
+      // hide that the runtime half deliberately does not carry it. It is NOT in
+      // `native` below, on the argument diary-save.spec.js records: that project
+      // serves a different web root, and a leg that also varied the channel
+      // would vary two things at once — and this path has no channel branch at
+      // all, which is what makes the web channel the right place to make the
+      // claim.
+      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress|update-check|surface-pager|back-button|profile-gate)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

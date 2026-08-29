@@ -105,20 +105,26 @@
          историю бампов маунта в том же шаге), и одна проверка, которая краснеет
          вместо ложной красноты в день промоушена, дешевле пятого раза. -->
     <title>TheyGrow</title>
-    <link rel="stylesheet" href="/m/v9/app.css">
+    <link rel="stylesheet" href="/m/v10/app.css">
 
     <!-- Module delivery hints (A1-P6, A1-DL-007). Every NON-ENTRY module of the
-         /m/v9/ graph — FORTY-ONE today. The count is written here as a series
-         because the series is the point: fifteen at A1-P6, twenty-one once
-         L1-P2 added the native store, forty-six once DIA-P3 added the diary,
-         forty-five once L3-P2 deleted the transfer offer's surface,
+         /m/v10/ graph — FORTY-SEVEN today. The count is written here as a
+         series because the series is the point: fifteen at A1-P6, twenty-one
+         once L1-P2 added the native store, forty-six once DIA-P3 added the
+         diary, forty-five once L3-P2 deleted the transfer offer's surface,
          forty-three once PPR-P2 retired the transfer mechanism (four out) and
-         added the consent gate (two in), and forty-one since UIP-P1 retired
-         analytics and the consent gate with it (two out). It had
-         been left at twenty-one through four packets, which read as a claim
-         about the list below rather than as the history it is; the number is
-         only worth carrying if it is the current one, so it is corrected in
-         every packet that moves it rather than left to drift.
+         added the consent gate (two in), forty-one once UIP-P1 retired
+         analytics and the consent gate with it (two out), forty-two since
+         NAV-P1 added the header menu (one in), forty-three once NAV-P2 added
+         the update surface (one in), and forty-seven since NAV-P3 added the
+         surface pager, the hardware back button and the two nav/ declarations
+         they share (four in). It had been left at twenty-one through four
+         packets, which read as a claim about the list below rather than as the
+         history it is; the number is only worth carrying if it is the current
+         one, so it is corrected in every packet that moves it rather than left
+         to drift. (It drifted once more all the same: NAV-P2 added a module and
+         left the word at forty-two, so this line named forty-two over
+         forty-three tags until NAV-P3 counted them.)
 
          Nobody needs to count by hand to check it: app/tests/delivery-contract.
          spec.js asserts this set EQUALS the walked import graph in both
@@ -129,7 +135,7 @@
 
          modulepreload FETCHES AND COMPILES; it does not evaluate. It creates no
          evaluation root, so the graph is still evaluated in post-order from the
-         deferred <script type="module" src="/m/v9/app.js"> below, in exactly the
+         deferred <script type="module" src="/m/v10/app.js"> below, in exactly the
          order it was before. Nothing here changes behaviour.
 
          The two entries (app.js, sw-register.js) are deliberately NOT hinted:
@@ -142,47 +148,53 @@
 
          Order mirrors OFFLINE_URLS in app/sw.js so the two lists diff by eye.
          On a mount bump, repoint EVERY href — see docs/RUNBOOK.md. -->
-    <link rel="modulepreload" href="/m/v9/core/kb-boot.js">
-    <link rel="modulepreload" href="/m/v9/core/state.js">
-    <link rel="modulepreload" href="/m/v9/core/storage.js">
-    <link rel="modulepreload" href="/m/v9/core/repo-local.js">
-    <link rel="modulepreload" href="/m/v9/core/signals.js">
-    <link rel="modulepreload" href="/m/v9/core/dom-utils.js">
-    <link rel="modulepreload" href="/m/v9/core/format.js">
-    <link rel="modulepreload" href="/m/v9/core/zpd.js">
-    <link rel="modulepreload" href="/m/v9/core/urgency.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/table.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/skill-completion.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/zpd-filter.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/skill-modal.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/profile.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/activities.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/onboarding.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/accordion.js">
-    <link rel="modulepreload" href="/m/v9/store/boot.js">
-    <link rel="modulepreload" href="/m/v9/store/store.js">
-    <link rel="modulepreload" href="/m/v9/store/journal.js">
-    <link rel="modulepreload" href="/m/v9/store/repo-journal.js">
-    <link rel="modulepreload" href="/m/v9/store/import-legacy.js">
-    <link rel="modulepreload" href="/m/v9/store/records.js">
-    <link rel="modulepreload" href="/m/v9/store/bridge.js">
-    <link rel="modulepreload" href="/m/v9/store/config.js">
-    <link rel="modulepreload" href="/m/v9/store/errors.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/channel.js">
-    <link rel="modulepreload" href="/m/v9/channel/config.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/diary.js">
-    <link rel="modulepreload" href="/m/v9/surfaces/export.js">
-    <link rel="modulepreload" href="/m/v9/export/run.js">
-    <link rel="modulepreload" href="/m/v9/export/build.js">
-    <link rel="modulepreload" href="/m/v9/export/readout.js">
-    <link rel="modulepreload" href="/m/v9/export/sink.js">
-    <link rel="modulepreload" href="/m/v9/export/text.js">
-    <link rel="modulepreload" href="/m/v9/export/readme.js">
-    <link rel="modulepreload" href="/m/v9/export/zip.js">
-    <link rel="modulepreload" href="/m/v9/export/pdf.js">
-    <link rel="modulepreload" href="/m/v9/export/ttf.js">
-    <link rel="modulepreload" href="/m/v9/export/config.js">
-    <link rel="modulepreload" href="/m/v9/export/errors.js">
+    <link rel="modulepreload" href="/m/v10/core/kb-boot.js">
+    <link rel="modulepreload" href="/m/v10/core/state.js">
+    <link rel="modulepreload" href="/m/v10/core/storage.js">
+    <link rel="modulepreload" href="/m/v10/core/repo-local.js">
+    <link rel="modulepreload" href="/m/v10/core/signals.js">
+    <link rel="modulepreload" href="/m/v10/core/dom-utils.js">
+    <link rel="modulepreload" href="/m/v10/core/format.js">
+    <link rel="modulepreload" href="/m/v10/core/zpd.js">
+    <link rel="modulepreload" href="/m/v10/core/urgency.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/table.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/skill-completion.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/zpd-filter.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/skill-modal.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/profile.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/activities.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/onboarding.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/accordion.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/menu.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/update.js">
+    <link rel="modulepreload" href="/m/v10/store/boot.js">
+    <link rel="modulepreload" href="/m/v10/store/store.js">
+    <link rel="modulepreload" href="/m/v10/store/journal.js">
+    <link rel="modulepreload" href="/m/v10/store/repo-journal.js">
+    <link rel="modulepreload" href="/m/v10/store/import-legacy.js">
+    <link rel="modulepreload" href="/m/v10/store/records.js">
+    <link rel="modulepreload" href="/m/v10/store/bridge.js">
+    <link rel="modulepreload" href="/m/v10/store/config.js">
+    <link rel="modulepreload" href="/m/v10/store/errors.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/channel.js">
+    <link rel="modulepreload" href="/m/v10/channel/config.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/diary.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/pager.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/back.js">
+    <link rel="modulepreload" href="/m/v10/nav/config.js">
+    <link rel="modulepreload" href="/m/v10/nav/overlays.js">
+    <link rel="modulepreload" href="/m/v10/surfaces/export.js">
+    <link rel="modulepreload" href="/m/v10/export/run.js">
+    <link rel="modulepreload" href="/m/v10/export/build.js">
+    <link rel="modulepreload" href="/m/v10/export/readout.js">
+    <link rel="modulepreload" href="/m/v10/export/sink.js">
+    <link rel="modulepreload" href="/m/v10/export/text.js">
+    <link rel="modulepreload" href="/m/v10/export/readme.js">
+    <link rel="modulepreload" href="/m/v10/export/zip.js">
+    <link rel="modulepreload" href="/m/v10/export/pdf.js">
+    <link rel="modulepreload" href="/m/v10/export/ttf.js">
+    <link rel="modulepreload" href="/m/v10/export/config.js">
+    <link rel="modulepreload" href="/m/v10/export/errors.js">
 </head>
 <body>
     <!-- PWA Update Available Banner -->
@@ -222,22 +234,29 @@
                         <!-- Профили будут добавлены динамически -->
                     </div>
                 </div>
-                <!-- О ПРИЛОЖЕНИИ (L3-P3; значок сменён в UIP-P3). Постоянный вход
-                     во вступительное окно, на ОБОИХ каналах и без объявлений: он
-                     не предлагает действия, которого канал не выполняет, — он
+                <!-- О ПРИЛОЖЕНИИ (L3-P3; значок сменён в UIP-P3, перерисован в
+                     NAV-P1). Постоянный вход во вступительное окно — он не
+                     предлагает действия, которого канал не выполняет, он
                      открывает текст, который лежит в тех же байтах.
 
-                     С UIP-P3 ЭТО ЕДИНСТВЕННЫЙ ВХОД, И ОТ ЭТОГО ЗАВИСИТ БОЛЬШЕ,
-                     ЧЕМ РАНЬШЕ. Вступление больше не приходит само — ни на первом
-                     запуске, ни в каком другом состоянии (решение владельца
-                     2026-08-25). Внутри него лежат ссылка на политику
-                     конфиденциальности (PDR-035, аннотация 2026-08-21: у ссылки
-                     ровно два носителя — это окно и эта кнопка) и строка о том,
-                     что у браузерной копии нет резервной. Обе достижимы ровно
-                     через эту кнопку, поэтому она обязана быть видимой в ЛЮБОМ
-                     состоянии, включая первый запуск: это утверждение, а не
-                     пожелание, и его исполняет app/tests/behavior.spec.js
-                     (UIP-P3-INV-001).
+                     С NAV-P1 ЭТА КНОПКА — ВХОД ВЕБ-КАНАЛА, А НЕ ОБОИХ. Приходит
+                     видимой и прячется на нативном канале (surfaces/channel.js),
+                     где тот же вход стоит строкой в меню (#menuAboutBtn) под тем
+                     же именем, слово в слово. Витрине меню не нужно: за ним стоял
+                     бы один пункт, то есть лишний щелчок перед той же кнопкой
+                     (PDR-034 §1). Вход не исчез и не удвоился — у каждого канала
+                     он свой и ровно один.
+
+                     ОТ ЭТОГО ВХОДА ЗАВИСИТ БОЛЬШЕ, ЧЕМ ОТ КНОПКИ. Вступление не
+                     приходит само — ни на первом запуске, ни в каком другом
+                     состоянии (решение владельца 2026-08-25, UIP-P3). Внутри него
+                     лежат ссылка на политику конфиденциальности (PDR-035,
+                     аннотация 2026-08-21: у ссылки ровно два носителя — это окно
+                     и этот контрол) и строка о том, что у браузерной копии нет
+                     резервной. Обе достижимы ровно через него, поэтому он обязан
+                     быть видимым в ЛЮБОМ состоянии своего канала, включая первый
+                     запуск: это утверждение, а не пожелание, и его исполняет
+                     app/tests/behavior.spec.js (UIP-P3-INV-001).
 
                      ЗНАЧОК «i», А НЕ «?» (UIP-P3). Вопросительный знак обещает
                      справку по затруднению — «что-то не получается, спроси
@@ -246,12 +265,21 @@
                      ни на байт: тот же id, то же имя, тот же обработчик, то же
                      окно и та же ссылка внутри него.
 
-                     ЗНАЧОК, А НЕ ПОДПИСЬ, и круг, а не пилюля: действие канала в
-                     шапке одно и оно главное (см. .header-action), а это —
-                     справка рядом с ним. Имя у кнопки нарочно шире её сегодняшнего
-                     содержимого: «О приложении», а не «Инструкция». Окно позже
-                     может стать несколькими разделами, и тогда меняется то, что
-                     за кнопкой, а не кнопка.
+                     ОДИН КРУГ, А НЕ ДВА (NAV-P1). Рамка кнопки была круглой, и
+                     внутри неё стоял круг самого значка — родитель видел две
+                     окружности одна в другой, чего в стандартном знаке «i» нет.
+                     Рамка снята в app.css; круг остался ровно один — тот, что
+                     нарисован здесь. Размер кнопки (44px) не изменился: круг ушёл
+                     из вида, а не из-под пальца.
+
+                     ИМЯ — НЕ ЗНАЧОК, И ЭТО ПРОВЕРЯЕТСЯ. «О приложении» нарочно
+                     шире сегодняшнего содержимого окна: окно позже может стать
+                     несколькими разделами, и тогда меняется то, что за кнопкой, а
+                     не кнопка. Политика конфиденциальности называет носитель
+                     ссылки этим именем, а не знаком на нём (vault PDR-035,
+                     надстройка 2026-08-27), и app/tests/privacy-page.spec.js
+                     читает aria-label отсюда: перерисовать значок можно молча,
+                     переименовать — нельзя.
 
                      Ни onclick, ни телеметрии здесь нет — как и у соседей, и с
                      UIP-P1 её нет вообще нигде (аннотация к ADR-043 от
@@ -269,67 +297,6 @@
                         <path d="M12 11v5"/>
                         <path d="M12 7.5h.01"/>
                     </svg>
-                </button>
-                <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
-                     файл наружу». Не дискета: дискета означает «сохранить внутри
-                     приложения» и вдобавок мертвый предмет для артефакта, весь
-                     смысл которого — читаться через двадцать лет.
-                     На десктопе иконка + подпись, на мобильном только иконка;
-                     aria-label и title дословно повторяют видимую подпись.
-
-                     DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
-                     канале (surfaces/channel.js). В браузере архив не
-                     собирается вообще — веб-ветки в export/sink.js нет и не было
-                     (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
-                     происходит. Разметка одна на оба канала: это ветка времени
-                     выполнения, а не вторая сборка (LSC-P1-INV-002). -->
-                <button type="button"
-                        class="header-action"
-                        id="exportBtn"
-                        hidden
-                        title="Сохранить архив"
-                        aria-label="Сохранить архив">
-                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round"
-                         aria-hidden="true" focusable="false">
-                        <path d="M12 3v11"/>
-                        <path d="M8 10l4 4 4-4"/>
-                        <path d="M4 19h16"/>
-                    </svg>
-                    <span class="header-action-label">Сохранить архив</span>
-                </button>
-                <!-- Дневник (DIA-P3). Иконка — раскрытая тетрадь с пером:
-                     «записать своими словами», в отличие от галочки в таблице,
-                     которая утверждает про ребёнка. Это разные объекты: отметка
-                     — приписанное утверждение и живёт в неизменяемом журнале,
-                     запись дневника — собственный текст родителя и правится
-                     перезаписью (PDR-026 §4, правило 1).
-
-                     Приходит СКРЫТОЙ и раскрывается только на нативном канале
-                     (surfaces/channel.js): дневник пишется в устройственное
-                     хранилище, а в браузере его нет вообще — store/bridge.js там
-                     инертен по построению (LSC-P1-INV-001). Предлагать действие,
-                     которого на этом канале не происходит, — ровно тот дефект,
-                     который PDR-034 §1 назвал, а DIA-P2 закрыл для архива.
-
-                     Ни события аналитики, ни onclick здесь нет — и с UIP-P1
-                     аналитики нет ни на одном канале. -->
-                <button type="button"
-                        class="header-action"
-                        id="diaryBtn"
-                        hidden
-                        title="Дневник"
-                        aria-label="Дневник">
-                    <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round"
-                         aria-hidden="true" focusable="false">
-                        <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/>
-                        <path d="M20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/>
-                        <path d="M16 3l2 2-4 4h-2V7z"/>
-                    </svg>
-                    <span class="header-action-label">Дневник</span>
                 </button>
                 <!-- Приложение для Android (DIA-P2, ADR-047). Единственный канал
                      распространения — прямой APK со страницы релизов, не
@@ -387,6 +354,223 @@
                         <path d="M9 11l3 3 3-3"/>
                     </svg>
                 </button>
+                <!-- МЕНЮ ШАПКИ (NAV-P1). ОДИН ПРЕДМЕТ ВМЕСТО ДВУХ, И ТОЛЬКО НА
+                     НАТИВНОМ КАНАЛЕ. Приходит СКРЫТЫМ и раскрывается там же, где
+                     архив, — в surfaces/channel.js, — потому что вопрос тот же:
+                     что этот канал вообще предлагает. Натив — продукт, веб —
+                     витрина (PDR-034 §1), и у продукта список действий растёт, а
+                     у витрины нет: на вебе за меню стоял бы один пункт, то есть
+                     лишний щелчок перед той же кнопкой, которая и так в шапке.
+
+                     ТРИ ПОЛОСЫ, А НЕ ТРИ ТОЧКИ. Точки означают «ещё действия над
+                     тем, что перед вами», и живут рядом с предметом, к которому
+                     относятся; полосы означают «здесь весь список этого экрана» и
+                     стоят в шапке. Здесь второе: за ним не уточнения к таблице, а
+                     то, что приложение умеет помимо неё.
+
+                     ЗДЕСЬ ТРИ ПУНКТА С NAV-P2, И ТРЕТИЙ ПРИШЁЛ ВМЕСТЕ С ТЕМ,
+                     ЧТО ОН ДЕЛАЕТ. NAV-P1 отказался ставить «Обновление»
+                     заготовкой — строка, которая ничего не делает, это обещание,
+                     а не подготовка, — и пункт приходит теперь одним пакетом с
+                     первым сетевым вызовом этого канала и редакцией политики
+                     v1.3 (vault ADR-052 §1). Панель растёт по содержимому;
+                     четвёртого пункта здесь нет и по тому же правилу не будет,
+                     пока не появится то, что он делает.
+
+                     ДНЕВНИК СЮДА НЕ ПЕРЕЕХАЛ И НЕ ПЕРЕЕДЕТ: его кнопка уходит из
+                     шапки вместе с появлением жеста влево из таблицы навыков,
+                     отдельным пакетом. Меню — не свалка для всего, что стояло
+                     справа.
+
+                     Ни onclick, ни телеметрии: аналитики нет ни на одном канале с
+                     UIP-P1, и счётчика открытий меню здесь тоже нет — отсутствие
+                     сигнала остаётся решением. -->
+                <div class="header-menu" id="headerMenu" hidden>
+                    <button type="button"
+                            class="header-menu-toggle"
+                            id="menuBtn"
+                            title="Меню"
+                            aria-label="Меню"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            aria-controls="headerMenuPanel">
+                        <svg class="header-menu-icon" width="24" height="24" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true" focusable="false">
+                            <path d="M4 7h16"/>
+                            <path d="M4 12h16"/>
+                            <path d="M4 17h16"/>
+                        </svg>
+                    </button>
+                    <!-- ПАНЕЛЬ — НЕ role="menu", И ЭТО ВЫБОР. Роль menu обещает
+                         вспомогательным технологиям стрелочную навигацию с ровно
+                         одной остановкой Tab на всём списке; исполнять это обещание
+                         пришлось бы кодом переноса фокуса, которого в проекте нет
+                         ни у одной поверхности. Здесь обычные кнопки в обычном
+                         порядке обхода: Tab идёт по ним, Enter и Пробел нажимают,
+                         диктор называет их кнопками. Раскрытие объявлено там, где
+                         его читают, — aria-expanded на самой кнопке меню. -->
+                    <div class="header-menu-panel" id="headerMenuPanel">
+                        <!-- О ПРИЛОЖЕНИИ, ВТОРОЙ РАЗ И НАРОЧНО. Кнопка #aboutBtn
+                             выше — вход веб-канала, эта строка — вход нативного;
+                             одновременно видимой бывает ровно одна из них
+                             (surfaces/channel.js). Имя у обеих ОДНО И ТО ЖЕ, слово
+                             в слово: политика конфиденциальности называет носитель
+                             ссылки по имени контрола, а не по знаку на нём (vault
+                             PDR-035, надстройка 2026-08-27), и родитель, читающий
+                             документ, должен найти в приложении ровно ту строку,
+                             которую документ назвал. Гард сопряжения читает
+                             aria-label из этой оболочки: app/tests/privacy-page.spec.js.
+
+                             Обработчик — тот же openOnboardingModal() из
+                             surfaces/onboarding.js, что и у кнопки веб-канала. Окно,
+                             текст и ссылка внутри него не менялись ни на байт. -->
+                        <button type="button"
+                                class="header-menu-item"
+                                id="menuAboutBtn"
+                                title="О приложении"
+                                aria-label="О приложении">
+                            <svg class="header-menu-item-icon" width="24" height="24" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round"
+                                 aria-hidden="true" focusable="false">
+                                <circle cx="12" cy="12" r="9"/>
+                                <path d="M12 11v5"/>
+                                <path d="M12 7.5h.01"/>
+                            </svg>
+                            <span class="header-menu-item-label">О приложении</span>
+                        </button>
+                        <!-- Архив (L1-P3). Иконка — стрелка вниз: соглашение «получить
+                             файл наружу». Не дискета: дискета означает «сохранить внутри
+                             приложения» и вдобавок мертвый предмет для артефакта, весь
+                             смысл которого — читаться через двадцать лет.
+                             aria-label и title дословно повторяют видимую подпись.
+
+                             С NAV-P1 ЭТО СТРОКА МЕНЮ, А НЕ КНОПКА В РЯДУ, и подпись
+                             видна теперь ВСЕГДА, включая мобильный: правило, которое
+                             прячет .header-action-label под 768px, внутри панели
+                             перебито (.header-menu-panel .header-action-label в
+                             app.css). В ряду значок без подписи читался соседством с
+                             другими значками; в списке безымянная строка не читается
+                             никак. Сама кнопка не переписана — тот же id, тот же
+                             класс, тот же hidden, то же имя в трёх местах и тот же
+                             обработчик в surfaces/export.js; изменился её родитель.
+
+                             DIA-P2: приходит СКРЫТЫМ и раскрывается только на нативном
+                             канале (surfaces/channel.js). В браузере архив не
+                             собирается вообще — веб-ветки в export/sink.js нет и не было
+                             (LSC-DL-003 (m)), — а кнопка предлагала то, чего не
+                             происходит. Разметка одна на оба канала: это ветка времени
+                             выполнения, а не вторая сборка (LSC-P1-INV-002). -->
+                        <button type="button"
+                                class="header-action"
+                                id="exportBtn"
+                                hidden
+                                title="Сохранить архив"
+                                aria-label="Сохранить архив">
+                            <svg class="header-action-icon" width="24" height="24" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round"
+                                 aria-hidden="true" focusable="false">
+                                <path d="M12 3v11"/>
+                                <path d="M8 10l4 4 4-4"/>
+                                <path d="M4 19h16"/>
+                            </svg>
+                            <span class="header-action-label">Сохранить архив</span>
+                        </button>
+                        <!-- ОБНОВЛЕНИЕ (NAV-P2). ЕДИНСТВЕННОЕ МЕСТО, ОТКУДА ЭТО
+                             ПРИЛОЖЕНИЕ ВООБЩЕ ХОДИТ В СЕТЬ. Нажатие — и только
+                             нажатие — отправляет один неаутентифицированный GET
+                             к объявленному адресу (CHANNEL_CONFIG.updateApiUrl).
+                             Ни на загрузке, ни по таймеру, ни в service worker,
+                             ни повторно после отказа: за это отвечает
+                             app/tests/update-check.spec.js, где инструментом
+                             служит сетевой лог настоящей страницы, а не шпион в
+                             нашей же обёртке (vault ADR-052 §4).
+
+                             data-keeps-menu-open — НЕ УКРАШЕНИЕ. Панель закрывает
+                             себя одним делегированным слушателем на любое нажатие
+                             кнопки внутри (surfaces/menu.js), и без этого атрибута
+                             строка закрывала бы список ровно в тот момент, когда
+                             начинает отвечать. Атрибут, а не идентификатор в
+                             menu.js: тот файл намеренно не знает своих строк по
+                             именам.
+
+                             ПРИХОДИТ СКРЫТОЙ и раскрывается в surfaces/update.js
+                             по решению surfaces/channel.js — нативный канал и
+                             копия НЕ из Play (vault ADR-052 §1.5; довод — у
+                             каналов разные подписи, ADR-047, надстройка
+                             2026-08-25). Раскрытие здесь асинхронное, потому что
+                             второй факт приходит от плагина; поэтому строка
+                             скрыта в разметке, а не показана и потом убрана —
+                             мигнуть пунктом, которого в этой копии быть не
+                             должно, хуже, чем показать его на кадр позже. -->
+                        <button type="button"
+                                class="header-menu-item header-menu-item-update"
+                                id="menuUpdateBtn"
+                                hidden
+                                data-keeps-menu-open
+                                title="Обновление"
+                                aria-label="Обновление">
+                            <span class="header-menu-item-fill" id="updateFill" aria-hidden="true"></span>
+                            <svg class="header-menu-item-icon" width="24" height="24" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round"
+                                 aria-hidden="true" focusable="false">
+                                <path d="M12 21v-11"/>
+                                <path d="M8 14l4-4 4 4"/>
+                                <path d="M4 5h16"/>
+                            </svg>
+                            <span class="header-menu-item-label">Обновление</span>
+                        </button>
+                        <!-- ИСХОД ПРОВЕРКИ — ГОТОВЫЕ ПРЕДЛОЖЕНИЯ В ОБОЛОЧКЕ, А НЕ
+                             СТРОКИ, СОБИРАЕМЫЕ КОДОМ. surfaces/update.js не
+                             присваивает textContent и не строит ни одной строки:
+                             он снимает hidden ровно с одного из этих абзацев.
+                             Так обещание «ни одно сообщение об ошибке не несёт
+                             семейных данных» становится СВОЙСТВОМ, а не
+                             обязательством — несущей данные строки просто неоткуда
+                             взяться, и app/tests/update-contour.spec.js читает это
+                             как свойство дерева.
+
+                             role="status" с aria-live="polite": исход объявляется
+                             диктору там же, где появляется глазу. Показывается не
+                             больше одного абзаца за раз.
+
+                             ОТКАЗЫ РАЗЛИЧЕНЫ, А НЕ СВЕДЕНЫ В ОДИН. «Слишком много
+                             запросов» — единственный отказ, за которым стоит
+                             другое действие (подождать), поэтому у него своя
+                             фраза; остальные честно говорят, что произошло, и не
+                             предлагают ничего.
+
+                             «Установить» — ССЫЛКА, А НЕ КНОПКА, и адрес ей
+                             проставляет surfaces/update.js из объявленного
+                             CHANNEL_CONFIG.apkReleaseUrl, а не из ответа сервера:
+                             адрес продукта объявлен в одном месте. target="_blank"
+                             — тот же приём, что у #installDownloadLink и
+                             #introPolicyLink: приложение НЕ скачивает файл, не
+                             готовит его и не запускает установку, а открывает
+                             страницу релиза в системном браузере. Разрешение
+                             REQUEST_INSTALL_PACKAGES не вводится (vault ADR-052
+                             §1.3). -->
+                        <div class="header-menu-status" id="updateStatus" role="status" aria-live="polite">
+                            <p class="header-menu-status-line" id="updateStatusChecking" hidden>Проверяем обновление</p>
+                            <p class="header-menu-status-line" id="updateStatusCurrent" hidden>Обновлений нет</p>
+                            <p class="header-menu-status-line" id="updateStatusAvailable" hidden>Есть новая версия</p>
+                            <p class="header-menu-status-line" id="updateStatusOffline" hidden>Не удалось проверить: нет соединения</p>
+                            <p class="header-menu-status-line" id="updateStatusTimeout" hidden>Не удалось проверить: сервер не ответил</p>
+                            <p class="header-menu-status-line" id="updateStatusRateLimited" hidden>Не удалось проверить: слишком много запросов, попробуйте позже</p>
+                            <p class="header-menu-status-line" id="updateStatusServerError" hidden>Не удалось проверить: сервер ответил ошибкой</p>
+                            <p class="header-menu-status-line" id="updateStatusUnreadable" hidden>Не удалось проверить: непонятный ответ</p>
+                            <a class="header-menu-status-link"
+                               id="updateInstallLink"
+                               hidden
+                               target="_blank"
+                               rel="noopener noreferrer">Установить</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <!-- ПОДЗАГОЛОВКА ЗДЕСЬ БОЛЬШЕ НЕТ (UIP-P3). Строка «Отслеживание развития
@@ -397,6 +581,51 @@
              второй строки, которую читают все и каждый раз. Правила
              .header-subtitle ушли из app.css вместе с ней: класс без предмета
              — это следующий пакет, который «почему-то не применяется». -->
+        <!-- ПЕРЕКЛЮЧАТЕЛЬ РАЗДЕЛОВ (NAV-P3). ЗДЕСЬ КОНЧАЕТСЯ КНОПКА «ДНЕВНИК»
+             И НАЧИНАЕТСЯ СПИСОК ЭКРАНОВ. До этого пакета дневник был действием
+             в шапке — значок справа, рядом с архивом. Теперь это второй ЭКРАН
+             упорядоченного списка, и попасть в него можно двумя способами:
+             ведением пальца влево по таблице навыков и этими кнопками.
+
+             ЭТИ КНОПКИ — НЕ УКРАШЕНИЕ И НЕ ПОДПИСЬ К ЖЕСТУ. Жест недостижим ни
+             с клавиатуры, ни диктором; приложение, у которого вход в раздел
+             только один и он — движение пальцем, для части родителей просто не
+             имеет этого раздела. Поэтому здесь настоящие <button> в обычном
+             порядке обхода: Tab идёт по ним, Enter и Пробел нажимают, диктор
+             называет их кнопками. Объявлено ровно то, что исполняется.
+
+             ПОРЯДОК СЛЕВА НАПРАВО — ЭТО И ЕСТЬ ПОРЯДОК ЭКРАНОВ, и он один и тот
+             же здесь и в surfaces/pager.js. Самый левый — начальный. Целевая
+             навигация владельца — три экрана, Спросить / Навыки / Дневник, со
+             «Спросить» как начальным; когда третий появится, он встанет СЛЕВА
+             от «Навыков», и ни эта разметка, ни механизм от этого не
+             переписываются. Заготовки «Спросить» здесь нет: строка, которая
+             ничего не делает, — обещание, а не подготовка (тот же довод, по
+             которому NAV-P1 отказался ставить «Обновление» заранее).
+
+             Приходит СКРЫТЫМ и раскрывается только на нативном канале
+             (surfaces/channel.js, shouldOfferSurfacePager): дневник пишется в
+             устройственное хранилище, а в браузере его нет вообще.
+
+             role="tablist"/"tab" здесь НЕ объявлены — по тому же доводу, по
+             которому surfaces/menu.js отказался от role="menu": роль вкладок
+             обещает диктору стрелочную навигацию и одну остановку Tab на весь
+             список, и исполнять это обещание пришлось бы кодом переноса фокуса.
+             Текущий раздел называется через aria-current="page", который
+             surfaces/pager.js ставит там же, где меняет экран.
+
+             Ни onclick, ни телеметрии: счётчика переходов между разделами нет
+             ни на одном канале, и его отсутствие — решение (ADR-013 /
+             контракт §4.7). -->
+        <nav class="surface-nav" id="surfaceNav" hidden aria-label="Разделы приложения">
+            <button type="button"
+                    class="surface-nav-item"
+                    id="surfaceSkillsBtn"
+                    aria-current="page">Навыки</button>
+            <button type="button"
+                    class="surface-nav-item"
+                    id="surfaceDiaryBtn">Дневник</button>
+        </nav>
     </header>
 
 
@@ -602,12 +831,23 @@
         </div>
     </div>
 
-    <!-- ЧТО ЭТО ЗА ПРИЛОЖЕНИЕ И ГДЕ ЖИВУТ ДАННЫЕ — экран перед установкой
-         (L3-P3). Открывается кнопкой «Приложение для Android» в шапке (до UIP-P3
+    <!-- ЧТО ДАЁТ ПРИЛОЖЕНИЕ — экран перед установкой (L3-P3, переписан на
+         NAV-P4). Открывается кнопкой «Приложение для Android» в шапке (до UIP-P3
          она называлась «Скачать APK» и обещала загрузку, которой на десктопе не
-         происходит), то есть ровно в тот момент, когда посетитель решил ставить. До этого пакета в этот момент он
-         получал голую загрузку: страницу релизов, файл .apk и ни одного слова о
-         том, что он ставит и что случится с записями о его ребёнке.
+         происходит), то есть ровно в тот момент, когда посетитель решил ставить.
+         До L3-P3 в этот момент он получал голую загрузку: страницу релизов, файл
+         .apk и ни одного слова о том, что он ставит и что случится с записями о
+         его ребёнке.
+
+         ЧТО ИЗМЕНИЛ NAV-P4 И ПОЧЕМУ. Текст был списком параметров под четырьмя
+         заголовками — «Что это», «Где живут данные», «Обратная сторона», «Как
+         установить», — и первый из них пересказывал ровно то, что посетитель уже
+         видит в браузере. Родитель узнавал, ЧТО ЭТО ЗА ПРОДУКТ, и не узнавал,
+         ЧТО ОН ПОЛУЧИТ, поставив его. PDR-034 §1 делает эту разницу самим
+         продуктовым решением: натив — продукт, веб — витрина. Значит окно обязано
+         называть разницу, и называть её честно, а не продавать: перечислены ровно
+         те вещи, которых в браузере нет, и у каждой названа обратная сторона там,
+         где она есть.
 
          ОКНО ЖИВЁТ ТОЛЬКО НА ВЕБ-КАНАЛЕ, и не потому, что разметка вторая — она
          одна на оба канала, — а потому, что кнопка, которая его открывает,
@@ -618,16 +858,36 @@
          процентилей, ни серий и полос, ни «успейте, окно развития закрывается»
          (PDR-006 слой B, PDR-003 §2). Это ровно та поверхность, на которой такой
          текст продавал бы лучше всего, и ровно поэтому запрет на него записан
-         здесь, рядом с текстом, а не только в решении.
+         здесь, рядом с текстом, а не только в решении. Исполнитель —
+         app/tests/channel-composition.spec.js, и NAV-P4 его НЕ ПРАВИЛ: четыре
+         обязательные фразы перенесены в новый текст слово в слово. Правка
+         сторожа под свежесочинённый текст — ровно тот способ, которым сторож
+         перестаёт работать.
 
          И КАЖДОЕ УТВЕРЖДЕНИЕ НИЖЕ — ПРО ТО, ЧТО ПРИЛОЖЕНИЕ ДЕЛАЕТ НА САМОМ ДЕЛЕ.
+         Дневник — второй экран упорядоченного списка (surfaces/pager.js), и в
+         браузере его нет совсем: wirePager() выходит до первого слушателя, а
+         whyNotWritable() отвечает «нет хранилища» (surfaces/diary.js).
          Шифрованное хранилище — SQLCipher, `androidIsEncryption: true`
          (StoreEngineTest читает cipher_version). «Никуда не отправляются» —
          LSC-P4-INV-004: нативный канал не обращается к аналитике. «Ни копии в
          облаке, включая автобэкап» — allowBackup="false" и оба формата правил,
-         LSC-P1-INV-002 (b). «Копия одна» — docs/RUNBOOK.md, «The first install
-         destroys the app sandbox». Архив собирается локально и не передаётся —
-         LSC-P3-INV-002. Про цену здесь не сказано ничего: это публичное
+         LSC-P1-INV-002 (b). «В браузере архив не собирается» — в export/sink.js
+         нет и никогда не было веб-ветки (LSC-DL-003 (m)). «Копия одна» —
+         docs/RUNBOOK.md, «The first install destroys the app sandbox». Архив
+         собирается локально и не передаётся — LSC-P3-INV-002. Проверка
+         обновления — NAV-P2-INV-001, и предложение про сведения о вас,
+         устройстве, установке и ребёнке взято ИЗ ОПУБЛИКОВАННОЙ ПОЛИТИКИ слово в
+         слово (редакция 1.3, краткая сводка); app/tests/privacy-page.spec.js
+         требует совпадения во всех трёх файлах, чтобы обещание не разошлось с
+         документом молча. Последняя фраза того же пункта — про то, что ссылки
+         открывает браузер телефона, — снимает единственную оставшуюся
+         двусмысленность: «единственный запрос» сказано про запросы САМОГО
+         приложения, а родитель, открывший из него политику или страницу выпуска,
+         видит на телефоне сетевую активность. Приложение при этом никуда не
+         обращается: `target="_blank"` отдаёт адрес системному браузеру
+         (политика — редакция 1.3 §6, «открывает страницу выпуска в браузере
+         вашего устройства»). Про цену здесь не сказано ничего: это публичное
          обещание на границе free/paid, и молчание её не двигает.
 
          Ссылки на политику конфиденциальности здесь НЕТ, и это решение владельца
@@ -641,17 +901,18 @@
             <span class="modal-close" id="installModalClose">&times;</span>
             <h2>Приложение TheyGrow для Android</h2>
 
-            <h3>Что это</h3>
-            <p>Список навыков по месяцам, ваши отметки о том, что ребёнок уже освоил, и занятия, которые с этими навыками связаны. Месяцы — это ориентир, по которому удобно искать, а не оценка и не диагноз: приложение ничего не измеряет и ни с кем вашего ребёнка не сравнивает.</p>
+            <p>Здесь, в браузере, — список навыков и ваши отметки. Вот что появляется, когда приложение стоит на телефоне.</p>
 
-            <h3>Где живут данные</h3>
-            <p>Имя, дата рождения, отметки и записи дневника хранятся в зашифрованном хранилище на самом телефоне. Они никуда не отправляются: у приложения нет ни аккаунта, ни синхронизации, ни копии в облаке — включая автоматический бэкап Android, который в нём выключен.</p>
+            <ul class="install-gains">
+                <li><strong>Дневник о ребёнке.</strong> Ваши собственные записи, с датами и поиском по тексту, на отдельном экране рядом с таблицей навыков. В браузере дневника нет совсем.</li>
+                <li><strong>Записи остаются у вас.</strong> Имя, дата рождения, отметки и дневник хранятся в зашифрованной базе на самом телефоне. Они никуда не отправляются: ни аккаунта, ни синхронизации, ни копии в облаке — автоматический бэкап Android для базы приложения выключен. В браузере ваши отметки живут только в этом браузере, и резервной копии у них нет.</li>
+                <li><strong>Архив, который можно унести.</strong> По вашей команде приложение собирает архив ваших записей прямо на телефоне — текстом и в PDF — и отдаёт его вам. В браузере архив не собирается. Он же и единственный способ унести записи с телефона: удалите приложение — его база удалится вместе с ним.</li>
+                <li><strong>Вы узнаете о новой версии.</strong> Когда вы нажмёте «Обновление», приложение спросит у GitHub, вышла ли новая. Сведения о вас, устройстве, установке или ребёнке при этом не передаются. Это единственный запрос, который приложение делает само; ссылки, которые вы открываете из него, — политику, страницу выпуска — открывает браузер телефона.</li>
+            </ul>
 
-            <h3>Обратная сторона</h3>
-            <p>Копия одна. Если удалить приложение, записи исчезнут вместе с ним. Поэтому в приложении есть архив: оно собирает его на телефоне, по вашей команде, и никуда не передаёт.</p>
+            <p>Приложение ничего не измеряет и ни с кем вашего ребёнка не сравнивает: месяцы в таблице — ориентир, по которому удобно искать, а не оценка и не диагноз.</p>
 
-            <h3>Как установить</h3>
-            <p>Файл .apk лежит на странице релизов; Android спросит разрешение на установку из неизвестных источников. Регистрация не нужна.</p>
+            <p>Файл .apk и его контрольная сумма SHA-256 лежат на странице выпусков. Android предупредит об установке из неизвестных источников: приложение не из магазина, это ожидаемо. Регистрация не нужна.</p>
 
             <div class="modal-buttons">
                 <button type="button" class="modal-button modal-button-secondary" id="installCloseBtn">Закрыть</button>
@@ -679,7 +940,38 @@
     <!-- Модальное окно деталей навыка -->
     <div id="skillModal" class="skill-modal">
         <div class="skill-modal-content">
-            <span class="skill-modal-close" id="skillModalClose">↩</span>
+            <!-- ОДИН КОНТРОЛ С ДВУМЯ СОСТОЯНИЯМИ (NAV-P3, решение владельца
+                 2026-08-29). Здесь стояла стрелка ↩, и она делала два разных
+                 дела под одним знаком: с посещёнными карточками за спиной —
+                 возвращала на предыдущую, без них — закрывала окно. Пакет
+                 убирал стрелки «назад» внутри окон, потому что они
+                 существовали ради неработавшей аппаратной кнопки; здесь
+                 решение иное и принято после того, как механика была измерена:
+                 у этого окна стрелка была ЕДИНСТВЕННЫМ контролом, а на
+                 веб-канале аппаратной кнопки нет, так что простое закрытие
+                 отняло бы шаг назад совсем.
+
+                 Поэтому контрол один и на том же месте, а ЗНАК И ДОСТУПНОЕ ИМЯ
+                 переключаются вместе с тем, что он сделает: × «Закрыть», пока
+                 след пуст, и ↩ «К предыдущей карточке», пока в нём что-то есть
+                 (surfaces/skill-modal.js). В разметке лежит состояние по
+                 умолчанию — окно всегда открывается с пустым следом.
+
+                 СЛЕД — ЭТО ПОСЕЩЁННЫЕ КАРТОЧКИ, а не цепочка предпосылок: в
+                 него попадает каждый переход по любой из трёх разновидностей
+                 ссылок — «Требуемые навыки», «Открывает дальше» и «Откроется,
+                 когда», — то есть он может вести вниз по графу так же, как
+                 вверх.
+
+                 role и tabindex — минимум, который делает объявленное имя
+                 достижимым: имя, которого нельзя достичь и нажать, не имя.
+                 Ни один другой крестик в этом файле не тронут. -->
+            <span class="skill-modal-close"
+                  id="skillModalClose"
+                  role="button"
+                  tabindex="0"
+                  title="Закрыть"
+                  aria-label="Закрыть">&times;</span>
             <div id="skillModalBody"></div>
         </div>
     </div>
@@ -800,14 +1092,14 @@
         </div>
     </div>
 
-    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v9/ — this entry
+    <!-- App entry (A1-P4/A1-P5): the module graph under /m/v10/ — this entry
          over surfaces/ (one module per UI surface) over core/ (shared state,
          I/O and pure helpers). Deferred like every module script — see
-         m/v9/app.js for boot order, and the modulepreload block in the head
+         m/v10/app.js for boot order, and the modulepreload block in the head
          for how the graph is delivered. -->
-    <script type="module" src="/m/v9/app.js"></script>
+    <script type="module" src="/m/v10/app.js"></script>
 
     <!-- Service Worker Registration + update-available prompt -->
-    <script type="module" src="/m/v9/sw-register.js"></script>
+    <script type="module" src="/m/v10/sw-register.js"></script>
 </body>
 </html>

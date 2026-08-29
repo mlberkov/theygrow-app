@@ -102,25 +102,30 @@ const cacheKeys = (page) => page.evaluate(() => caches.keys());
 // and which says nothing about an upgrade. Measured, not assumed: running the
 // legs below with the fixture switch never set reds here, at the cache pin.
 // THE STAGED CLIENT CARRIES THE PREVIOUS GENERATION'S STORAGE VOCABULARY, AND
-// THAT IS WHY ONE RETIRED KEY IS WRITTEN OUT AS A LITERAL HERE (UIP-P3).
+// THAT IS WHY ONE RETIRED KEY IS STILL WRITTEN OUT AS A LITERAL HERE (UIP-P3,
+// re-read at NAV-P1 when the pair moved).
 //
 // `onboarding_dismissed` left `core/storage.js` and `support/seed.js` with the
-// intro window's auto-open (owner decision 2026-08-25, `UIP-DL-003`). It is dead
-// in `/m/v9/`. It is NOT dead in the generation this fixture stages: a frozen
-// mount is byte-untouchable (`A1-DL-004`), so `/m/v8/` still reads the key and
-// still opens the intro when it is unset — and `/m/v8/openOnboardingModal` calls
-// the `trackEvent()` the shell stopped defining at UIP-P1, which throws.
+// intro window's auto-open (owner decision 2026-08-25, `UIP-DL-003`). The pair
+// this fixture stages is now `/m/v10/` over `/m/v9/`, and the key is INERT on
+// both sides of it: `/m/v9/` is the generation UIP-P3 shipped, so it neither
+// reads the key nor auto-opens. The seed below is therefore a no-op today, and
+// it is kept rather than deleted because what it guards is a CLASS, not this
+// instance — see the next paragraph.
 //
-// WHAT THAT IS AND IS NOT. It is an artifact of a fixture that is already, on
-// the record, the WEAKER of two things: `support/prev-generation.js` stages the
-// CURRENT shell repointed one generation back, not the shell that generation
-// published. No real client can hold this pair — a client on `/m/v8/` holds the
-// shell that shipped with it, gtag shim included, and the moment it takes the
-// new shell it takes `/m/v9/` with it. So this is not a product defect and the
-// throw is not evidence of one; it is the fixture's known unfaithfulness meeting
-// a key that changed meaning. The repair belongs here, in the fixture, and it is
-// a literal rather than an import precisely because the constant it would import
-// no longer exists — the current mount is right not to have it.
+// WHAT THE CLASS IS. `support/prev-generation.js` stages the CURRENT shell
+// repointed one generation back, not the shell that generation published — the
+// weaker of two things, on the record. So whenever a generation changes what a
+// storage key MEANS, the staged pair can read the new shell's storage with the
+// old mount's code. It bit once, at UIP-P3: `/m/v8/` still read this key, still
+// opened the intro when it was unset, and its `openOnboardingModal` called the
+// `trackEvent()` UIP-P1 had stopped defining, which threw. That instance left
+// the staging window when `/m/v8/` stopped being previous. No real client ever
+// held that pair — a client on `/m/v8/` held the shell that shipped with it —
+// so it was never a product defect, and the repair belonged here. The literal
+// stays a literal rather than an import for the same reason it did then: the
+// constant it would import no longer exists, and the current mount is right not
+// to have it.
 async function installPreviousGeneration(page, context, baseURL) {
   await context.addCookies([{ name: PREV_GEN_COOKIE, value: '1', url: baseURL }]);
   await gotoApp(page, {

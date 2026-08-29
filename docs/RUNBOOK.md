@@ -91,7 +91,7 @@ Three places in this file, and the header comment of all three build-configs, us
    - Live-DOM (update banner present): `curl -fsS "$TAG_URL/" | grep -q 'id="updateBanner"'` → exit 0.
    - Worker re-fetched fresh: `curl -fsSI "$TAG_URL/sw.js"` → `200` with `Cache-Control: no-cache, must-revalidate` (the `/sw.js` header from the cache-surface note above).
    - KB artifact immutable: `curl -fsSI "$TAG_URL/kb-v1.json"` → `200` with `Cache-Control: public, immutable, max-age=31536000` (the narrow `^/kb-v[0-9]+\.json$` nginx location).
-   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v9/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v9/app.js"` and `curl -fsSI "$TAG_URL/m/v9/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v9/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at four closes now (`/m/v6/` → `/m/v7/` → `/m/v8/` → `/m/v9/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18), and again at UIP-P1 for the bump to `/m/v9/` (`CACHE_VERSION` v19).
+   - Module mount immutable + MIME (the only place production `Content-Type` is ever observed — it comes from the base image's `mime.types`, which is not in this repo and which no test parses): `curl -fsSI "$TAG_URL/m/v10/app.css"` → `200` with `Cache-Control: public, immutable, max-age=2592000` and `Content-Type: text/css`; `curl -fsSI "$TAG_URL/m/v10/app.js"` and `curl -fsSI "$TAG_URL/m/v10/core/state.js"` → the same `Cache-Control` and a **JavaScript** `Content-Type` (`application/javascript` on the current base image; `text/javascript` is equally valid — anything else blocks the ES module outright). `app.js` is the shell's only JS entry and a `core/` file proves the subdirectory is served by the same rule; `/m/v10/sw-register.js` carries the same headers. **Read the generation out of `app/index.html` before running these, not out of this sentence** — it has gone stale at five closes now (`/m/v6/` → `/m/v7/` → `/m/v8/` → `/m/v9/` → `/m/v10/`), and a smoke against a frozen generation passes while the one the revision actually serves is unverified. Corrected at PPR-P3 for the PPR-P2 bump to `/m/v8/` (`CACHE_VERSION` v18), at UIP-P1 for the bump to `/m/v9/` (`CACHE_VERSION` v19), and at NAV-P1 for the bump to `/m/v10/` (`CACHE_VERSION` v20).
    - KB artifact integrity (ADR-020 gate): `curl -fsS "$TAG_URL/kb-v1.json" | sha256sum` → must equal `sha256sum app/kb-v1.json` at the deployed commit (served == vendored, byte-as-published; for the current artifact: `03a71f2e6336095d0e7fa8ffd575e32bceae8d557e5c8e721e28c40537dcc9ab`).
    - **The privacy policy is served, and served as a document** (added at PPR-P3, `PPR-DL-001` (k); two of the four lines repaired at PPR-P4, `PPR-DL-004`). Nothing in this repository runs the real nginx image — the parity suite drives `app/tests/server.js`, a hand-written mirror — so this is the only place the production response for `/privacy` is ever observed, and the in-app link is not to be trusted until it has been. **That is also why these lines themselves have to be right: two of them were not.** One reported a false red on a clean page and one accepted a `301` without reading where it pointed — which is how `/privacy/` shipped a redirect to an address that does not answer:
      - `curl -sI "$TAG_URL/privacy"` → `200`, `content-type: text/html`, `cache-control: public, max-age=3600, must-revalidate`, and **not** `immutable`. The document is versioned by its own text and effective date, at one address; an immutable cache class would strand a redaction.
@@ -349,16 +349,76 @@ decides the order you do things in.
    It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
    geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
    download and a pinch-zoom rather than a document. The page is a hand conversion of the CURRENT edition
-   — `docs/privacy-policy-v1.2.md` since UIP-P8 — and the two are paired by
+   — `docs/privacy-policy-v1.3.md` since NAV-P2 — and the two are paired by
    `app/tests/privacy-page.spec.js` heading by heading so a drift is a red test rather than a discovery
    months later. **One address, and since UIP-P2 exactly one:** `/privacy/` and `/privacy.html` both
    answer `301` to `/privacy`, so the document cannot accumulate a second bookmarked address across
    editions. **Superseded editions stay in `docs/` and are never republished** — `docs/privacy-policy-v1.0.md`
-   (effective date `23.08.2026`) and `docs/privacy-policy-v1.1.md` (`27.08.2026`) are kept byte-untouched as
+   (effective date `23.08.2026`), `docs/privacy-policy-v1.1.md` (`27.08.2026`) and
+   `docs/privacy-policy-v1.2.md` (`28.08.2026`) are kept byte-untouched as
    history, because §10 of the document promises that the address always carries the edition currently in
-   force. **An edition freezes the moment the next one is written**, which is what UIP-P8 did to 1.1. **Whether a parent ever read edition
+   force. **An edition freezes the moment the next one is written**, which is what UIP-P8 did to 1.1 and NAV-P2 did to 1.2. **Whether a parent ever read edition
    1.0 is not a repository fact** — the PPR milestone is merged and NOT promoted — so the history table
    records the edition and its stated effective date, and claims nothing about a window of force.
+1a. **PUBLISHING A NEW EDITION — the seven places that move together, and the order they move in.**
+   *(Added at NAV-P2, `NAV-DL-002`. This step is the debt `UIP-DL-008` recorded and named: step 6 below
+   covered the effective DATE and nothing covered the act of publishing edition N+1 and repointing the
+   references that name the current one. UIP-P8 moved them by hand and enumerated them; this is that list
+   turned into a procedure, written from the run that produced edition 1.3. It is numbered `1a` rather
+   than inserted as a new `2` for the reason `PPR-DL-003` (g) recorded for the other section: steps 2–7
+   are named by number from inside this section and from elsewhere in this file, and renumbering them to
+   make room breaks references that name a step by its number.)*
+   **When this step applies:** when the described handling of data changes. §10 of the document promises
+   a new edition for exactly that, and the boundary is by SUBJECT, not by the size of the diff (vault
+   `PDR-035`, annotation 2026-08-27): an interface-only change — a control renamed, a glyph redrawn — is
+   corrected **inside** the edition in force, and the version, the effective date and the history table do
+   not move. NAV-P2 is the clearest case of the other side: the app began making a network request, which
+   is data handling, so edition 1.3 was not optional.
+   1. **Write the new file, never edit the old one.** Copy `docs/privacy-policy-v{current}.md` to
+      `docs/privacy-policy-v{new}.md` and edit the copy. The superseded file is frozen from this moment —
+      byte-untouched, including its history row. `app/tests/privacy-page.spec.js` compares the two change
+      tables row for row in both files, so a "tidying" edit of a frozen row is red twice.
+   2. **Inside the new file, four things move together:** `**Версия:**`, `**Дата вступления в силу:**`, a
+      NEW top row in the change-history table carrying that version and that date, and the body text the
+      edition is actually about. Do not strip the trailing double spaces on the header lines — they are
+      Markdown hard line breaks, which is why `docs/privacy-policy-v` is excluded from the hygiene hooks
+      by version-agnostic prefix.
+   3. **Sweep the whole document for statements the change has made misleading, and repair them in the
+      same edition.** This is the half that is easy to skip and expensive to skip: edition 1.3 added one
+      paragraph to §6 and had to correct three sentences elsewhere that a reader would otherwise take as
+      "this app never goes to the network" — the summary bullet, §3.2 and §7. A sentence that outlives the
+      product it describes is the defect edition 1.2 existed to fix.
+   4. **Convert it into `app/privacy.html` by hand, and change nothing else there.** The page is a
+      translation, not a second edition: same headings, same words, same history table with the new row on
+      top. Its `.meta` block carries the same version and date, and its head comment names the new source
+      file and the newly frozen one.
+   5. **Repoint the references that name the CURRENT edition.** They are, today, exactly six, and every
+      one of them is a place where a stale name is silently wrong rather than red:
+      `app/tests/privacy-page.spec.js` — `const EDITION` and the sentence in its head comment;
+      `app/playwright.config.js` — the sentence naming the edition in the `contract` project's prose;
+      `app/privacy.html` — the head comment's `ИСТОЧНИК ТЕКСТА` line and its frozen-editions paragraph;
+      `docs/RUNBOOK.md` — step 1 above (the "CURRENT edition" clause and the frozen list) and step 6's two
+      source-document bullets. `const EDITION` is the load-bearing one: it selects the whole paired source,
+      so leaving it behind is six red tests rather than one (measured at `UIP-DL-008`, mutation 1).
+   6. **Re-stage the APK web root** — `node native/tools/stage-webdir.js`. `app/privacy.html` ships in
+      both channels and `LSC-P1-INV-002` compares them byte for byte, so an edition published without
+      re-staging is red on the native channel and green on the web one.
+   7. **Then step 6 below, before you promote**, because the date you have just written is a guess until
+      the promotion day is chosen. And `docs/INVARIANTS.md` is deliberately NOT edited: `UIP-P2-INV-001`
+      names no edition filename, by design, so that a new edition costs no invariant edit.
+   **The edition and the code it describes go out in ONE promotion, and that is a rule rather than a
+   habit** (vault `ADR-020`: nothing reaches people before promotion; vault `ADR-052` §4 states the pairing
+   for edition 1.3 by name). Edition 1.3 describes a network call the app did not make before, so a
+   promotion carrying the code without the edition publishes an app doing something its live policy does
+   not mention, and a promotion carrying the edition without the code publishes a document describing a
+   feature nobody has. Both halves live on one branch by construction — the same arrangement step 0 of
+   § *Promotion + rollback* keeps for `UIP-P1`/`UIP-P2` — so the condition holds unless someone splits
+   them deliberately. **Check, one command:** `grep -c 'api.github.com' app/privacy.html` and
+   `grep -c updateApiUrl app/m/v*/channel/config.js | grep -v ':0'` must both be non-zero in the revision
+   you are about to promote.
+   **What still has no home in this repository:** the Google Play **Data safety** answers. A new edition
+   that changes what the app does with data can change them too, and the form is owner-side — see the
+   named debt in `NAV-DL-002`.
 2. **Then declare it. — DONE at PPR-P3.** In `app/index.html`,
    `<meta name="theygrow-privacy-policy" content="published">`. Anything that is not exactly `published` — a
    missing tag, an empty value, a typo, a stale `none` — means "no document", and no link is offered
@@ -370,10 +430,14 @@ decides the order you do things in.
    rollback**. The shell is ALSO what the APK carries, so on a **phone** it reaches nobody until the next
    release build is produced and installed (**Release build + APK distribution** above). Until then the app
    on a parent's phone correctly shows no link.
-4. **Check it, in the place it lives.** Open the app, press the round **«?»** in the header, scroll to the
-   bottom of the greeting: «Политика конфиденциальности» must be there and must open the real page. It is
-   the only home the link has, on both channels, and «?» is the only way back into that window once the
-   greeting has been closed.
+4. **Check it, in the place it lives.** Open the greeting and scroll to the bottom: «Политика
+   конфиденциальности» must be there and must open the real page. It is the only home the link has, on both
+   channels, and since the greeting stopped opening by itself (`UIP-P3`) the control below is the only way
+   into that window at all. **The control is not the same one on both channels since `NAV-P1`** — it is
+   named rather than drawn here on purpose, because the sign on it has already changed twice while the name
+   has not, and the published policy quotes the name (vault `PDR-035`, annotation 2026-08-27):
+   - **on the web** — the header control **«О приложении»**;
+   - **in the app** — the header menu (three bars), then the row **«О приложении»**.
 5. **Ordering is the whole point, exactly as it is for the release.** Flipping the token before the
    document exists puts a parent on a 404 under the word "privacy" — a promise about their family's data
    with nothing behind it. Nothing in CI can catch that: the token is a statement by you, and
@@ -385,8 +449,8 @@ decides the order you do things in.
    **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
    step used to carry (`app/privacy.html:103` and `:263`) had already gone stale to `:107` and `:267`
    by the time anyone read them, which is the failure mode of addressing a moving file by offset:
-   - `docs/privacy-policy-v1.2.md` — the header block, the line beginning `**Дата вступления в силу:**`
-   - `docs/privacy-policy-v1.2.md` — the **top** row of the change-history table, i.e. the row whose
+   - `docs/privacy-policy-v1.3.md` — the header block, the line beginning `**Дата вступления в силу:**`
+   - `docs/privacy-policy-v1.3.md` — the **top** row of the change-history table, i.e. the row whose
      first cell is the version the header declares
    - `app/privacy.html` — the same header block, `<strong>Дата вступления в силу:</strong>`
    - `app/privacy.html` — the same top row of its change-history table
@@ -409,7 +473,11 @@ decides the order you do things in.
    it came into force. UIP-P6 set it to `27.08.2026`, **the day of promotion**, before publication rather
    than after. UIP-P8 set edition 1.2 to `28.08.2026` on the same rule and for the same reason — the day
    it is promoted, chosen before publication; if the promotion slips to another day, the four literals
-   move together **before** you promote, not after. **The date this step names is the day the revision reaches a parent, not the day it was
+   move together **before** you promote, not after. **NAV-P2 wrote `29.08.2026` into edition 1.3 as a
+   value it could not know**: the `NAV` milestone opens a PR at its close, so the promotion day was not
+   fixed when the edition was written. Treat that literal as unset until you have picked the day —
+   this step is where it is picked, and edition 1.3 is the first one written several packets before
+   its own promotion rather than in the packet that promotes. **The date this step names is the day the revision reaches a parent, not the day it was
    written**, and a merged-but-unpromoted revision is corrected here rather than superseded by a new
    edition.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
@@ -447,23 +515,34 @@ decides the order you do things in.
 
 ## Release build + APK distribution (RSN, owner-run)
 
-> **Owner action, and the only channel there is.** The signed release APK is built by the `Release` workflow (`.github/workflows/release.yml`) and **published by hand**. CI creates no release, uploads no asset, invokes no `gh`, and keeps `permissions: contents: read` — automated publication would need `contents: write` and is a decision that has not been taken (ADR-047). Distribution is direct APK handout (ADR-043 §3). **Merge is not delivery** (ADR-020), and on this channel nothing is automatic at all: a family device gets a new build only when a human hands it one.
+> **Owner action, and the only channel there is.** The signed release APK is built by the `Release` workflow (`.github/workflows/release.yml`) and **published by hand**. CI creates no release, uploads no asset, invokes no `gh`, and keeps `permissions: contents: read` — automated publication would need `contents: write` and is a decision that has not been taken (ADR-047). Distribution is direct APK handout (ADR-043 §3). **Merge is not delivery** (ADR-020), and on this channel no DELIVERY is automatic: a family device gets a new build only when a human hands it one. *(Narrowed at NAV-P4. This read "nothing is automatic at all", which `NAV-P2` falsified: the app can now TELL a parent that a new build exists — one request to the GitHub Releases API, on a press of «Обновление» and on nothing else, `NAV-P2-INV-001`, published policy edition 1.3 §6. What it still cannot do is download or install anything; «Установить» opens the release page in the phone's browser. Notice is automatic to ask for; delivery is not automatic at all.)*
 
-**What is proven, and what the first run executes for the first time.** This section describes a procedure that has never been run end to end, and it is written so a reader can tell the two apart. **No run of the `Release` workflow has ever happened, on any trigger.**
+**What has run, and what is still unobserved.** *(Rewritten at NAV-P4, and the rewrite is the point: this section used to open "This section describes a procedure that has never been run end to end … **No run of the `Release` workflow has ever happened, on any trigger.**" That was written at RSN-CLOSE on 2026-08-15 and was falsified three days later, by the owner's own first release. It then stood for eleven days while three releases shipped — a runbook telling its only reader that nothing here has ever happened, while the thing it describes had happened four times.)*
 
-| Proven, on every push | First executed by the owner, on the first release run |
+**The `Release` workflow has run four times, all green, on both of its triggers.** Measured with `gh run list --workflow=release.yml`: run **32104136618** (`workflow_dispatch`, on `main`, 2026-08-18), then three tag pushes — **32105726467** (`v0.1.183`, 2026-08-18), **32650457603** (`v0.1.221`, 2026-08-23), **33025455648** (`v0.1.236`, 2026-08-27). **Three releases are published by hand**, each carrying both files the procedure below requires: `theygrow-v{…}.apk` and `theygrow-v{…}.apk.sha256` (`gh release list`, `gh release view`).
+
+So the two-column table below no longer splits "proven" from "first execution". It splits **proven on every push** from **proven by those four runs**, and the right-hand column now holds facts rather than intentions. What is genuinely still unobserved is nothing about the workflow at all — it is two things about the world outside it, named immediately below the table.
+
+| Proven, on every push | Proven by the four release runs (2026-08-18 … 2026-08-27) |
 | --- | --- |
-| The comparator can go **red**, twice and differently: `pytest app/tests/release` in the `quality` job (its logic, against synthesised `apksigner` output), and the `android` job step *The signature comparator rejects a foreign certificate*, which runs the **real** `apksigner` against the **real** debug APK and requires exit **3** — a debug certificate is by definition not the release one. **Both halves are proven.** That step returned **4**, not 3, on every run from RSN-P2 until RSN-P4: `apksigner`'s signer line is scheme-qualified on the runner's build-tools and the parse pattern did not cover that shape, so the comparator never reached the comparison. It failed **closed**, which is correct, and RSN-P4 (`RSN-DL-005`) repaired the pattern and pinned it against the recorded bytes — and the `android` job of run **31898815923** is where "returns 3 against a foreign certificate with the real tool" first passed — exit **3** by the step's own `-ne 3` guard, since the log prints no status code — with both sides labelled and the tool named (build-tools 37.0.0). It has held since, including on `main` (run **31900363700**). Read this row as proven **on every push**; the **positive** verdict has still never been observed, and it is in the right-hand column (`RSN-P2-INV-001`, `XPT-DL-002`). | `ANDROID_KEYSTORE_BASE64` decoding to a keystore. |
-| Release packaging **fails closed**: the `android` job step *Release packaging fails closed without a usable signing environment* runs `:app:assembleRelease` twice — no signing environment, then a keystore it cannot open — and asserts the named token and that no release APK exists (`RSN-P1-INV-001`). | That keystore **opening** under `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_ALIAS` naming an entry inside it. |
-| The committed baseline parses, holds one fingerprint, and still says it is public (`app/tests/release/test_verify_release_signature.py`). | The comparator's **positive** verdict — the first time the committed baseline and the key in the secret ever meet. |
-| `release.yml` parses as YAML (`check-yaml`, via `pre-commit`). Its **behaviour** is not covered by that and by nothing else. | The in-run arm-check, the `output-metadata.json` read-back and the derived filename, `sha256sum -c`, the artifact upload, and the keystore-removal step. |
+| The comparator can go **red**, twice and differently: `pytest app/tests/release` in the `quality` job (its logic, against synthesised `apksigner` output), and the `android` job step *The signature comparator rejects a foreign certificate*, which runs the **real** `apksigner` against the **real** debug APK and requires exit **3** — a debug certificate is by definition not the release one. **Both halves are proven.** That step returned **4**, not 3, on every run from RSN-P2 until RSN-P4: `apksigner`'s signer line is scheme-qualified on the runner's build-tools and the parse pattern did not cover that shape, so the comparator never reached the comparison. It failed **closed**, which is correct, and RSN-P4 (`RSN-DL-005`) repaired the pattern and pinned it against the recorded bytes — and the `android` job of run **31898815923** is where "returns 3 against a foreign certificate with the real tool" first passed — exit **3** by the step's own `-ne 3` guard, since the log prints no status code — with both sides labelled and the tool named (build-tools 37.0.0). It has held since, including on `main` (run **31900363700**). Read this row as proven **on every push**. *(The sentence that stood here — "the **positive** verdict has still never been observed" — was falsified at NAV-P4: the comparator returned it on all four runs, since a run that failed it is red and none was.)* (`RSN-P2-INV-001`, `XPT-DL-002`). | `ANDROID_KEYSTORE_BASE64` decoded to a keystore, four times. |
+| Release packaging **fails closed**: the `android` job step *Release packaging fails closed without a usable signing environment* runs `:app:assembleRelease` twice — no signing environment, then a keystore it cannot open — and asserts the named token and that no release APK exists (`RSN-P1-INV-001`). | That keystore **opened** under `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_ALIAS` named an entry inside it. All three secrets are set and correct; the four green runs are what says so. |
+| The committed baseline parses, holds one fingerprint, and still says it is public (`app/tests/release/test_verify_release_signature.py`). | The comparator's **positive** verdict: the committed baseline and the key in the secret agree, and have on every run. |
+| `release.yml` parses as YAML (`check-yaml`, via `pre-commit`). Its **behaviour** is not covered by that and by nothing else. | The in-run arm-check, the `output-metadata.json` read-back and the derived filename, `sha256sum -c`, the artifact upload, and the keystore-removal step — all four times. The derived names are on the release pages: `theygrow-v0.1.183-183.apk`, `theygrow-v0.1.221-221.apk`, `theygrow-v0.1.236-236.apk`. |
 
-Individual steps below carry a **(first execution)** marker where they fall in the right-hand column.
+*(The line that stood here — "Individual steps below carry a **(first execution)** marker where they fall in the right-hand column" — went with the markers at NAV-P4. Every step of the workflow and of the hand-publication below has been executed.)*
 
-### Before the first run
+**WHAT IS STILL UNOBSERVED, AND IT IS NOT IN THE WORKFLOW.** Two things below are **not knowable from this repository**, and NAV-P4 deliberately left them unflipped rather than guessing from the fact that releases exist. Both are the owner's to record, and each is marked *(owner-fill)* where it stands:
+
+1. **Whether a release build has ever been INSTALLED on a device**, and therefore whether the sandbox-destroying first install described under *The first install destroys the app sandbox* has actually happened to anyone. A published release page is evidence of a publication, not of an install. § *The first install destroys the app sandbox*.
+2. **Whether either keystore-backup leg has ever been run.** § *Keystore backup and the restorability check*. Four green CI runs say the keystore in the Actions secret works; they say nothing at all about the two backup copies, which is exactly the thing that check exists for.
+
+### Before a run
+
+*(Titled "Before the first run" until NAV-P4. The first run happened on 2026-08-18; these four are preconditions for **any** run, and re-reading them is what a secret rotation or a keystore move calls for.)*
 
 1. **The key exists; this repository does not hold it.** Its certificate fingerprint is committed, in `keytool` / Play Console form, at `native/android/release-signing/cert-sha256.txt` — that file is the comparand every release run is checked against. It is a fingerprint **of** a certificate, not key material, and it is public on purpose. **Never move it into an Actions secret:** a detector whose expected value lives in the same store as the key it checks proves nothing.
-2. **Three repository Actions secrets must be set** — `ANDROID_KEYSTORE_BASE64` (the PKCS12 keystore, base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`. **There is no fourth.** PKCS12 has no separate key-entry password — `keytool` refuses to set one — so `native/android/app/build.gradle` feeds `keyPassword` the same variable as `storePassword` deliberately (`RSN-DL-001`). Whether the three are currently set is not knowable from this repository; the first run is what says so, by name.
+2. **Three repository Actions secrets must be set** — `ANDROID_KEYSTORE_BASE64` (the PKCS12 keystore, base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`. **There is no fourth.** PKCS12 has no separate key-entry password — `keytool` refuses to set one — so `native/android/app/build.gradle` feeds `keyPassword` the same variable as `storePassword` deliberately (`RSN-DL-001`). *(This used to end "Whether the three are currently set is not knowable from this repository; the first run is what says so, by name." It has said so: four green runs decoded the keystore, opened it and found the alias. The sentence is kept in its corrected form because the reasoning still holds for anyone who rotates a secret — the next run is what says the new one is right.)*
 3. **Key custody (`solo-shortcuts-registry` C-2 — an obligation, not a wish).** The keystore lives in **two separate places**, and the store password is held **apart from the file**, so that losing one does not lose both. Losing the key is not recoverable: every future build would carry a different identity, and every device would need an uninstall-reinstall. Verify the backups periodically — see **Keystore backup and the restorability check** below.
    - **Backup copy A:** *location to be recorded by the owner.*
    - **Backup copy B:** *location to be recorded by the owner — a different place, not a second folder in the first one.*
@@ -475,18 +554,18 @@ Individual steps below carry a **(first execution)** marker where they fall in t
 
 1. **Trigger it** — two ways, and the difference decides the first run's order:
    - **Tag push.** Push a tag matching `v*` at the commit you want released. **The tag name does not set the version** (see step 3); it selects the commit and it is what makes the release identifiable afterwards.
-   - **`workflow_dispatch`.** GitHub → **Actions** → **Release** → **Run workflow**. Documented GitHub behaviour, and unexecuted here: **the manual button only appears once the workflow file is on the default branch.** Until this milestone merges, a tag is the only trigger available; after it merges, both are.
+   - **`workflow_dispatch`.** GitHub → **Actions** → **Release** → **Run workflow**. **Both triggers have been used**: the manual button first, on `main`, run **32104136618** (2026-08-18), and tag pushes for all three releases since. *(This read "Documented GitHub behaviour, and unexecuted here … Until this milestone merges, a tag is the only trigger available" — written while `release.yml` was still on a branch. It has been on the default branch since the RSN merge, the button appeared, and it was pressed.)*
    - The two triggers are the whole list on purpose. Every run of this workflow decodes the keystore, so the number of runs that touch that secret is kept small. **There is deliberately no `push` on branches — do not add one** (`RSN-DL-002`).
    - Runs are serialised (`concurrency: release`) and never cancelled in flight: a cancelled run can be killed before its cleanup step completes, leaving a decoded keystore on a runner it no longer controls.
-2. **Watch it.** No Telegram message arrives — `notify.yml` is scoped to the `CI` workflow only, and that was left as it is deliberately (`RSN-DL-003`). Read the run page. **(first execution)** for every step in it.
-3. **What a green run produces** — **(first execution)**, and the naming path in particular: no run has ever read `output-metadata.json` or derived a filename from it. One artifact, `theygrow-release-apk` (retention **30 days**), holding exactly two files:
+2. **Watch it.** No Telegram message arrives — `notify.yml` is scoped to the `CI` workflow only, and that was left as it is deliberately (`RSN-DL-003`). Read the run page. A green run takes about **two minutes** (2m07s–2m22s across the four).
+3. **What a green run produces** — observed four times, the naming path included. One artifact, `theygrow-release-apk` (retention **30 days**), holding exactly two files:
    - `theygrow-v{versionName}-{versionCode}.apk` — e.g. `theygrow-v0.1.147-147.apk`. `versionCode` is `git rev-list --count HEAD` at the released commit (reproducible from the commit, monotone along ancestry — a CI run number is neither), and `versionName` is `0.1.{versionCode}`, the marketing half being the one number a human ever chooses. Both are **read back from the build's own `output-metadata.json`**, not re-derived: the filename is a claim about the APK, and re-deriving would agree with itself even if the APK disagreed.
    - `theygrow-v{versionName}-{versionCode}.apk.sha256` — `sha256sum`'s own format, so `sha256sum -c` works with the two files side by side.
 4. **Nothing else survives the run.** The decoded keystore lives only under `RUNNER_TEMP`, never in the workspace or the build tree, and the final step removes it and fails the job if it is still there. It is `rm`, not `shred`, and the reason is written into the workflow: the runner VM and its disk are destroyed with the run, and `shred` on an overlay filesystem does not deliver what its name promises.
 
 ### Publishing it, by hand
 
-**(first execution) — all of it.** Nothing here has been done before: no artifact of this workflow has ever been downloaded, and nothing has been published on this channel.
+**Done three times.** `v0.1.183` (2026-08-18), `v0.1.221` (2026-08-23) and `v0.1.236` (2026-08-27) were each downloaded from their run page and published by hand, and each release carries both files. *(This read "**(first execution) — all of it.** Nothing here has been done before: no artifact of this workflow has ever been downloaded, and nothing has been published on this channel." — corrected at NAV-P4.)*
 
 1. **Download the artifact** from the run page. It arrives as a `.zip` (the Actions UI always zips artifacts).
 2. **Unzip it and publish the two files inside — verbatim.** Not the zip, not renamed, not re-compressed. The checksum was computed on the APK this run produced; re-wrapping it is what makes a good checksum look wrong to the person checking it.
@@ -497,7 +576,10 @@ Individual steps below carry a **(first execution)** marker where they fall in t
    2. Merge and deploy as usual, then promote per **Promotion + rollback (L1 deploy-safety gate)**. **The state lives in the shell and not under `/m/v{N}/` deliberately:** the mount is served `immutable, max-age=2592000` and its bytes are never rewritten, so a flag there would have cost a whole mount generation, a `CACHE_VERSION` bump and a promotion for one token. The shell is `max-age=3600, must-revalidate` and served network-first, so this reaches installed clients on their next navigation.
    - **Ordering is the whole point.** Flipping the token before the release page carries the two files puts a visitor on a page with nothing on it — the dead promise the withholding exists to prevent. Nothing in CI can catch that: the token is a statement by you, and `DIA-P2-INV-002` checks only that the code obeys it.
    - **If a release is ever withdrawn or the repository is made private, set it back to `none`.** The link would 404 for every visitor and no test would go red.
-6. **Handout text (Russian — it is read by the people installing, not by whoever runs this procedure).** Fill in the filename and the checksum:
+6. **Handout text (Russian — it is read by the people installing, not by whoever runs this procedure).** Fill in the filename and the checksum.
+
+   **Step 3 was split at NAV-P4, and the split is not cosmetic.** It read as one instruction — «обновиться поверх неё нельзя … прежнюю нужно удалить, и вместе с ней удалятся все данные» — written when the only thing that could already be on a phone was a debug build. Three releases later that is no longer the only case, and it is the expensive one to get wrong: every release is signed by the same key (the comparator verifies the committed fingerprint on every run), so a **previous release** updates over cleanly, and telling its holder to uninstall costs them their local database for nothing. **A DEBT THIS PACKET CANNOT CLOSE:** the three release bodies already published on GitHub carry the un-split text. Editing them is an owner act on the release pages — see `NAV-DL-004`.
+
 
 ```
 theygrow — приложение для Android
@@ -509,17 +591,24 @@ SHA-256: <строка из файла .sha256>
 2. Android предупредит про установку из неизвестных источников. Это ожидаемо:
    приложение не из Google Play, оно передаётся напрямую. Разрешите установку
    для того приложения (браузер или файловый менеджер), из которого открываете файл.
-3. ВАЖНО, если на телефоне уже стоит прежняя тестовая сборка: обновиться поверх
-   неё нельзя — у новой версии другая подпись. Прежнюю нужно удалить, и вместе с
-   ней удалятся все данные, которые вы вносили в приложении на телефоне. Если там
-   есть что-то нужное — сначала «Сохранить архив» и скопируйте архив с телефона.
+3. Если на телефоне УЖЕ СТОИТ это приложение — два разных случая, не перепутайте:
+   а) ПРЕДЫДУЩИЙ ВЫПУСК (файл вида theygrow-v0.1.NNN-NNN.apk): просто установите
+      новый поверх. Подпись у всех выпусков одна и та же, данные остаются на
+      месте, удалять ничего не нужно.
+   б) ПРЕЖНЯЯ ТЕСТОВАЯ сборка, которую ставили до первого выпуска: обновиться
+      поверх неё нельзя — у выпуска другая подпись. Прежнюю нужно удалить, и
+      вместе с ней удалятся все данные, которые вы вносили в приложении на
+      телефоне. Если там есть что-то нужное — сначала «Сохранить архив» и
+      скопируйте архив с телефона.
 4. История в браузере (веб-версия) при этом никуда не денется. Ничего в браузере
    очищать не нужно — и не очищайте.
 ```
 
 ### The first install destroys the app sandbox — read this before installing
 
-**The release APK is signed by a different key than the debug build that is installed today, so Android will not update over it** (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). The install is **uninstall-then-install**, and the uninstall takes the **app sandbox** with it: the SQLCipher-encrypted store, the key held in `EncryptedSharedPreferences`, and everything written on that phone since L1-P4. Android Auto Backup is off by design (`LSC-P1-INV-002`), so there is no cloud copy anywhere. **(first execution)** — no release build has been installed on any device, so the failure mode described here is the documented Android behaviour for a signature change, not something observed on this app.
+**This section is about ONE transition — a debug build to a release build — and NAV-P4 says so in its first line, because it stopped being the only transition there is.** Release-to-release is the ordinary case now and is not this case: every release is signed by the same key, so a newer release installs over an older one and the sandbox survives.
+
+**A release APK is signed by a different key than a debug build, so Android will not update over one** (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). That install is **uninstall-then-install**, and the uninstall takes the **app sandbox** with it: the SQLCipher-encrypted store, the key held in `EncryptedSharedPreferences`, and everything written on that phone since L1-P4. Android Auto Backup is off by design (`LSC-P1-INV-002`), so there is no cloud copy anywhere. **(owner-fill)** — whether any release build has actually been installed on a device is **not knowable from this repository**; three published releases are evidence of publication, not of an install. Until the owner records otherwise, the failure mode described here is the documented Android behaviour for a signature change rather than something observed on this app.
 
 - **Precondition.** If the sandbox holds anything worth keeping, **export first** — *The export archive — L1-P3* below — and copy the archive **off the device** before uninstalling. An archive still on the phone is deleted with the app.
 - **The app-side export does NOT protect the family's real history, and must not be treated as if it did.** That history lives in the **browser's `localStorage` under the production origin**. It is untouched by any uninstall, it is the only real copy, and **it must not be cleared** — not before this install, not after a successful one. *(Rewritten at PPR-P3. This sentence used to end "until the browser→app transfer path exists", and added that the migration bridge reads the WebView's own storage. That path was built at DIA-P1 and **retired at PPR-P2 without ever having been run against a family's real history**, so the condition it named can no longer be met and the rule is now unconditional: there is nothing on the phone that can stand in for the browser copy, and no procedure in this runbook that moves it.)* ADR-043 §3 and its 2026-08-15 annotation; the one-way import in *The write path and the legacy import — L1-P4* was never reconciliation and now has no source at all.
@@ -559,7 +648,7 @@ Every failure below prints a bare `THEYGROW_RELEASE_*` token, so a raw CI log ca
 
 A backup nobody has opened is a belief. This check is the only thing that ever tells you the keystore backup is still usable, and it is the standing half of the C-2 obligation — it is not deferred to any trigger. It publishes nothing, uploads nothing and changes nothing.
 
-**Cadence.** Before each release run, and on a standing period between releases. Run it against **both** backup copies, not the convenient one. **(first execution)** — neither leg has been run by anyone; whether the backups open at all is not known from this repository, and that is precisely what makes this check worth its place rather than an obligation on paper.
+**Cadence.** Before each release run, and on a standing period between releases. Run it against **both** backup copies, not the convenient one. **(owner-fill)** — whether either leg has ever been run is **not knowable from this repository**, and four green release runs say nothing about it: they exercise the keystore in the Actions secret, which is the copy this check is not about. That gap is precisely what makes this check worth its place rather than an obligation on paper. *(This read "**(first execution)** — neither leg has been run by anyone"; NAV-P4 could confirm neither half of that and made it an owner-fill line rather than leave a claim nothing measured.)*
 
 **Leg (a) — the backup leg. This is the leg that discharges the obligation.** For each copy, open it with the password from its separate home and read the certificate out:
 
@@ -755,14 +844,35 @@ buildless, as `native/package.json` says.
    - **since L3-P1, check what BACKGROUNDING does — this is the step that tells a parent's device from a test's.** With the device attached and `adb logcat -s TheyGrowSignal` running: press **Home**, or lock the screen. Within a second a `[signal] store.close outcome=complete failure_class=none close_ms=…` must appear. Then reopen the app **and touch something that reads the store** — open the diary — and a second `[signal] store.open …` must appear carrying **`previous_run_clean=true`**. Those two lines together are the whole of `FIU-P1-INV-001` as a parent's phone performs it, and `previous_run_clean=true` is the one that says the `PRAGMA integrity_check` at every launch is over. **If the close line never appears**, this handset's WebView does not deliver the visibility change at `onStop` and the park needs the native belt `FIU-DL-001` alternative 3 describes — record the handset and its Android version, because that is the finding.
    - **and check the return, which is a UX step and not a log step.** Open the diary or the activities window, press **Home**, come back. The app must be where you left it, with **nothing** over it. *(Rewritten at L3-P2. This step used to name the «Перенести историю» screen, and added that getting it once at a cold start was still shipped behaviour with P2 as its address. That has happened: the transfer offer is removed from the product outright, so on no launch and no return is there a transfer screen to get. What to look for now is the general form — a return must add nothing to the screen — because that is what `FIU-P1-INV-001`'s off-device leg was rewritten to assert too.)*
    - **since L3-P2, check what a FIRST launch does, on a device with no child yet.** Install onto a handset that has never held this app (or clear its data), open it, and close the greeting. The app must ask you to create a child's profile by itself — the create-profile window, with a name and a birthdate. **There must be no offer to move anything from a browser, at any point.** Fill it in: the header must then carry the child's name, and ticking a skill must stick. That whole path is `FIU-P2-INV-001`, and this is the only place it is observed on a real handset; the browser channel's half of it runs on every push.
-   - **since L3-P3, check that the greeting closes FOR GOOD, and that you can get it back.** On a first
-     launch, close the greeting with the **✕** (not the «Закрыть» button — the ✕ is the one that used to
-     forget). Force-stop the app and open it again: the greeting must **not** appear. Then press the round
-     **«?»** in the header: the same window must open, and it must open again every time you press it. That
-     pair is `FIU-DL-001` debt 14 as a parent's phone performs it — a text read once, reachable always.
-   - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** Open the
-     greeting with «?» and scroll to the bottom: «Политика конфиденциальности» must be there, and pressing
-     it must open the document — the real page, in a new tab, not a 404 and not the skills table. *(Rewritten
+   - **since UIP-P3, check that the greeting does NOT come up by itself, and that you can still get to it.**
+     On a first launch the greeting must **not** appear — not on that launch and not on any later one; the
+     auto-open is gone, and with it the whole «close it with ✕ and see whether it stays closed» check this
+     step used to carry (that check was written for `FIU-DL-001` debt 14 and stopped being performable when
+     `UIP-P3` removed what it was about). Then open the **menu** in the header — the control with three
+     horizontal bars, and since `NAV-P3` the only one on the right besides the profile, the diary having
+     left the header for the surface switcher below it — and press
+     **«О приложении»**: the greeting must open, and it must open again every time you press it. That is
+     the same debt as a parent's phone performs it today — a text that never interrupts, reachable always.
+   - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** With the
+     greeting open, scroll to the bottom: «Политика конфиденциальности» must be there, and pressing it must
+     open the document — the real page, in a new tab, not a 404 and not the skills table.
+   - **since NAV-P1, check the menu itself.** Since NAV-P2 it must carry exactly **three** rows — «О
+     приложении», «Сохранить архив» and «Обновление». Choosing either of the first two must close the menu
+     and open its window; pressing the archive row must reach the same archive window the header button
+     used to open, and nothing about the archive itself changed.
+   - **since NAV-P2, press «Обновление» — this is the one check no test in this repository can stand in
+     for.** The row must fill while it works and land on one of two answers: «Обновлений нет», or «Есть
+     новая версия» with an «Установить» link under it. **Pressing «Установить» must open the release page
+     in the phone's own browser, outside the app.** That last hop is Capacitor's default handling of a
+     `target="_blank"` anchor and is **unmeasured in this repository** — no anchor has ever been clicked
+     inside a real WebView here, and no emulator leg asserts it — so this is where it is first observed.
+     Record what happened; if the link does nothing, the row is offering an install nobody can complete.
+     **With the phone in airplane mode the same press must say «Не удалось проверить: нет соединения» and
+     leave the menu working** — the honest-failure half, and it costs one toggle.
+     **What the row must NOT do, and is worth looking for once:** nothing may happen on launch, on opening
+     the menu, or at any other moment. The executing evidence for that is
+     `app/tests/update-check.spec.js` on every push, against a real browser's network log; the phone check
+     is a second pair of eyes on it, not the evidence. *(Rewritten
      at PPR-P3. This step used to say the opposite — that there must be **no** link there yet, because the
      document was not published and the declaration fails closed. Both halves have happened: PPR-P1 put the
      document at `/privacy` and PPR-P3 set `content="published"`.)* **On a phone this checks the build in
@@ -873,7 +983,7 @@ scripts/parity-suite.sh --project=contract    # no network, no scheduling, the c
 
 **Diary smoke (owner-run, after installing the APK — DIA-P3).** The instrumented gate presses these same controls, but on a fresh emulator image with an engine that was made full on purpose. What no test can do is read the sentences as a parent reads them, so read them.
 
-1. Open the app and press **Дневник** in the header. On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Press **«Создать профиль»** there and fill it in. **Since UIP-P4 what follows is the packet's whole subject, so read it as a parent would:** the entry form must open **by itself**, with the cursor already in the text field, and it must be the **only** thing on screen — the create window closed, nothing stacked behind or above it. Press **«Закрыть»** (the form's second button says exactly that, and here it closes the window rather than returning to a list): you must be back on the table, with the child's name in the header and nothing else open, and **no entry must have been written**. Now press **Дневник** again: the list is empty and says «Записей пока нет», and «Новая запись» is where it always was. *(The old wording of this step — «Create a profile, reopen: the list is empty…» — described the app before UIP-P4, when nothing happened after a profile was created; it is the symptom the owner found on a device.)* **And when you add a SECOND child later** — the dropdown, «+ Создать новый профиль» — the same form appears for them; write two words and press «Сохранить», then check the entry stands in the **new** child's diary and that the first child's is untouched. Off-device that is `app/tests/diary-save.spec.js`; on a phone it is the only place the real store answers.
+1. Open the app and press **«Дневник»** in the surface switcher under the header. *(Rewritten at `NAV-P3`: the diary was a header button until that packet and is now the second SURFACE of an ordered pager, reached by the switcher or by a left swipe from the skills table. The step named a control that no longer exists.)* On a phone with no profile yet, the window must say that a profile is needed and must **not** offer «Новая запись» — a form that is going to refuse is a way of making somebody write something and lose it. Press **«Создать профиль»** there and fill it in. **Since UIP-P4 what follows is the packet's whole subject, so read it as a parent would:** the entry form must open **by itself**, with the cursor already in the text field, and it must be the **only** thing on screen — the create window closed, nothing stacked behind or above it. Press **«Закрыть»** (the form's second button says exactly that, and here it closes the window rather than returning to a list): you must be back on the table, with the child's name in the header and nothing else open, and **no entry must have been written**. Now press **«Дневник»** in the switcher again: the list is empty and says «Записей пока нет», and «Новая запись» is where it always was. *(The old wording of this step — «Create a profile, reopen: the list is empty…» — described the app before UIP-P4, when nothing happened after a profile was created; it is the symptom the owner found on a device.)* **And when you add a SECOND child later** — the dropdown, «+ Создать новый профиль» — the same form appears for them; write two words and press «Сохранить», then check the entry stands in the **new** child's diary and that the first child's is untouched. Off-device that is `app/tests/diary-save.spec.js`; on a phone it is the only place the real store answers.
 2. Press **Новая запись**. The day defaults to today. **Set it back a few days** — this is the one product claim the smoke exists for: a parent writes in the evening about the morning, and the entry belongs to the day it is about.
 3. Write two or three sentences and press **Сохранить**. **Three things must happen together:** the window stays open, the list comes back, and the new entry is at the top of it with the day you chose. The window not closing is deliberate (`DIA-DL-005` (g)) — the list is the confirmation.
 4. Press **Изменить** on that entry, change a word and the day, and save again. The list must show **one** entry, corrected. A second entry appearing means an edit has become an append and the diary has silently become a journal — stop and report it.
@@ -1103,7 +1213,7 @@ milestone* step 10 withdrew at L3-P4 and which PPR-P2 made impossible outright b
 mechanism. The current order is: the diary and its search, then the export archive, whose step 9 reads
 the diary entry back out of the archive.)*
 
-1. **Write an entry.** Open **Дневник** in the header. The window opens on the list. *(Since UIP-P4 there is a
+1. **Write an entry.** Press **«Дневник»** in the surface switcher under the header, or swipe left from the skills table. The diary surface opens on the list. *(Rewritten at `NAV-P3`, which took the diary out of the header — see the swipe-and-back smoke below.)* *(Since UIP-P4 there is a
    second way in, and on a fresh install you meet it first: creating the profile opens the entry form by itself.
    That flow has its own step — see the Дневник smoke below — and this one starts after it has been closed.)*
    Press **Новая запись**,
@@ -1157,6 +1267,50 @@ query, so the parent sees their entry rather than an explanation (`DIA-DL-008` (
 them about it; `rebuilt=true` in the signal line above is where an operator reads that it happened. If a
 search that should hit keeps missing across a full restart of the app, that is the case to report — it is
 not a case the parent can fix and not one this procedure has a command for.
+
+### Swiping between surfaces, and the hardware back button — NAV-P3 (owner-run)
+
+**Run this on the phone, after installing the APK, and run it BEFORE the diary smoke below it** — that
+smoke now starts by reaching the diary, and this is the step that says the two ways of reaching it work.
+The instrumented gate presses these same things (`BackButtonTest`), and the parity suite drives the same
+gesture off-device with a mouse; what neither can do is tell you whether it feels like a page turning
+under your thumb, so use it as a parent would rather than as a checklist.
+
+1. **The header no longer has a diary button, and that is the first thing to confirm.** On the right you
+   have the profile and the menu (three bars), and **nothing else**. Under the header there is a row with
+   two names: **Навыки** and **Дневник**, with «Навыки» marked as the one you are on. If you still see a
+   notebook icon in the header, you are running an older build.
+2. **Swipe left on the skills table.** The diary arrives from the right. Swipe **right** anywhere on the
+   diary: you are back on the table, and the switcher's mark has moved back to «Навыки». Do it a few
+   times; nothing should accumulate, and nothing should be left half-open.
+3. **Check that the gesture does not eat the content, which is the half worth being slow about.**
+   Scroll the table **up and down** with an ordinary drag — it must scroll, and must not turn the page,
+   even when your thumb is not perfectly vertical. **Tap** a skill — the card must open, not a page turn.
+   Then open the diary, put the cursor in a text field and drag sideways inside it: you must be selecting
+   text, not leaving the diary.
+4. **The non-gesture way must work too, and for some parents it is the only way.** Press **«Дневник»** in
+   the switcher: the diary opens. Press **«Закрыть»** at the foot of the diary: you are back. If you have
+   a keyboard attached, Tab to those two names and press Enter — both must work, because the swipe reaches
+   nobody who does not use a finger.
+5. **The hardware back button, three presses, in this order — this is the packet.**
+   - Open **«О приложении»** from the menu and press **back**: the window closes, and you are still in the
+     app, still on the skills table.
+   - Open the **diary** and press **back**: you are back on the skills table, and the app is still open.
+   - Now, on the skills table with nothing open, press **back**: the app goes to the background, exactly
+     as any other app does. **There must be no «press again to exit», no confirmation dialog and no
+     toast** — if you meet one, it did not come from this product.
+6. **Open a skill card and follow a link inside it — «Требуемые навыки», «Открывает дальше» or
+   «Откроется, когда», any of the three.** The control in the card's top-right corner changes from **×**
+   to **↩** as soon as there is a card behind you: it says what it will do next. Press **back** (or that
+   control): you return to the previous card, and the sign goes back to **×**. Press **back** again: the
+   card closes. **The trail is of cards you have visited, not of prerequisites** — following «Открывает
+   дальше» puts a card on it just the same, which is what the owner observed and what the measurement
+   confirmed.
+7. **What this smoke cannot reach.** Whether some other handset's WebView cancels a pointer gesture for
+   reasons Chromium on this one does not — the recogniser treats a cancelled pointer as «the browser took
+   this gesture», deliberately, because that is what makes scrolling win. If a page turn ever fails to
+   register on a particular phone, the switcher still works and that is the finding to report, with the
+   handset and its Android version.
 
 ### Closing a milestone: the owner sequence, end to end (L2 / DIA-P4; step 4 added at L3 / FIU-P4)
 
@@ -1271,6 +1425,24 @@ not a case the parent can fix and not one this procedure has a command for.
    Expected to come back GREEN, all four: `visual-desktop/header.png`, `visual-mobile/header.png`,
    `visual-mobile/modal-create-profile.png`, `visual-mobile/modal-skill.png`.
 
+   **FOR THE NAV MILESTONE THE SET IS DIFFERENT AND IS ALREADY MEASURED, so do not read the UIP list
+   above as this milestone's expectation.** `NAV-P3` ran both visual projects in the pinned container
+   before handing over: **18 passed, 2 failed** — `visual-desktop/modal-skill.png` and
+   `visual-mobile/modal-skill.png`, and nothing else. Both move for one glyph: the skill window's single
+   control now ships `×` «Закрыть» in its resting state instead of `↩`. Both `header.png` shots came back
+   **GREEN**, which is the load-bearing half of that measurement — `#diaryBtn` left the shell and
+   `#surfaceNav` arrived in the same packet, and both are `display: none` on the web channel, so the
+   rendered header is unchanged. **A finding rather than a re-bless for this milestone:** any third PNG
+   moving, either `header.png` moving, or any red outside the two visual projects. **For `NAV-P3` this step
+   is already DONE and needs no owner run:** both diffs were decoded before re-blessing and each marks a
+   single **23×15 px** region at the skill window's top-right corner — 80 marked pixels at x 946-968,
+   y 89-103 on desktop, 74 at x 347-369, y 46-60 on mobile — which is the control and nothing else, with
+   both canvases unchanged in size, so there is no layout movement anywhere. The two PNGs were re-blessed
+   in the pinned container and both visual projects then came back **20 passed / 0 failed**. The move is an
+   expected consequence of an owner decision (the skill window's control now rests at `×` «Закрыть»), so
+   there was nothing to adjudicate; a **checkpoint is taken only on a clean state**, which is why it was
+   not left open.
+
    **The DOM baselines are NOT part of this step and were re-blessed by the agent at UIP-P1**, because they
    are neither viewport- nor font-metric-dependent and run on the host. **Four moved, in two pairs.**
    `dom-desktop/control-footer.html` and `dom-mobile/control-footer.html` lost the PPR-P2 comment block
@@ -1299,9 +1471,10 @@ not a case the parent can fix and not one this procedure has a command for.
    in place, so through that milestone `CACHE_VERSION` stayed **v16** and the mount checks addressed `/m/v6/`.
    *(Corrected at L3-P1, `FIU-DL-001`: that sentence was written while `/m/v6/` was still unpublished, and it
    stopped describing the tree the moment L2 merged. L3-P1 bumped the mount to `/m/v7/` with `CACHE_VERSION`
-   **v17**, PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, and UIP-P1 bumped it to
-   `/m/v9/` with `CACHE_VERSION` **v19**, so the checks in step 3 address `/m/v9/` — as the corrected
-   lines there now do, corrected a second time at PPR-P3. The rule the L2
+   **v17**, PPR-P2 bumped it again to `/m/v8/` with `CACHE_VERSION` **v18**, UIP-P1 bumped it to
+   `/m/v9/` with `CACHE_VERSION` **v19**, and NAV-P1 bumped it to `/m/v10/` with `CACHE_VERSION` **v20**,
+   so the checks in step 3 address `/m/v10/` — as the corrected lines there now do, corrected a third time
+   at NAV-P1. The rule the L2
    note is an instance of, and the one to apply at every future close, is `Module mount` item 1: read the
    current values out of `app/index.html` and `app/sw.js` rather than out of this sentence.)*
 9. **Promote 100% traffic**, then perform the installed-client check — **Promotion + rollback**, steps 4–5.
@@ -1327,9 +1500,9 @@ not a case the parent can fix and not one this procedure has a command for.
     done**: nothing in the code removes, rewrites or marks the source consumed, no transfer exists to
     confirm, and the browser copy is therefore the only copy of a family's history with no path off it. The
     decision and the moment stay the owner's, and the honest default is *not yet*. Removing the install
-    prompt (PDR-034 §3, gated on this smoke). Retiring `m/v1`–`m/v8`. *(Rewritten at UIP-P1 in two places. `/m/v9/` is the running generation since that
-    packet, so `/m/v8/` joins the list of generations an owner may retire, and retiring any of them stays
-    an owner-level decision. And **the GA4 item is gone from this list entirely, by removal rather than by
+    prompt (PDR-034 §3, gated on this smoke). Retiring `m/v1`–`m/v9`. *(Rewritten at UIP-P1 in two places and extended at NAV-P1. `/m/v10/` is the
+    running generation since that packet, so `/m/v9/` joins the list of generations an owner may retire, and
+    retiring any of them stays an owner-level decision. And **the GA4 item is gone from this list entirely, by removal rather than by
     action**: it read "The GA4 surface, which stays until authentication appears at L4", and vault
     `ADR-043`'s 2026-08-25 annotation (class: reversal) took analytics off the web showcase altogether —
     there is no surface left for an owner to decide about, and nothing here for anyone to do. See
@@ -1421,7 +1594,7 @@ uv tool install "graphifyy[sql]"
 
 The upstream distribution is `graphifyy` (two `y`s); the commands it installs are `graphify` and `graphify-mcp`. Installed version at the time of writing: **0.9.48**.
 
-**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v9/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
+**The `[sql]` extra is not optional, and the reason is measured.** It pulls `tree-sitter-sql` (0.3.11 here); without it every `.sql` file in the repository contributes **nothing** to the graph — and that includes `app/m/v10/store/schema/001-core.sql`, the live mount's schema, which carries the DDL, the append-only triggers and the views. With the extra, that one file supplies **26 nodes**, and `scripts/dev/init-pgvector.sql` one more. Anyone who installs plain `graphifyy` gets a graph with the schema missing and no error to say so.
 
 *(A note on a number that will not reproduce: before `.graphifyignore` landed, the graph held **209** `.sql` nodes across **9** files. Eight of those files were the same `store/schema/001-core.sql`, once per module generation — 7 frozen copies × 26 nodes, plus the live one, plus the dev script. The exclusion removed the duplicates, not the schema.)*
 
@@ -1456,7 +1629,7 @@ Each prints a number; an absence of output is not evidence. A non-zero count in 
 
 **5. Corpus exclusions.**
 
-`.graphifyignore` at the repository root (`ADR-051` p.7) keeps the frozen module generations `app/m/v1…v7` out of the graph; without it they are 323 of 556 scanned files and 48.5% of all nodes, and navigation lands in a frozen copy instead of the live mount. **Maintenance action, one line:** when a new generation goes live, add the one it replaces to that file.
+`.graphifyignore` at the repository root (`ADR-051` p.7) keeps the frozen module generations out of the graph; without them excluded they are 323 of 556 scanned files and 48.5% of all nodes, and navigation lands in a frozen copy instead of the live mount. **The list is `app/m/v1` through `app/m/v8` today** — this sentence said `v1…v7` for two bumps after `v8` was added to the file, which is the same drift the mount line in step 3 warns about, so it now names the range instead of a fixed end. **Maintenance action, one line:** when a new generation goes live, add the one it replaces to that file — open at NAV-P1, where `/m/v10/` becomes the shell's mount but nothing is live until the owner promotes.
 
 Changing `.graphifyignore` makes the next incremental run prune the now-excluded nodes by itself. If stale nodes survive a run, force a full re-scan:
 

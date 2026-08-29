@@ -75,10 +75,10 @@ test.describe('the diary is offered only where the store it writes to exists', (
         // channel does offer is visible in the same shot — otherwise a renamed
         // id or a shell that failed to boot would make "hidden" true for the
         // wrong reason.
-        await expect(page.locator('#diaryBtn')).toHaveCount(1);
+        await expect(page.locator('#surfaceDiaryBtn')).toHaveCount(1);
         await expect(page.locator('#activitiesBtn')).toBeVisible();
 
-        await expect(page.locator('#diaryBtn')).toBeHidden();
+        await expect(page.locator('#surfaceDiaryBtn')).toBeHidden();
         await expect(page.locator('#diaryModal')).toBeHidden();
     });
 });
@@ -101,10 +101,10 @@ test.describe('on the native channel the diary opens, and says why it cannot be 
         // stand in for it.
         await gotoApp(page, { state: STATES.seeded });
 
-        await expect(page.locator('#diaryBtn')).toBeVisible();
+        await expect(page.locator('#surfaceDiaryBtn')).toBeVisible();
         await expect(page.locator('#diaryModal')).toBeHidden();
 
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
 
         await expect(page.locator('#diaryModal')).toBeVisible();
         await expect(page.locator('#diaryModal')).toHaveCSS('display', 'block');
@@ -122,7 +122,7 @@ test.describe('on the native channel the diary opens, and says why it cannot be 
         // help, creating a profile cannot. Before the surface told them apart,
         // one string covered both.
         await gotoApp(page, { state: STATES.seeded });
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
 
         await expect(page.locator('#diaryNoStore')).toBeVisible();
         await expect(page.locator('#diaryNoStore')).toContainText('хранилище');
@@ -143,7 +143,7 @@ test.describe('a refusal leaves the parent holding their text', () => {
 
     test('an entry with no text is refused, and the window stays open', async ({ page }) => {
         await gotoApp(page, { state: STATES.seeded });
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await revealForm(page);
 
         await page.locator('#diarySaveBtn').click();
@@ -166,7 +166,7 @@ test.describe('a refusal leaves the parent holding their text', () => {
         const written = 'Впервые сам встал у дивана и держался почти минуту';
 
         await gotoApp(page, { state: STATES.seeded });
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await revealForm(page);
 
         await page.locator('#diaryEventDate').fill('2026-02-01');
@@ -193,7 +193,7 @@ test.describe('a refusal leaves the parent holding their text', () => {
         // Checked as an absence, which is the only way it can be checked: the
         // words that would make a lost entry read as the parent's fault.
         await gotoApp(page, { state: STATES.seeded });
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await revealForm(page);
         await page.locator('#diaryBody').fill('текст');
         await page.locator('#diarySaveBtn').click();
@@ -263,7 +263,7 @@ test.describe('a fresh install reaches a working profile by itself', () => {
         await bootWithStore(page, null);
 
         // ANTI-VACUITY: a shell that failed to boot would make every count zero.
-        await expect(page.locator('#diaryBtn')).toBeVisible();
+        await expect(page.locator('#surfaceDiaryBtn')).toBeVisible();
         expect(
             await page.locator('#importModal').count(),
             'the transfer offer is back in the shell'
@@ -328,7 +328,7 @@ test.describe('the diary refusal offers the act that resolves it', () => {
         await page.locator('#cancelProfile').click();
         await expect(createProfileModal(page)).toHaveCSS('display', 'none');
 
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryModal')).toBeVisible();
         await expect(page.locator('#diaryNoChild')).toBeVisible();
         await expect(
@@ -360,7 +360,7 @@ test.describe('the diary refusal offers the act that resolves it', () => {
 
     test('THE ARM — with a child there is no such button', async ({ page }) => {
         await bootWithStore(page, A_CHILD);
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryNewBtn')).toBeVisible();
         await expect(page.locator('#diaryCreateProfileBtn')).toBeHidden();
         await expect(page.locator('#diaryNoChild')).toBeHidden();

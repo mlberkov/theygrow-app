@@ -3,7 +3,7 @@
 // The privacy policy page, as a property of the tree (PPR-P1).
 //
 // WHAT THIS FILE IS FOR. app/privacy.html is a CONVERSION of the CURRENT
-// edition of the document — docs/privacy-policy-v1.2.md since UIP-P8 — written
+// edition of the document — docs/privacy-policy-v1.3.md since NAV-P2 — written
 // by hand because this repository is buildless by contract: there is no
 // renderer to trust and no build step to blame. A conversion drifts silently:
 // someone fixes a sentence in one file, the other keeps saying the old thing,
@@ -65,7 +65,7 @@ const ROUTE = '/privacy';
 
 // The edition this page converts. Named once; every leg below derives from it,
 // and the "no newer edition on disk" leg is what stops it going stale silently.
-const EDITION = '1.2';
+const EDITION = '1.3';
 const DOCS_DIR = path.join(REPO_ROOT, 'docs');
 const SOURCE_NAME = `privacy-policy-v${EDITION}.md`;
 const SOURCE_DOCUMENT = path.join(DOCS_DIR, SOURCE_NAME);
@@ -781,5 +781,104 @@ test.describe('the document says what the app can erase, and the code is what sa
       sentencesWithStem('| 1.2 | 28.08.2026 | удаления отдельной записи в приложении нет |', 'отдельной записи'),
       'a change-history row was pulled into the prose pairing'
     ).toEqual([]);
+  });
+});
+// NAV-P4 — THE PRE-INSTALL WINDOW QUOTES THE POLICY, IT DOES NOT PARAPHRASE IT.
+//
+// The window a visitor opens before installing (`#installModal`) now says what
+// the update check sends. That is a statement about DATA HANDLING on a surface
+// the policy also covers, and there are exactly two ways to keep the two in
+// agreement: remember to, or derive it. This milestone has already been bitten
+// twice by the first (the effective date at UIP-P6, the control's name at
+// UIP-P7), so the sentence in the shell IS the policy's sentence, byte for byte,
+// and this pairing is what says so.
+//
+// THE DIRECTION IS THE POLICY → THE SHELL, AND THAT IS NOT ARBITRARY. The
+// document is the published promise; the showcase copy is a quotation of it. So
+// the sentence is DERIVED from the Markdown by a stem — a reword of the policy
+// is legitimate and stays green as long as it reaches all three files — and the
+// shell and the page must then contain what the document says. Deriving from the
+// shell instead would let product copy set the wording of a published document.
+//
+// STATIC, AND IT SAYS SO ABOUT ITSELF (AGENTS.md §11). It reads three files and
+// boots nothing. What it carries is the shape of the tree — three files carrying
+// one string — which is the admissible kind. What a rendered window actually
+// shows is app/tests/channel-composition.spec.js in `behavior`, deliberately not
+// this file, and that guard was NOT edited by the packet that rewrote the copy.
+
+test.describe('the pre-install window quotes the policy on the update request (NAV-P4)', () => {
+  // The stem any honest wording of that promise has to contain. It is the list
+  // of things the request does not carry, which is the whole content of the
+  // sentence; a reword that dropped it would be a different promise.
+  const UPDATE_PAYLOAD_STEM = 'устройстве, установке или ребёнке';
+
+  const SENTENCES = sentencesWithStem(MARKDOWN, UPDATE_PAYLOAD_STEM);
+
+  // The markup of the window, isolated so "the shell contains it" cannot be
+  // satisfied by the sentence living somewhere else in a 1000-line file.
+  function installWindow(shell) {
+    const start = shell.indexOf('<div id="installModal"');
+    if (start === -1) {
+      throw new Error('privacy-page: no #installModal in the shell — the window the policy is quoted in is gone');
+    }
+    const end = shell.indexOf('<div class="modal-buttons">', start);
+    if (end === -1) {
+      throw new Error('privacy-page: #installModal has no button row — the window markup is not the shape this pairing reads');
+    }
+    return shell.slice(start, end);
+  }
+
+  const WINDOW = installWindow(SHELL).replace(/<!--[\s\S]*?-->/g, '');
+
+  test('the document states it exactly once, outside the change-history table', () => {
+    // Anti-vacuity, and the load-bearing half: an empty derivation would make
+    // every assertion below vacuously true, and two matches would make "the
+    // sentence" a statement about whichever one the loop happened to take. The
+    // history row naming the same fields in different words is excluded by the
+    // extractor, which is why this is exactly one and not two.
+    expect(
+      SENTENCES.length,
+      `${SOURCE_NAME} states the update-request promise ${SENTENCES.length} time(s) in prose; this pairing needs exactly one sentence to quote`
+    ).toBe(1);
+    expect(SENTENCES[0].length, 'the derived sentence is empty').toBeGreaterThan(40);
+  });
+
+  test('the window really is the window, and it really carries copy', () => {
+    expect(WINDOW.length, 'the pre-install window collapsed to almost nothing').toBeGreaterThan(500);
+    expect(WINDOW, 'the window no longer carries its own heading').toContain('Приложение TheyGrow для Android');
+  });
+
+  test('the shell and the page carry the document\'s sentence, verbatim', () => {
+    const sentence = SENTENCES[0];
+    expect(
+      WINDOW,
+      `the pre-install window no longer carries the policy's own sentence «${sentence}» — a promise about what leaves the device must be the document's words, not a paraphrase of them`
+    ).toContain(sentence);
+    expect(
+      PAGE_CODE,
+      `app/privacy.html and ${SOURCE_NAME} disagree about the update-request promise — one of the paired files was edited alone`
+    ).toContain(sentence);
+  });
+
+  test('the pairing is armed, and proves it on inputs it builds in-run', () => {
+    // Self-proving rather than argued: the same extractor is run over fragments
+    // written here, so no shipped file is mutated and it is shown catching both
+    // the shape it exists for and the shape that would make it vacuous.
+    expect(
+      sentencesWithStem('А. Сведения о вас, устройстве, установке или ребёнке при этом не передаются. Б.', UPDATE_PAYLOAD_STEM),
+      'the extractor did not isolate the sentence carrying the stem'
+    ).toEqual(['Сведения о вас, устройстве, установке или ребёнке при этом не передаются.']);
+    expect(
+      sentencesWithStem('| 1.3 | 29.08.2026 | не передаёт сведений о пользователе, устройстве, установке или ребёнке |', UPDATE_PAYLOAD_STEM),
+      'a change-history row was pulled into the prose pairing'
+    ).toEqual([]);
+    expect(
+      sentencesWithStem('nothing here.', UPDATE_PAYLOAD_STEM),
+      'the extractor invented a sentence'
+    ).toEqual([]);
+    expect(
+      () => installWindow('<p>no window here</p>'),
+      'a shell without the pre-install window passed'
+    ).toThrow(/no #installModal/);
   });
 });

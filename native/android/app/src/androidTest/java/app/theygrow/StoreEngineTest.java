@@ -562,7 +562,7 @@ public class StoreEngineTest {
      * one — run 31971968427 red this line with "Queries can be performed using
      * SQLiteDatabase query or rawQuery methods only". The app's own seam draws
      * the same distinction for the same reason, and says so where it draws it
-     * ({@code app/m/v9/store/bridge.js}, {@code pragma()}).
+     * ({@code app/m/v10/store/bridge.js}, {@code pragma()}).
      */
     private void clampPageCount(long pages) {
         queryScalar("PRAGMA max_page_count = " + pages);

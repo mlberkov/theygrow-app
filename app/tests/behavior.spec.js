@@ -323,7 +323,19 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
     await expect(page.locator('#activitiesModal')).toHaveClass(/show/);
   });
 
-  test('graph chips push history and the close glyph walks back', async ({ page }) => {
+  test('one control names what it will do: back through visited cards, then close', async ({ page }) => {
+    // NAV-P3, owner decision 2026-08-29. The window has ONE control, in one
+    // place, with two states. Until this packet the glyph was always ↩ and the
+    // behaviour was already conditional — a sign promising a step back over a
+    // handler that would close the window. Now the sign and the accessible name
+    // change with the behaviour, and this leg reads BOTH at both states,
+    // because the whole decision was that they must not come apart.
+    //
+    // AND THE TRAIL IS OF VISITED CARDS, not of prerequisites: the same
+    // .prerequisite-skill class renders «Требуемые навыки», «Открывает дальше»
+    // and «Откроется, когда», so a step back can lead down the graph as easily
+    // as up. The chip taken below is simply the first one the card offers.
+
     await gotoApp(page, { state: STATES.seeded });
 
     await page.evaluate(
@@ -335,12 +347,23 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
       CHAIN.blocked
     );
 
+    // With nothing visited behind it, the control is a CLOSE control and says so.
+    await expect(page.locator('#skillModalClose')).toHaveText('×');
+    await expect(page.locator('#skillModalClose')).toHaveAttribute('aria-label', 'Закрыть');
+
     const chip = page.locator('#skillModalBody .prerequisite-skill[data-skill-id]').first();
     const chipId = await chip.getAttribute('data-skill-id');
     await chip.click();
     await expect(page.locator('#skillModalBody h2')).toHaveAttribute('data-skill-id', chipId);
 
-    // History is non-empty, so the glyph is a BACK control, not a close control.
+    // A card is now behind it, so the same control is a BACK control — and the
+    // sign and the name moved together.
+    await expect(page.locator('#skillModalClose')).toHaveText('↩');
+    await expect(page.locator('#skillModalClose')).toHaveAttribute(
+      'aria-label',
+      'К предыдущей карточке'
+    );
+
     await page.locator('#skillModalClose').click();
     await expect(page.locator('#skillModalBody h2')).toHaveAttribute(
       'data-skill-id',
@@ -348,8 +371,28 @@ test.describe('deep link: activity card -> skill modal (modal stack)', () => {
     );
     await expect(page.locator('#skillModal')).toHaveCSS('display', 'block');
 
-    // History now empty — the same glyph closes.
+    // The trail is empty again, so the same control is a close control again.
+    await expect(page.locator('#skillModalClose')).toHaveText('×');
+    await expect(page.locator('#skillModalClose')).toHaveAttribute('aria-label', 'Закрыть');
+
     await page.locator('#skillModalClose').click();
+    await expect(page.locator('#skillModal')).toHaveCSS('display', 'none');
+  });
+
+  test('the control is reachable and operable from the keyboard', async ({ page }) => {
+    // The accessible name added above is only worth having if something can
+    // reach it. This leg is why role and tabindex were added to that one
+    // control, and it is the executor for them.
+    await gotoApp(page, { state: STATES.seeded });
+
+    await page.evaluate(
+      ({ app, id }) => app.openSkillModal(app.DATA._skillsMap[id], true, 'parity'),
+      { app: await appModule(page), id: CHAIN.blocked }
+    );
+    await expect(page.locator('#skillModal')).toHaveCSS('display', 'block');
+
+    await page.locator('#skillModalClose').focus();
+    await page.keyboard.press('Enter');
     await expect(page.locator('#skillModal')).toHaveCSS('display', 'none');
   });
 });
@@ -392,9 +435,10 @@ test.describe('the .modal.show rule resolves the surfaces the app opens by class
   // becomes visible in use: the handler paths are not exercised here and would
   // not red if they broke. Those belong to android-instrumented and remain
   // residual debt (LSC-DL-005 debt 13).
-  // DIA-P3 adds #diaryModal to the same list, on the same terms: its trigger
-  // (#diaryBtn) is revealed on the native channel only, so what is asserted here
-  // is the RULE resolving for it and nothing about the diary being reachable.
+  // DIA-P3 adds #diaryModal to the same list, on the same terms: its trigger is
+  // revealed on the native channel only — #diaryBtn until NAV-P3, the surface
+  // switcher #surfaceNav since — so what is asserted here is the RULE resolving
+  // for it and nothing about the diary being reachable.
   // That the control appears where it should, and that the surface refuses
   // honestly when the store does, is app/tests/diary-surface.spec.js.
   for (const id of ['storeUnavailableModal', 'exportModal', 'diaryModal']) {
@@ -607,13 +651,31 @@ test.describe('nothing that ships hidden renders (FIU-P3-INV-001)', () => {
   //
   // TWO COMPOSITIONS FOR FREE. This file runs in `behavior` (web branch,
   // desktop) and in `native` (Capacitor asset root, mobile). The hidden SET
-  // differs between them — the web branch hides the archive and the diary, the
-  // native branch hides the download offer — so both channel compositions are
-  // swept, at both viewports, by the same eight lines.
+  // differs between them — the web branch hides the archive, the surface
+  // switcher and, since NAV-P1, the header menu; the native branch hides the
+  // download offer and the header's own about control, whose entry moved into
+  // that menu — so both channel compositions are swept, at both viewports, by
+  // the same eight lines. The web composition was nineteen elements at NAV-P1;
+  // NAV-P3 removed #diaryBtn from the shell entirely and added the surface
+  // switcher #surfaceNav in its place, so the count is unchanged and the
+  // membership is not.
   //
-  // SOUNDNESS, MEASURED. Deleting `.header-action[hidden] { display: none }`
-  // from the mount's app.css reds this with exactly two violations,
-  // `exportBtn -> flex` and `diaryBtn -> flex`, at 1280x800 and at 412x760.
+  // SOUNDNESS, MEASURED — AND THE OLD MEASUREMENT WAS WRONG BY NAV-P3, WHICH IS
+  // WHY IT IS RESTATED HERE RATHER THAN EDITED IN PLACE. This block used to
+  // record that deleting `.header-action[hidden] { display: none }` reds it with
+  // exactly two violations, `exportBtn -> flex` and `diaryBtn -> flex`. Run at
+  // NAV-P3, that mutation reds this test with NOTHING AT ALL, and the reason is
+  // two packets old: NAV-P1 moved #exportBtn into the header panel, where the
+  // more specific `.header-menu-panel .header-action[hidden]` hides it, and
+  // #apkBtn — the class's other wearer — is not hidden in this fixture, because
+  // the shell declares the release published. The rule is still load-bearing;
+  // what carries it is `channel-composition.spec.js`, where the two legs about
+  // an UNDECLARED release and about the native branch both red under that
+  // mutation. Measured, both directions, at NAV-P3.
+  //
+  // WHAT THIS TEST DOES CARRY, measured in the same pass: deleting
+  // `.surface-nav[hidden] { display: none }` reds it with exactly one
+  // violation, `surfaceNav -> flex`, at 1280x800 and at 412x760.
   test('every element carrying [hidden] computes to display: none', async ({ page }) => {
     await gotoApp(page, { state: STATES.seeded });
 

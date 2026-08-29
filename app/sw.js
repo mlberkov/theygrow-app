@@ -79,7 +79,32 @@
 // the second generation SMALLER than the one before it, and for the same reason
 // /m/v8/ was: a copy-forward that omits a file deletes it without touching a
 // frozen byte.
-const CACHE_VERSION = 'v19';
+//
+// changed_in: NAV-DL-001 — v19 -> v20 with the /m/v10/ mount bump, which carries
+// the header menu: on the native channel the intro and the archive stop being
+// two buttons in the header row and become two rows behind one control, while
+// the web showcase keeps its one direct control into the intro window (vault
+// PDR-034 §1 — native is the product, web the showcase). Under the mount that is
+// surfaces/menu.js added, one branch added to surfaces/channel.js, the .header-
+// menu rules and the borderless .header-help added to app.css, and two stale
+// comments corrected. FORCED for the standing reason: bytes at a published mount
+// URL are never rewritten (A1-DL-004), and /m/v9/ has been published since the
+// UIP merge. The cost is a TENTH generation shipped and served immutable;
+// retiring the early ones stays an owner cleanup (DIA-DL-008 debt 7). /m/v10/ is
+// the first generation LARGER than the one before it since PPR-P2 — it adds a
+// module rather than dropping one, which is why the previous-generation fixture
+// has something to drop again (app/tests/support/prev-generation.js).
+//
+// NAV-P2 ADDS A FILE TO THIS LIST AND DOES NOT BUMP THE VERSION, AND THAT IS THE
+// RULE RATHER THAN AN EXCEPTION. `surfaces/update.js` joins the precache below
+// with the «Обновление» row it serves. What forces a bump is a byte at a
+// PUBLISHED mount URL (A1-DL-004, docs/RUNBOOK.md § Module mount); /m/v10/ and
+// v20 arrived together at NAV-P1 and neither has been promoted, so this
+// generation is still the one being written rather than one being replaced.
+// NAV-DL-001 (g) says the same thing forward: the milestone takes exactly one
+// copy-forward, and NAV-P2–P4 edit /m/v10/ in place. A second bump inside one
+// milestone would ship an eleventh generation to buy nothing.
+const CACHE_VERSION = 'v20';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
 const OFFLINE_URLS = [
@@ -94,10 +119,10 @@ const OFFLINE_URLS = [
   // done in both directions in one packet rather than swept up later.
   // Versioned module mount (A1-DL-004): the shell references these by URL, so
   // they are precached by name. Content changes ship as a NEW mount version
-  // (/m/v9/...), never as new bytes at these URLs — inside the 30-day immutable
+  // (/m/v10/...), never as new bytes at these URLs — inside the 30-day immutable
   // window addAll would otherwise refill the new cache from the stale HTTP copy.
-  '/m/v9/app.css',
-  '/m/v9/sw-register.js',
+  '/m/v10/app.css',
+  '/m/v10/sw-register.js',
   // A1-P4/A1-P5: the app entry and the whole graph it imports — core/ (shared
   // state, I/O and pure helpers) and surfaces/ (one module per UI surface). The
   // shell EXECUTES only the entry; since A1-P6 it also NAMES every other module
@@ -107,58 +132,60 @@ const OFFLINE_URLS = [
   // this list and the graph in agreement (A1-P4-INV-001), and asserts the hint
   // set equals that graph in both directions (A1-P6-INV-001). cache.addAll is
   // atomic: a path that is wrong here fails SW install outright.
-  '/m/v9/app.js',
-  '/m/v9/core/kb-boot.js',
-  '/m/v9/core/state.js',
-  '/m/v9/core/storage.js',
-  '/m/v9/core/repo-local.js',
-  '/m/v9/core/signals.js',
-  '/m/v9/core/dom-utils.js',
-  '/m/v9/core/format.js',
-  '/m/v9/core/zpd.js',
-  '/m/v9/core/urgency.js',
-  '/m/v9/surfaces/table.js',
-  '/m/v9/surfaces/skill-completion.js',
-  '/m/v9/surfaces/zpd-filter.js',
-  '/m/v9/surfaces/skill-modal.js',
-  '/m/v9/surfaces/profile.js',
-  '/m/v9/surfaces/activities.js',
-  '/m/v9/surfaces/onboarding.js',
-  '/m/v9/surfaces/accordion.js',
+  '/m/v10/app.js',
+  '/m/v10/core/kb-boot.js',
+  '/m/v10/core/state.js',
+  '/m/v10/core/storage.js',
+  '/m/v10/core/repo-local.js',
+  '/m/v10/core/signals.js',
+  '/m/v10/core/dom-utils.js',
+  '/m/v10/core/format.js',
+  '/m/v10/core/zpd.js',
+  '/m/v10/core/urgency.js',
+  '/m/v10/surfaces/table.js',
+  '/m/v10/surfaces/skill-completion.js',
+  '/m/v10/surfaces/zpd-filter.js',
+  '/m/v10/surfaces/skill-modal.js',
+  '/m/v10/surfaces/profile.js',
+  '/m/v10/surfaces/activities.js',
+  '/m/v10/surfaces/onboarding.js',
+  '/m/v10/surfaces/accordion.js',
+  '/m/v10/surfaces/menu.js',
+  '/m/v10/surfaces/update.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the
   // import graph reaches them, and an installed client must not boot offline
   // with a broken graph. The DDL artifact they read
-  // (/m/v9/store/schema/001-core.sql) is deliberately NOT here: only the native
+  // (/m/v10/store/schema/001-core.sql) is deliberately NOT here: only the native
   // channel ever fetches it, and that channel does not use this worker.
   //
   // NOTE, and it is a real trap: no apostrophe may appear in a comment inside
   // this array. The ship-list guard reads OFFLINE_URLS TEXTUALLY, pairing single
   // quotes — an apostrophe swallows every entry after it and the guard then
   // reports the icons as unprecached.
-  '/m/v9/store/boot.js',
-  '/m/v9/store/store.js',
-  '/m/v9/store/journal.js',
-  '/m/v9/store/repo-journal.js',
-  '/m/v9/store/import-legacy.js',
+  '/m/v10/store/boot.js',
+  '/m/v10/store/store.js',
+  '/m/v10/store/journal.js',
+  '/m/v10/store/repo-journal.js',
+  '/m/v10/store/import-legacy.js',
   // DIA-P3 — the diary record path. Precached with the rest of the store
   // because the diary is the app shell now, not an extra: a parent who opens
   // the app offline must still be able to write down what happened today.
-  '/m/v9/store/records.js',
-  '/m/v9/store/bridge.js',
-  '/m/v9/store/config.js',
-  '/m/v9/store/errors.js',
+  '/m/v10/store/records.js',
+  '/m/v10/store/bridge.js',
+  '/m/v10/store/config.js',
+  '/m/v10/store/errors.js',
   // DIA-P2 — the channel composition: which of the two header actions this
   // channel offers, and the knobs that decide it.
-  '/m/v9/surfaces/channel.js',
-  '/m/v9/channel/config.js',
+  '/m/v10/surfaces/channel.js',
+  '/m/v10/channel/config.js',
   // L1-P3: the export contour. Precached for the same reason the store modules
   // are — the import graph reaches them, and an installed client must not boot
   // offline with a broken graph. Like the DDL above, the artifacts these modules
   // FETCH at runtime are deliberately NOT here: the declaration
-  // (/m/v9/export/declaration.json) plus the two print-layer binaries, the
-  // embedded font and the ICC profile under /m/v9/export/assets/. Only the
+  // (/m/v10/export/declaration.json) plus the two print-layer binaries, the
+  // embedded font and the ICC profile under /m/v10/export/assets/. Only the
   // native channel ever reads them, that channel does not use this worker, and
   // the web channel cannot export at all — so precaching them would spend
   // roughly 443 KB of an installed web client cache budget on bytes it can
@@ -166,19 +193,28 @@ const OFFLINE_URLS = [
   //
   // (Note the wording above avoids an apostrophe on purpose — see the trap
   // named further down this comment block.)
-  '/m/v9/surfaces/diary.js',
-  '/m/v9/surfaces/export.js',
-  '/m/v9/export/run.js',
-  '/m/v9/export/build.js',
-  '/m/v9/export/readout.js',
-  '/m/v9/export/sink.js',
-  '/m/v9/export/text.js',
-  '/m/v9/export/readme.js',
-  '/m/v9/export/zip.js',
-  '/m/v9/export/pdf.js',
-  '/m/v9/export/ttf.js',
-  '/m/v9/export/config.js',
-  '/m/v9/export/errors.js',
+  '/m/v10/surfaces/diary.js',
+  // NAV-P3 — the surface pager, the hardware back button and the two nav/
+  // declarations they share. Precached with the rest of the graph, not because
+  // the web channel runs any of it (nothing arms the pager there) but because
+  // the import graph reaches them from the entry: an installed client must
+  // never boot offline with a broken graph, and cache.addAll is atomic.
+  '/m/v10/surfaces/pager.js',
+  '/m/v10/surfaces/back.js',
+  '/m/v10/nav/config.js',
+  '/m/v10/nav/overlays.js',
+  '/m/v10/surfaces/export.js',
+  '/m/v10/export/run.js',
+  '/m/v10/export/build.js',
+  '/m/v10/export/readout.js',
+  '/m/v10/export/sink.js',
+  '/m/v10/export/text.js',
+  '/m/v10/export/readme.js',
+  '/m/v10/export/zip.js',
+  '/m/v10/export/pdf.js',
+  '/m/v10/export/ttf.js',
+  '/m/v10/export/config.js',
+  '/m/v10/export/errors.js',
   '/icons/icon-logo-192-v2.png',
   '/icons/icon-logo-512-v2.png',
   '/icons/maskable-192-v2.png',

@@ -495,8 +495,13 @@ public class DiaryEntryTest {
                 evaluate(
                         scenario,
                         "(function () {"
-                            + "var open = document.getElementById('diaryBtn');"
-                            + "if (!open || open.hidden) { return 'not-offered'; }"
+                            // NAV-P3: the diary left the header. The way in is
+                            // the surface switcher, whose OWN element carries no
+                            // `hidden` — its container does — so the probe asks
+                            // whether the control is rendered rather than whether
+                            // it carries an attribute.
+                            + "var open = document.getElementById('surfaceDiaryBtn');"
+                            + "if (!open || open.offsetParent === null) { return 'not-offered'; }"
                             + "open.click();"
                             + "return 'pressed';"
                             + "})()");

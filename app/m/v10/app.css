@@ -1,0 +1,2357 @@
+@charset "UTF-8";
+
+/* ===== CSS ПЕРЕМЕННЫЕ - МЯГКАЯ ПАСТЕЛЬНАЯ ПАЛИТРА ===== */
+:root {
+    /* Мягкая пастельная палитра для мам */
+    --primary-purple: #8B5CF6;
+    --primary-purple-light: #A78BFA;
+    --primary-pink: #EC4899;
+    --accent-lavender: #EDE9FE;
+    --accent-pink-light: #FCE7F3;
+    --success-green: #10B981;
+    --success-light: #D1FAE5;
+    --text-primary: #374151;
+    --text-secondary: #6B7280;
+    --text-category: #6B46C1;
+    --bg-soft: #F9FAFB;
+    --bg-white: #FFFFFF;
+    --border-soft: #E5E7EB;
+    --border-lighter: #F3F4F6;
+    --shadow-purple: rgba(139, 92, 246, 0.25);
+    --shadow-purple-hover: rgba(139, 92, 246, 0.35);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    background: #ffffff;
+    /* Оболочка приложения по высоте видимой области. 100vh на Chrome/Android
+       разрешается в БОЛЬШОЙ вьюпорт (адресная строка убрана), из-за чего
+       нижняя панель управления уезжает за экран, а прокрутить оболочку
+       нельзя (overflow: hidden, скроллится только .table-wrapper).
+       100dvh отслеживает фактически видимую высоту; строка с 100vh —
+       запасной вариант для браузеров без поддержки динамических единиц. */
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Новый стиль заголовка с Flex */
+header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 13px 30px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dddddd;
+    flex-shrink: 0;
+    z-index: 40;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    position: relative;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+}
+
+header h1 {
+    font-size: 20px;
+    font-weight: bold;
+    color: #000;
+    margin: 0;
+}
+
+/* Блок профиля */
+.profile-button {
+    background: #f1f3f5;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    position: relative;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.profile-button:hover {
+    background: #e9ecef;
+}
+
+/* Действие в шапке: иконка плюс подпись (L1-P3).
+   На десктопе подпись видна, на мобильном скрывается и остаётся одна иконка;
+   доступное имя задано в разметке и от подписи не зависит.
+
+   DIA-P2: этот класс носят ОБА канальных действия — кнопка архива (нативный
+   канал) и ссылка на APK (веб-канал), — и в любой момент показано ровно одно из
+   них. Отсюда text-decoration: ссылка не должна выглядеть иначе, чем кнопка, на
+   месте которой она стоит. Один и тот же вид у обоих — это не экономия правил,
+   а утверждение: у канала есть одно главное действие в шапке. */
+.header-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 14px;
+    background: var(--primary-purple);
+    border: none;
+    border-radius: 12px;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px var(--shadow-purple);
+    flex-shrink: 0;
+}
+
+/* СКРЫТОЕ ДОЛЖНО ОСТАВАТЬСЯ СКРЫТЫМ (DIA-P2), и это не формальность.
+   `display` в правиле класса перебивает `display: none` из атрибута hidden —
+   специфичность класса выше пользовательского стиля браузера. Без этой строки
+   оба канальных действия приходят видимыми: кнопка архива предлагается в
+   браузере, где архив не собирается, а ссылка на APK — до того, как релиз
+   опубликован. Ровно этот дефект поймал app/tests/channel-composition.spec.js
+   на первом же прогоне: `hidden=""` в разметке, `visible` на экране. */
+.header-action[hidden] {
+    display: none;
+}
+
+.header-action:hover {
+    background: #7C3AED;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-purple-hover);
+}
+
+.header-action:active {
+    transform: translateY(0);
+}
+
+.header-action:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: 2px;
+}
+
+.header-action-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+/* СПРАВКА В ШАПКЕ (L3-P3): постоянный вход во вступительное окно, с NAV-P1 —
+   вход ВЕБ-канала (на нативном тот же вход стоит строкой меню, surfaces/channel.js).
+   Значок, а не пилюля с подписью, и это разделение ролей, а не украшение:
+   .header-action — действие канала, и оно должно оставаться самым заметным
+   предметом в шапке; этот контрол стоит рядом и не спорит за внимание.
+
+   РАМКИ БОЛЬШЕ НЕТ, И ЭТО ИСПРАВЛЕНИЕ, А НЕ ВКУС (NAV-P1). Здесь стояла
+   `border: 1px solid` при `border-radius: 50%`, то есть круглая рамка кнопки, — а
+   внутри неё значок рисует СВОЙ круг (<circle r="9"> в разметке). Родитель видел
+   две окружности одна в другой; в стандартном знаке «i» окружность ровно одна.
+   Убрана внешняя: та, что была рамкой кнопки, а не частью знака.
+
+   BORDER-RADIUS ОСТАЁТСЯ, ХОТЯ ВИДИМОГО КРУГА У КНОПКИ БОЛЬШЕ НЕТ: по нему
+   скругляется подсветка :hover ниже, и квадратная подсветка под круглым знаком
+   читалась бы как чужая. Размер (44px, и на мобильном тоже) не тронут — круг ушёл
+   из вида, а не из-под пальца. */
+.header-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--primary-purple);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+/* Правило по тому же правилу, что .header-action[hidden] и .diary-search[hidden]
+   (третий случай в проекте): класс задаёт display, значит скрытому состоянию
+   нужна своя строка. Эта кнопка сегодня не скрывается ни на одном канале — она
+   объявлена заранее, чтобы день, когда её начнут скрывать, не стал четвёртым
+   случаем. Исполняет это правило app/tests/behavior.spec.js (FIU-P3-INV-001). */
+.header-help[hidden] {
+    display: none;
+}
+
+.header-help:hover {
+    background: var(--accent-lavender);
+}
+
+.header-help:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: 2px;
+}
+
+/* 24px, а не прежние 22 (NAV-P1): без рамки видимый предмет — сам знак, и он
+   встаёт в один размер с соседними .header-action-icon вместо того, чтобы быть
+   на два пикселя меньше внутри рамки, которой больше нет. */
+.header-help-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+/* ===== МЕНЮ ШАПКИ (NAV-P1) =====
+   Только нативный канал; раскрывается в surfaces/channel.js, как архив и дневник.
+   Вид взят у .header-help, а не у .header-action, и это утверждение: меню — не
+   действие, а вход в список действий, и спорить с ними за внимание оно не должно. */
+.header-menu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Четвёртый случай правила, которое .header-help[hidden] выше объявляло заранее:
+   класс задаёт display, значит скрытому состоянию нужна своя строка, иначе
+   `hidden` в разметке ничего не значит и меню приходит раскрытым в браузере.
+   Исполняет app/tests/behavior.spec.js (FIU-P3-INV-001). */
+.header-menu[hidden] {
+    display: none;
+}
+
+.header-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--primary-purple);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.header-menu-toggle:hover {
+    background: var(--accent-lavender);
+}
+
+.header-menu-toggle:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: 2px;
+}
+
+.header-menu-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+/* Панель. Геометрия — та же, что у .profile-dropdown выше, и намеренно: в шапке
+   уже есть один выпадающий список, и второй, устроенный иначе, читался бы как
+   другой предмет. Ширина посажена на содержимое двух строк — под третью здесь
+   места не оставлено, потому что третьей в этом пакете нет. */
+.header-menu-panel {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 220px;
+    display: none;
+    z-index: 50;
+    overflow: hidden;
+}
+
+/* Класс, а не #id: сканер app/tests/show-rule-coverage.spec.js ищет `.класс.show`
+   и элемент без класса честно объявляет непокрытым (EMV-P1-INV-001). */
+.header-menu-panel.show {
+    display: block;
+}
+
+/* ОДИН ВИД НА ДВА СЕЛЕКТОРА, И ЭТО НЕ ЭКОНОМИЯ ПРАВИЛ. Строка «О приложении» —
+   собственный предмет меню (.header-menu-item), а «Сохранить архив» — та же самая
+   кнопка #exportBtn, что стояла в шапке: NAV-P1 сменил ей родителя, а не разметку,
+   поэтому она по-прежнему носит .header-action. У двух строк одного списка обязан
+   быть один вид, и здесь он записан один раз. */
+.header-menu-panel .header-menu-item,
+.header-menu-panel .header-action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: auto;
+    padding: 12px 16px;
+    justify-content: flex-start;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    border-radius: 0;
+    box-shadow: none;
+    color: #333;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.header-menu-panel .header-menu-item:last-child,
+.header-menu-panel .header-action:last-child {
+    border-bottom: none;
+}
+
+.header-menu-panel .header-menu-item:hover,
+.header-menu-panel .header-action:hover {
+    background: #f8f9fa;
+    transform: none;
+    box-shadow: none;
+}
+
+.header-menu-panel .header-action:active {
+    transform: none;
+}
+
+.header-menu-panel .header-menu-item:focus-visible,
+.header-menu-panel .header-action:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: -3px;
+}
+
+/* Скрытая строка остаётся скрытой и внутри панели: правило выше задаёт display
+   для .header-action, а `hidden` — пользовательский стиль браузера, и он слабее
+   класса. Тот же довод, что у .header-action[hidden] выше; здесь он нужен второй
+   раз, потому что селектор с потомком специфичнее. */
+.header-menu-panel .header-action[hidden] {
+    display: none;
+}
+
+.header-menu-item-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: var(--primary-purple);
+}
+
+/* Значок архива в списке красится в тот же лиловый, что и соседний: в шапке он
+   был белым на лиловой пилюле, а пилюли здесь нет. Размер задан здесь, а не
+   унаследован: в блоке <=768px .header-action-icon сжимается до 20px под ряд
+   значков, а в списке значок стоит рядом с текстом и живёт по правилам списка. */
+.header-menu-panel .header-action-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--primary-purple);
+}
+
+/* ПОДПИСЬ В СПИСКЕ ВИДНА ВСЕГДА, ВКЛЮЧАЯ МОБИЛЬНЫЙ. Блок <=768px прячет
+   .header-action-label, потому что в ряду значок читается соседством с другими
+   значками. В списке безымянная строка не читается никак, поэтому правило здесь
+   перебито — селектором с потомком, а не !important. */
+.header-menu-panel .header-action-label {
+    display: inline;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ОБНОВЛЕНИЕ (NAV-P2): строка, которая заливается, и исход под ней.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Скрытая строка остаётся скрытой и здесь — по тому же доводу, что у
+   .header-menu-panel .header-action[hidden] выше: правило состава задаёт display
+   для .header-menu-item, а `hidden` — пользовательский стиль браузера, и он
+   слабее класса. Строка приходит скрытой и раскрывается только на нативном
+   канале и только в копии не из Play, поэтому без этого правила Play-копия
+   увидела бы пункт, которого в ней быть не должно. */
+.header-menu-panel .header-menu-item[hidden] {
+    display: none;
+}
+
+/* Заливка живёт ПОД содержимым строки, а не вместо него: значок и подпись
+   остаются читаемыми всё время проверки. */
+.header-menu-item-update {
+    position: relative;
+    isolation: isolate;
+}
+
+.header-menu-item-fill {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(139, 92, 246, 0.18);
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+}
+
+/* ЗАЛИВКА — ЭТО ОБРАТНЫЙ ОТСЧЁТ ДО ОТКАЗА, А НЕ ДОЛЯ ЗАГРУЖЕННОГО. Ответ здесь
+   один маленький JSON, событий прогресса у него нет, и любая полоса, называющая
+   долю выполненного, называла бы выдуманное число. Эта называет настоящее: она
+   доходит до края ровно тогда, когда истекает срок из
+   CHANNEL_CONFIG.updateCheckTimeoutMs и запрос отменяется. Ответ раньше срока
+   останавливает её раньше.
+
+   Длительность приходит переменной, которую surfaces/update.js ставит на элемент
+   из той же ручки. ЗАПАСНОГО ЗНАЧЕНИЯ ЗДЕСЬ НЕТ НАМЕРЕННО: непоставленная
+   переменная означает «нет анимации», а не «другая длительность», — второй
+   литерал был бы заливкой, которая врёт о сроке.
+
+   Форма кривой: быстро в начале, медленно к концу. Так строка отвечает на
+   нажатие сразу и при этом никогда не обещает, что вот-вот закончит. */
+@keyframes header-menu-update-fill {
+    0%   { transform: scaleX(0); }
+    12%  { transform: scaleX(0.45); }
+    40%  { transform: scaleX(0.72); }
+    100% { transform: scaleX(1); }
+}
+
+.header-menu-item-update.is-checking .header-menu-item-fill {
+    animation-name: header-menu-update-fill;
+    animation-duration: var(--update-fill-duration);
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+    animation-iteration-count: 1;
+}
+
+.header-menu-item-update[disabled] {
+    cursor: default;
+}
+
+/* Кому анимация мешает — тому статичная заливка вместо движущейся. Строка
+   по-прежнему говорит «идёт проверка», и то же самое говорит абзац под ней,
+   который читает диктор. */
+@media (prefers-reduced-motion: reduce) {
+    .header-menu-item-update.is-checking .header-menu-item-fill {
+        animation: none;
+        transform: scaleX(1);
+    }
+}
+
+/* ИСХОД. Один абзац за раз; пустой блок не занимает места, поэтому у панели нет
+   «хвоста» под последней строкой, пока проверку не запустили. */
+.header-menu-status:empty {
+    display: none;
+}
+
+.header-menu-status-line {
+    margin: 0;
+    padding: 10px 16px 10px 52px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.35;
+    background: #fbfafd;
+}
+
+.header-menu-status-line[hidden] {
+    display: none;
+}
+
+.header-menu-status-link {
+    display: block;
+    padding: 10px 16px 12px 52px;
+    color: var(--primary-purple);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    background: #fbfafd;
+}
+
+.header-menu-status-link[hidden] {
+    display: none;
+}
+
+.header-menu-status-link:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: -3px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ПЕРЕКЛЮЧАТЕЛЬ РАЗДЕЛОВ (NAV-P3)
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Строка под шапкой: список экранов слева направо, в том же порядке, что в
+   surfaces/pager.js. Не вкладки role="tab" — обычные кнопки; см. довод в
+   разметке. */
+.surface-nav {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Правило по тому же правилу, что .header-action[hidden], .header-help[hidden] и
+   .header-menu[hidden] выше: класс задаёт display, значит скрытому состоянию
+   нужна своя строка, иначе `hidden` в разметке ничего не значит и переключатель
+   приходит раскрытым в браузере — то есть веб-канал предлагал бы раздел,
+   которого у него нет. Исполняет app/tests/behavior.spec.js. */
+.surface-nav[hidden] {
+    display: none;
+}
+
+.surface-nav-item {
+    flex: 1 1 0;
+    padding: 8px 12px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #666;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+/* ТЕКУЩИЙ РАЗДЕЛ ПОКАЗАН ТЕМ ЖЕ ПРИЗНАКОМ, КОТОРЫЙ ЧИТАЕТ ДИКТОР. Отдельного
+   класса «активный» здесь нет намеренно: два источника правды о том, где
+   родитель находится, разошлись бы, и разошлись бы молча — глаз видел бы одно,
+   а диктор называл другое. */
+.surface-nav-item[aria-current="page"] {
+    color: var(--primary-purple);
+    border-bottom-color: var(--primary-purple);
+    font-weight: 600;
+}
+
+.surface-nav-item:hover {
+    color: var(--primary-purple);
+}
+
+.surface-nav-item:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: -3px;
+}
+
+/* Выпадающее меню профилей */
+.profile-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 250px;
+    display: none;
+    z-index: 50;
+}
+
+.profile-dropdown.show {
+    display: block;
+}
+
+.profile-dropdown-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+}
+
+.profile-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.profile-dropdown-item:hover {
+    background: #f8f9fa;
+}
+
+.profile-dropdown-item.create-new {
+    color: var(--primary-purple);
+    font-weight: 500;
+    border-top: 2px solid #dddddd;
+}
+
+.profile-dropdown-item.active {
+    background: var(--accent-lavender);
+    color: var(--primary-purple);
+}
+
+/* Модальное окно для создания профиля */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* EMV-DL-001. Правило, которого здесь не было до /m/v2/.
+ *
+ * Голый класс .modal носят пять элементов: #createProfileModal, #installModal,
+ * #storeUnavailableModal, #diaryModal и #exportModal, — и с L3-P3 все пять
+ * открываются одинаково, classList.add('show'). Без этого правила обработчик
+ * отрабатывал до конца, а окно оставалось display: none. (Список здесь дважды
+ * отставал от разметки: #importModal ушёл вместе с предложением переноса на
+ * L3-P2, а #createProfileModal открывался инлайновым style.display до L3-P3 —
+ * то есть работал, но мимо охраняемой идиомы, FIU-DL-002, долг 19.)
+ *
+ * block, а не flex: .modal-content центрируется через margin: 10% auto, а
+ * мобильная ветка (<=767px) ставит margin: 0 и 100vw/100dvh — обе схемы
+ * блочные. Ср. .activities-modal.show { display: flex }, где у контейнера
+ * есть align-items/justify-content, которых у .modal нет.
+ *
+ * Покрытие правила проверяется app/tests/show-rule-coverage.spec.js;
+ * то, что окно архива действительно видно после клика по #exportBtn —
+ * app/tests/channel-composition.spec.js (клик, а не скан исходника; с DIA-P2
+ * кнопка архива есть только на нативном канале, и жмут её там). */
+.modal.show {
+    display: block;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ПРИХОД ЭКРАНА (NAV-P3)
+   ──────────────────────────────────────────────────────────────────────────
+
+   Дневник — не окно поверх таблицы, а второй ЭКРАН упорядоченного списка, и
+   приходит он оттуда, куда ушёл палец: справа. Это единственная подсказка о
+   том, что произошло перелистывание, а не открытие.
+
+   ТОЛЬКО ПРИХОД, УХОДА НЕТ, И ЭТО РЕШЕНИЕ. Анимация ухода обязана удерживать
+   экран видимым ПОСЛЕ того, как решение принято, — то есть ставить таймер
+   между нажатием аппаратной кнопки «назад» и состоянием приложения. Это
+   единственное место, где такой таймер недопустим, поэтому его нет; уход
+   мгновенный.
+
+   ДЛИТЕЛЬНОСТЬ ПРИХОДИТ ПЕРЕМЕННОЙ, которую surfaces/pager.js ставит на
+   документ из NAV_CONFIG.surfaceTransitionMs. ЗАПАСНОГО ЗНАЧЕНИЯ ЗДЕСЬ НЕТ
+   НАМЕРЕННО, по тому же доводу, что у заливки строки «Обновление»:
+   непоставленная переменная делает объявление недействительным, то есть
+   означает «нет анимации», а не «другая длительность». На веб-канале её никто
+   не ставит — сюда попадает только вооружённый листатель, — и это верно: там
+   экран один. */
+@keyframes surface-enter {
+    from {
+        transform: translateX(6%);
+        opacity: 0;
+    }
+    to {
+        transform: none;
+        opacity: 1;
+    }
+}
+
+#diaryModal.modal.show {
+    animation: surface-enter var(--surface-transition-ms) ease-out both;
+}
+
+/* Кому движение мешает — тому экран просто появляется. Ничего, кроме движения,
+   при этом не теряется: направление было подсказкой, а не сообщением. */
+@media (prefers-reduced-motion: reduce) {
+    #diaryModal.modal.show {
+        animation: none;
+    }
+}
+
+.modal-content {
+    background-color: #ffffff;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+/* ОКНО ПЕРЕД УСТАНОВКОЙ (L3-P3): текста в нём больше, чем в остальных .modal,
+   поэтому шире и с собственной прокруткой. Ширина 560px, а не 450px, — читать
+   четыре коротких раздела в колонку 450px на десктопе неудобно; на мобильном
+   ветка <=767px и так растягивает .modal-content на весь экран. */
+.install-modal-content {
+    max-width: 560px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* padding-right — под ✕, который стоит абсолютом в правом верхнем углу
+   .modal-content: без него заголовок в две строки на телефоне заезжает под
+   крестик. Измерено на 412px. */
+.install-modal-content h2 {
+    margin: 0 0 4px;
+    padding-right: 32px;
+    font-size: 20px;
+    color: var(--text-primary, #333);
+}
+
+.install-modal-content p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary, #333);
+}
+
+/* NAV-P4 ЗАМЕНИЛ ЗДЕСЬ h3 НА СПИСОК, И ЭТО СМЕНА РОЛИ, А НЕ ОФОРМЛЕНИЯ. Окно
+   перестало быть таблицей параметров под четырьмя заголовками и стало
+   перечислением того, что даёт приложение; выгода — это предложение, а не имя
+   поля. Правило .install-modal-content h3 снято ВМЕСТЕ с элементами, которые оно
+   одевало: правило, пережившее свою разметку, — это то, как поверхность
+   возвращается (довод app/tests/install-channel.spec.js). Цвет заголовка
+   переехал на li strong, потому что вводное слово пункта несёт ровно ту роль,
+   которую нёс h3.
+
+   ОТСТУП МЕЖДУ АБЗАЦАМИ ОБЪЯВЛЕН ДОЧЕРНИМ КОМБИНАТОРОМ НАРОЧНО. Прежде
+   расстояние держали поля h3; без них соседние абзацы слиплись бы. Но под
+   .install-modal-content есть ещё один <p> — #installPlatformNote внутри
+   .modal-buttons, — у которого своя раскладка (margin: 0, flex, выравнивание
+   вправо). Правило на всех потомков добавило бы ему нижнее поле и сдвинуло ряд
+   кнопок; `>` оставляет его в точности таким, каким он был. Специфичность у двух
+   правил одинаковая, поэтому это стоит ПОСЛЕ правила выше — порядок здесь
+   несущий. Измерено на 412px. */
+.install-modal-content > p {
+    margin: 0 0 12px;
+}
+
+.install-modal-content > p:last-of-type {
+    margin-bottom: 0;
+}
+
+.install-modal-content ul.install-gains {
+    margin: 12px 0;
+    padding-left: 20px;
+}
+
+.install-modal-content ul.install-gains li {
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary, #333);
+}
+
+.install-modal-content ul.install-gains li:last-child {
+    margin-bottom: 0;
+}
+
+.install-modal-content ul.install-gains li strong {
+    color: var(--primary-purple);
+}
+
+/* ССЫЛКА НА ПОЛИТИКУ КОНФИДЕНЦИАЛЬНОСТИ (L3-P3). Спокойная, не кнопка: это
+   документ, а не действие, и он не должен спорить с «Закрыть» за внимание. */
+.policy-link {
+    display: inline-block;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--primary-purple);
+}
+
+/* ЧЕТВЁРТОЕ ПРАВИЛО ЭТОГО ВИДА В ПРОЕКТЕ, и написано оно теперь не задним
+   числом: класс задаёт display, значит скрытому состоянию нужна своя строка,
+   иначе `hidden` в разметке ничего не значит. Первые три (.header-action,
+   .diary-search, .header-help) появлялись после того, как дефект уже случился
+   дважды; с L3-P3 за этим следит app/tests/behavior.spec.js — и именно эта
+   ссылка приходит скрытой в каждой сборке, пока документ не объявлен, так что
+   охраняется здесь не гипотетический случай, а сегодняшнее состояние. */
+.policy-link[hidden] {
+    display: none;
+}
+
+.modal-close {
+    color: #aaa;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.modal-close:hover {
+    color: var(--primary-purple);
+}
+
+.modal h2 {
+    margin-bottom: 20px;
+    font-size: 22px;
+    color: var(--primary-purple);
+}
+
+.modal-form-group {
+    margin-bottom: 20px;
+}
+
+.modal-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* DIA-P3: textarea попадает в оба правила вместе с input. До этого пакета в
+   приложении не было ни одного многострочного поля — единственная форма
+   спрашивала имя и дату, — и селектор по одному `input` оставил бы поле
+   дневника без ширины, отступов и видимого фокуса. Дефект был бы в правиле, а
+   не в новом окне, поэтому меняются правила, а не добавляется третье. */
+.modal-form-group input,
+.modal-form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.modal-form-group input:focus,
+.modal-form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-purple);
+}
+
+/* font-family наследуется намеренно: без этого textarea уезжает в моноширинный
+   шрифт браузера, и текст про ребёнка выглядит как лог. resize: vertical —
+   родитель может дописать длинную запись, но не может сломать ширину окна. */
+.modal-form-group textarea {
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 120px;
+}
+
+/* Поиск по дневнику (DIA-P4). Один ряд: подпись, поле, две кнопки.
+
+   flex-wrap, а не медиа-запрос: на узком экране ряд переносится сам, и это
+   единственное, что от него требуется. Поле забирает остаток ширины через
+   flex: 1, поэтому длинный запрос виден целиком, а кнопки не уезжают.
+
+   Кнопки — те же .modal-button, что и везде в окнах, но с уменьшенным
+   вертикальным padding: строка поиска стоит над списком, а не в ряду действий
+   диалога, и кнопка полной высоты сделала бы её вторым рядом действий. */
+.diary-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+/* ТОТ ЖЕ ДЕФЕКТ, ЧТО У .header-action[hidden] ВЫШЕ, И ПОЙМАН ОН ТАК ЖЕ — новым
+   тестом на первом прогоне. `display: flex` в правиле класса перебивает
+   `display: none`, которое браузер даёт атрибуту hidden, поэтому без этой строки
+   форма поиска приходит видимой в пустом дневнике: искать предлагается там, где
+   искать нечего, и единственный возможный ответ — «ничего не нашлось». Это
+   второй случай в одной вехе (EMV-P1-INV-001), и правило одно и то же: если
+   класс задаёт display, скрытому состоянию нужна своя строка. */
+.diary-search[hidden] {
+    display: none;
+}
+
+.diary-search label {
+    font-size: 14px;
+    color: var(--text-secondary, #666);
+}
+
+.diary-search input {
+    flex: 1;
+    min-width: 140px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: inherit;
+}
+
+.diary-search input:focus {
+    outline: none;
+    border-color: var(--primary-purple);
+}
+
+.diary-search .modal-button {
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* Список записей дневника (DIA-P3). Прокручивается сам, а не тянет окно:
+   diaryListLimit ограничивает отрисовку двумя сотнями, и двести записей
+   вытолкнули бы кнопки за нижний край экрана. */
+.diary-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.diary-entry {
+    border-bottom: 1px solid #eee;
+    padding: 12px 0;
+}
+
+.diary-entry-date {
+    color: var(--text-secondary, #666);
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+/* pre-wrap, потому что абзацы родителя — это его абзацы: перенос строки в
+   записи про ребёнка не должен схлопываться в пробел. overflow-wrap ловит
+   длинное слово без пробелов, которое иначе растянуло бы окно. */
+.diary-entry-body {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}
+
+.diary-entry-edit {
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: none;
+    color: var(--primary-purple);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Ряд действий диалога (DIA-P2, находка владельца 2026-08-16: кнопки не прижаты
+   к правому краю).
+
+   До этого пакета здесь не было justify-content вообще, и оно было бы
+   бездействующим: `flex: 1` растягивал каждую кнопку на равную долю всей
+   ширины, свободного места не оставалось, и выравнивать было нечего. Поэтому
+   меняются ОБА правила, а не добавляется одно.
+
+   Правило общее — его носят все четыре диалога с .modal-buttons, — потому что
+   дефект в правиле, а не в том окне, где он замечен.
+
+   flex-wrap нужен не для красоты: в #importModal в разметке лежат четыре
+   кнопки, и на узком экране третья видимая иначе вылезала бы за край. min-width
+   держит палец: у кнопки по содержимому не должно получиться цели меньше, чем
+   можно уверенно нажать. */
+.modal-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.modal-button {
+    flex: 0 0 auto;
+    min-width: 140px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.modal-button-primary {
+    background: var(--primary-purple);
+    color: #ffffff;
+}
+
+/* ССЫЛКА, ОДЕТАЯ КАК КНОПКА ДИАЛОГА (L3-P3). Одна такая есть — «Скачать APK»
+   внутри окна перед установкой, — и она действительно ссылка: она ведёт наружу,
+   в отличие от предмета в шапке, который теперь открывает это окно и потому стал
+   кнопкой. Правила ниже добирают то, чего у <a> нет по сравнению с <button>:
+   строчный бокс, центрирование текста и снятое подчёркивание. Тот же довод, что
+   у .header-action: у соседних предметов один вид, потому что у них одна роль. */
+a.modal-button {
+    display: inline-block;
+    box-sizing: border-box;
+    text-align: center;
+    text-decoration: none;
+    line-height: 1.2;
+}
+
+/* ЧЕТВЁРТЫЙ СЛУЧАЙ ТОГО ЖЕ ПРАВИЛА, И ПЕРВЫЙ, ГДЕ ОНО ПОНАДОБИЛОСЬ СРАЗУ
+   (PPR-P2). Класс выше задаёт display, а значит `display: inline-block` из него
+   перебивает `display: none`, который браузер даёт атрибуту hidden. До этого
+   пакета ссылка «Скачать APK» никогда не приходила скрытой, поэтому строка была
+   не нужна; теперь она раскрывается только там, где ей можно воспользоваться, и
+   без этой строки была бы предложена всем — ровно тот дефект, который
+   .header-action[hidden] выше описывает словами «hidden="" в разметке, visible
+   на экране». Исполняет app/tests/channel-composition.spec.js. */
+a.modal-button[hidden] {
+    display: none;
+}
+
+.modal-button-primary:hover {
+    background: #7C3AED;
+}
+
+.modal-button-secondary {
+    background: #9CA3AF;
+    color: #ffffff;
+}
+
+.modal-button-secondary:hover {
+    background: #6B7280;
+}
+
+/* Архив (L1-P3). Два несмягчённых утверждения набраны заметнее остального
+   текста намеренно: родитель должен прочитать их до нажатия кнопки, а не
+   после того, как обнаружит отсутствие резервной копии. */
+#exportModal p {
+    margin-bottom: 12px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #374151;
+}
+
+.export-plain {
+    font-weight: 600;
+    color: #111827;
+}
+
+.export-status {
+    font-size: 14px;
+    color: var(--primary-purple);
+}
+
+.table-wrapper {
+    flex-grow: 1;
+    overflow: auto;
+    position: relative;
+}
+
+.zpd-empty-state {
+    padding: 24px 16px;
+    text-align: center;
+    color: #666;
+    font-size: 0.95rem;
+}
+
+table {
+    border-collapse: collapse;
+    width: max-content;
+}
+
+th, td {
+    border: 1px solid #dddddd;
+    text-align: center;
+    padding: 8px;
+    white-space: nowrap;
+}
+
+thead th {
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
+    z-index: 20;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.col-skill {
+    position: sticky;
+    left: 0;
+    width: var(--skill-col-width, 300px);
+    min-width: var(--skill-col-width, 300px);
+    max-width: var(--skill-col-width, 400px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #ffffff;
+    z-index: 10;
+    text-align: left;
+    padding-left: 10px;
+    cursor: pointer;
+}
+
+.col-skill:hover {
+    background: #f8f9fa;
+}
+
+.col-done {
+    position: sticky;
+    left: var(--done-col-left, 300px);
+    width: 50px;
+    background: #ffffff;
+    z-index: 10;
+}
+
+thead .col-skill,
+thead .col-done {
+    z-index: 30;
+}
+
+.col-month {
+    width: 35px;
+    min-width: 35px;
+}
+
+/* Подсветка текущего месяца */
+.current-month-col {
+    position: relative;
+    border-left: 2px solid var(--primary-purple);
+}
+
+.current-month-col::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(139, 92, 246, 0.08);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.cell-active {
+    background-color: #FEF3C7;
+}
+
+.cell-active.current-month-col {
+    background-color: #FBBF24;
+}
+
+.activity-card.activity-window-sensitive {
+    background-color: #FEF3C7;
+}
+
+.activity-card.activity-window-critical {
+    background-color: #FBBF24;
+}
+
+.cell-completed {
+    background-color: #D1FAE5;
+}
+
+.category-row {
+    background: #e9ecef;
+    font-weight: bold;
+}
+
+.category-row .col-skill {
+    text-align: left;
+    padding-left: 20px;
+    position: sticky;
+    left: 0;
+    background: #e9ecef;
+    z-index: 15;
+}
+
+.category-row .col-done {
+    position: sticky;
+    left: var(--done-col-left, 300px);
+    background: #e9ecef;
+    z-index: 15;
+}
+
+.category-row td {
+    background: #e9ecef;
+}
+
+.checkbox-cell input {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    /* For desktop view - basic style, will be overridden for mobile */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-soft);
+    border-radius: 50%;
+    background: var(--bg-white);
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.checkbox-cell input:hover {
+    border-color: var(--primary-purple-light);
+    background: var(--accent-lavender);
+    transform: scale(1.05);
+}
+
+.checkbox-cell input:active {
+    transform: scale(0.95);
+}
+
+.checkbox-cell input:checked {
+    background: linear-gradient(135deg, var(--primary-purple-light) 0%, var(--primary-pink) 100%);
+    border-color: var(--primary-purple-light);
+    box-shadow: 0 2px 8px var(--shadow-purple);
+}
+
+.checkbox-cell input:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Нижняя панель управления */
+.control-footer {
+    flex-shrink: 0;
+    padding: 9px 30px;
+    background: #ffffff;
+    border-top: 1px solid #dddddd;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Кнопка фильтра с градиентом */
+.filter-toggle-btn {
+    padding: 7px 32px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    background: var(--primary-purple);
+    user-select: none;
+}
+
+.filter-toggle-btn:hover {
+    background: #7C3AED;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.filter-toggle-btn:active {
+    transform: translateY(0);
+}
+
+.filter-toggle-btn.active {
+    background: var(--primary-purple-light);
+    box-shadow: 0 4px 15px rgba(167, 139, 250, 0.4);
+}
+
+/* Последняя кнопка с отступом */
+/* Правая привязка — свойство ИМЕННО кнопки активностей, а не позиции в разметке.
+   Раньше здесь стояло `.filter-toggle-btn:last-child`, и это молча закрепляло
+   правый край за тем, что окажется последним: третья кнопка (L1-P3) забрала
+   привязку себе, а «Подходящие активности» отъехала на 605 px влево. Правило
+   по идентификатору говорит то, что имеет в виду, и следующая добавленная
+   кнопка не сможет снова перехватить край. */
+#activitiesBtn {
+    margin-left: auto;
+}
+
+/* Модальное окно деталей навыка */
+.skill-modal {
+    display: none;
+    position: fixed;
+    z-index: 120; /* над .activities-modal (100), под .onboarding-modal (150) */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.skill-modal-content {
+    background-color: #ffffff;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 700px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.skill-modal-close {
+    color: #aaa;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.skill-modal-close:hover {
+    color: var(--primary-purple);
+}
+
+.skill-modal h2 {
+    margin-bottom: 10px;
+    font-size: 22px;
+    color: var(--primary-purple);
+}
+
+.skill-modal h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #555;
+}
+
+.skill-modal p {
+    line-height: 1.6;
+    color: #666;
+}
+
+.skill-modal .period {
+    color: #888;
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+.skill-modal .potential-issues {
+    color: #dc3545;
+}
+
+.skill-modal ul {
+    margin: 10px 0;
+    padding-left: 20px;
+    line-height: 1.6;
+}
+
+.skill-modal li {
+    margin-bottom: 8px;
+    color: #666;
+}
+
+.prerequisite-skill {
+    color: #007bff;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.prerequisite-skill:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.skill-modal .readiness {
+    font-weight: 500;
+}
+
+.skill-modal .readiness-done,
+.skill-modal .readiness-ready {
+    color: var(--primary-purple);
+}
+
+.skill-modal .readiness-blocked {
+    color: #888;
+}
+
+.prereq-marker {
+    font-weight: 600;
+}
+
+.prereq-marker-done {
+    color: var(--primary-purple);
+}
+
+.prereq-marker-todo {
+    color: #bbb;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.hidden-column {
+    display: none !important;
+}
+
+/* Модальное окно развивающих активностей */
+.activities-modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.activities-modal.show {
+    display: flex;
+}
+
+.activities-modal-content {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1200px;
+    max-height: 85vh;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.activities-modal-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--accent-lavender);
+}
+
+.activities-modal-header h2 {
+    font-size: 22px;
+    color: var(--primary-purple);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.activities-modal-icon {
+    font-size: 24px;
+}
+
+.activities-modal-close {
+    color: #aaa;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.activities-modal-close:hover {
+    color: var(--primary-purple);
+}
+
+.activities-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+    overflow-y: auto;
+    padding: 10px 5px;
+}
+
+.activity-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: default;
+}
+
+.activity-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px var(--shadow-purple);
+    border-color: var(--primary-purple-light);
+    background: var(--accent-lavender);
+}
+
+.activity-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+    line-height: 1.4;
+    min-height: 40px;
+    cursor: pointer;
+}
+
+/* Только не-раскладочные свойства — сетка не должна смещаться */
+.activity-card-title:hover {
+    color: #7C3AED;
+    text-decoration: underline;
+}
+
+.activity-card-title:focus-visible {
+    outline: 2px solid #7C3AED;
+    outline-offset: 2px;
+}
+
+.activity-card-content {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.activity-card-content ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.activity-card-content li {
+    margin-bottom: 6px;
+}
+
+.no-activities-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: #888;
+    font-size: 16px;
+}
+
+/* Модальное окно онбординга */
+.onboarding-modal {
+    display: none;
+    position: fixed;
+    z-index: 150;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.onboarding-modal.show {
+    display: flex;
+}
+
+.onboarding-modal-content {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1200px;
+    max-height: 85vh;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.onboarding-modal-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--accent-lavender);
+}
+
+.onboarding-modal-header h2 {
+    font-size: 24px;
+    color: var(--primary-purple);
+    margin: 0;
+}
+
+.onboarding-modal-close {
+    color: #aaa;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.onboarding-modal-close:hover {
+    color: var(--primary-purple);
+}
+
+.onboarding-modal-body {
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 10px;
+    line-height: 1.7;
+    color: #333;
+    font-size: 15px;
+}
+
+.onboarding-modal-body p {
+    margin: 0 0 16px 0;
+}
+
+.onboarding-modal-body ol {
+    margin: 0 0 16px 0;
+    padding-left: 24px;
+}
+
+.onboarding-modal-body li {
+    margin-bottom: 8px;
+}
+
+.onboarding-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+/* L3-P3: правила .onboarding-checkbox-label удалены вместе с самой галочкой
+   «Больше не показывать» — таблица стилей, которая продолжает одевать удалённую
+   поверхность, это способ, которым поверхность возвращается. */
+
+.onboarding-close-btn {
+    background-color: var(--primary-purple);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.onboarding-close-btn:hover {
+    background-color: var(--primary-purple-light);
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+    /* L1-P3: на мобильном действие в шапке — только иконка. Подпись прячется,
+       доступное имя остаётся в aria-label/title разметки. */
+    .header-action {
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .header-action-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .header-action-label {
+        display: none;
+    }
+
+    /* Размер справки на мобильном НЕ переопределяется, и это измеренный факт, а
+       не пропуск: ниже, в блоке <=767px, стоит правило touch-targets
+       `button:not(footer button) { min-height: 44px; min-width: 44px }`, и оно
+       побеждает любую попытку сжать кнопку до 40px. Написать здесь 40px значило
+       бы оставить правило, которое ничего не делает.
+
+       ЗНАЧОК ЗДЕСЬ 22px, А НЕ 20px, КАК У СОСЕДЕЙ (NAV-P1). У соседей значок стоит
+       на залитой лиловой пилюле, которая и ведёт глаз; у этого контрола с NAV-P1
+       нет ни пилюли, ни рамки — видимый предмет только сам знак, и сжимать его до
+       соседского размера значило бы делать его вдвое тише соседей, а не вровень. */
+    .header-help-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    /* Кнопка меню — по тому же доводу: плоская, без заливки, поэтому не
+       уменьшается до 20px. */
+    .header-menu-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    header {
+        padding: 10px 15px;
+    }
+
+    header h1 {
+        font-size: 16px;
+    }
+
+    .header-right {
+        gap: 12px;
+    }
+}
+
+/* ===== MOBILE RESPONSIVE STYLES ===== */
+@media (max-width: 767px) {
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 1. LAYOUT CONTAINER                                                      */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Предотвратить горизонтальный скролл */
+  }
+
+  .app-container {
+    width: 100vw;
+    max-width: 100vw;
+  }
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 2. HEADER - компактный                                                  */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  header {
+    padding: 8px 12px;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    justify-content: space-between;
+    background: linear-gradient(135deg, var(--bg-white) 0%, var(--accent-lavender) 100%);
+    border-bottom: 1px solid #E9D5FF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Скрыть заголовок */
+  header h1 {
+    display: none;
+  }
+
+  /* Верхний блок - горизонтальный */
+  .header-top {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-left {
+    position: static;
+    transform: none;
+    display: flex;
+    align-items: center;
+    order: 2;
+  }
+
+  .header-right {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Кнопка профиля - переместить влево.
+
+     `margin-right: auto` — ЭТО И ЕСТЬ ВЫРАВНИВАНИЕ ДЕЙСТВИЙ ПО ПРАВОМУ КРАЮ
+     (L3-P3). .header-right тут `width: 100%`, поэтому `margin-left: auto` из
+     базового правила поглощать нечего, а собственного justify-content у этого
+     правила нет — дети падали к левому краю, и весь запас шапки оставался
+     справа: при 412px кнопка канала заканчивалась на 283 из 400 доступных.
+     Отступ на чипе профиля толкает вправо всё, что идёт ПОСЛЕ него, и делает
+     это одинаково для одного, двух и трёх раскрытых действий — в отличие от
+     justify-content: space-between, который разложил бы их по-разному на разных
+     каналах.
+
+     min-width/эллипсис пришли платой за возвращённую подпись у #apkBtn (L3-P3);
+     UIP-P3 подпись убрал, а эти две строки оставлены: они держат чип в одной
+     строке при длинном имени ребёнка независимо от того, сколько места занимают
+     соседи, и без них длинное имя переносит чип на вторую строку и растит
+     шапку. Довод сменился, поведение — нет. */
+  .profile-button {
+    margin: 0 auto 0 0;
+    order: -1;
+    min-width: 0;
+  }
+
+  .profile-button > #profileName {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Выпадающий список профилей - выровнять по левому краю */
+  .profile-dropdown {
+    left: 0;
+    right: auto;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 3. TABLE - показать только Навык + Чекбокс                             */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  /* Контейнер таблицы */
+  .table-container,
+  #tableContainer {
+    overflow-x: hidden;
+    padding: 0;
+    background: var(--bg-white);
+  }
+
+  #mainTable {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  /* СКРЫТЬ ВСЕ колонки с месяцами (1-72) */
+  #mainTable th:not(:first-child):not(:nth-child(2)),
+  #mainTable td:not(:first-child):not(:nth-child(2)) {
+    display: none !important;
+  }
+
+  /* Если у колонок есть класс .month-column */
+  .month-column {
+    display: none !important;
+  }
+
+  /* Колонка "Навык" - улучшенная типографика */
+  #mainTable th:first-child,
+  #mainTable td:first-child {
+    width: calc(100vw - 76px); /* подстроено под новую ширину чекбокса */
+    min-width: auto;
+    padding: 12px 16px; /* более компактно, но читаемо */
+    font-size: 15px;
+    line-height: 1.55; /* чуть больше для комфорта чтения */
+    color: var(--text-primary);
+    font-weight: 400;
+    letter-spacing: 0.01em; /* чуть разреженнее */
+    white-space: normal; /* Перенос текста */
+    word-wrap: break-word;
+  }
+
+  /* ===== КРУГЛЫЕ ЧЕКБОКСЫ С ГРАДИЕНТОМ ===== */
+
+  /* Ячейка с чекбоксом - увеличенный padding для touch target 44px */
+  #mainTable th:nth-child(2),
+  #mainTable td:nth-child(2) {
+    width: 56px;
+    min-width: 56px;
+    text-align: center;
+    padding: 15px 12px; /* 15*2 + 26 = 56px > 44px ✓ */
+  }
+
+  /* Кастомный чекбокс - круглый, современный */
+  #mainTable td:nth-child(2) input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 26px;
+    height: 26px;
+    border: 2.5px solid #D1D5DB;
+    border-radius: 50%; /* Круглая форма */
+    background: var(--bg-white);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    margin: 0;
+    flex-shrink: 0;
+  }
+
+  /* Hover эффект - мягкое подсвечивание */
+  #mainTable td:nth-child(2) input[type="checkbox"]:hover {
+    border-color: var(--primary-purple-light);
+    background: var(--accent-lavender);
+    transform: scale(1.08);
+  }
+
+  /* Active (при нажатии) - feedback */
+  #mainTable td:nth-child(2) input[type="checkbox"]:active {
+    transform: scale(0.95);
+  }
+
+  /* Checked состояние - красивый градиент */
+  #mainTable td:nth-child(2) input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, var(--primary-purple-light) 0%, var(--primary-pink) 100%);
+    border-color: var(--primary-purple-light);
+    box-shadow: 0 2px 8px var(--shadow-purple);
+  }
+
+  /* Галочка внутри круга */
+  #mainTable td:nth-child(2) input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--bg-white);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    animation: checkPop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  /* Анимация появления галочки */
+  @keyframes checkPop {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Убираем стандартное ограничение min-size для кастомных чекбоксов */
+  #mainTable input[type="checkbox"] {
+    min-height: 26px;
+    min-width: 26px;
+  }
+
+  /* Header таблицы - скрыть на мобильных (не нужен) */
+  #mainTable thead {
+    display: none;
+  }
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 4. КАТЕГОРИИ - accordion (сворачиваемые)                               */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  /* Строка категории - более мягкая и современная */
+  #mainTable tr.category-row {
+    background: linear-gradient(135deg, #F5F3FF 0%, #FCE7F3 100%);
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    border-left: 4px solid var(--primary-purple-light);
+    transition: all 0.2s ease;
+  }
+
+  #mainTable tr.category-row:hover {
+    background: linear-gradient(135deg, #EDE9FE 0%, #FBCFE8 100%);
+  }
+
+  #mainTable tr.category-row td {
+    padding: 14px 16px !important;
+    color: var(--text-category);
+  }
+
+  /* Иконка раскрытия - более изящная */
+  #mainTable tr.category-row td:first-child::before {
+    content: '▼';
+    font-size: 11px;
+    color: var(--primary-purple-light);
+    margin-right: 10px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+  }
+
+  #mainTable tr.category-row.collapsed td:first-child::before {
+    content: '▶';
+    transform: rotate(0deg);
+  }
+
+  /* Счётчик навыков */
+  #mainTable tr.category-row td:first-child::after {
+    content: attr(data-skills-count);
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    opacity: 0.8;
+  }
+
+  /* Активный эффект при тапе */
+  #mainTable tr.category-row:active {
+    background: linear-gradient(135deg, #DDD6FE 0%, #F9A8D4 100%);
+  }
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 5. FOOTER - ультра-минимализм (iOS-style)                               */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  footer {
+    padding: 8px 16px; /* симметрично */
+    gap: 0; /* без gap */
+    flex-wrap: nowrap; /* в строку */
+    justify-content: space-evenly; /* равномерно */
+    background: rgba(249, 250, 251, 0.95); /* полупрозрачный */
+    backdrop-filter: blur(10px); /* iOS-style размытие */
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 0.5px solid rgba(0, 0, 0, 0.1); /* тонкая граница */
+    box-shadow: none;
+  }
+
+  /* Стили для кнопок футера (и с классом .filter-toggle-btn) */
+  footer button,
+  footer .filter-toggle-btn {
+    padding: 8px 6px; /* минимальный */
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+
+    /* Текстовые кнопки */
+    color: var(--primary-purple);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+
+    flex: 1 1 auto; /* адаптивно */
+    min-width: auto;
+    white-space: normal; /* перенос при необходимости */
+
+    /* ВЫСОТА КНОПКИ НЕ ЗАВИСИТ ОТ ЧИСЛА СТРОК В ПОДПИСИ (L1-P3,
+       LSC-DL-003 (r), (w)). Кнопка фильтра меняет подпись на «Показать все
+       навыки», когда фильтр включён; в закреплённом контейнере короткая подпись
+       перестаёт переноситься, и футер прыгает с 68.78 px на 55 px при каждом
+       переключении — вместе со всей страницей над ним. Проверено арбитром
+       (scripts/parity-suite.sh в закреплённом контейнере), а не локально.
+       Здесь зарезервированы РОВНО ДВЕ СТРОКИ. `lh` — высота строки самого
+       элемента, поэтому 2lh — это две строки ПО ОПРЕДЕЛЕНИЮ, в каких бы
+       метриках шрифта ни считал движок. Это и есть причина писать декларацию, а
+       не измеренную константу в пикселях: то же самое объявление даёт ~49.8 px
+       на машине разработчика и ~68.78 px в контейнере, и в обоих случаях оно
+       означает «две строки». Пиксельная константа была бы верна ровно в одной
+       из двух сред.
+       16px — вертикальные padding из этого же правила (box-sizing: border-box).
+       Порог касания в 36px перекрыт с запасом.
+       ЦЕНА: обрезка вместо роста. Её сторожит
+       app/tests/footer-height.spec.js — см. комментарий там. */
+    height: calc(2lh + 16px);
+    overflow: hidden;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    position: relative;
+  }
+
+  footer button:hover,
+  footer .filter-toggle-btn:hover {
+    opacity: 0.7;
+    background: transparent;
+    transform: none;
+    box-shadow: none;
+  }
+
+  footer button:active,
+  footer .filter-toggle-btn:active {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+
+  /* Разделители между кнопками */
+  footer button:not(:last-child)::after,
+  footer .filter-toggle-btn:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 25%;
+    height: 50%;
+    width: 0.5px;
+    background: var(--border-soft);
+  }
+
+  /* Здесь стояло `footer button:nth-child(3) { flex: 1 1 auto }` — «третья
+     кнопка, не выделяем, одинаковый размер». Правило удалено, а не
+     перепривязано: третьей кнопки в футере не будет (архив уехал в шапку),
+     значение совпадало с тем, что базовое правило выше уже даёт каждой кнопке
+     футера, то есть оно ничего не меняло ни при какой привязке. Позиционную
+     форму не возвращаем — она снова взведёт ту же ловушку при следующей
+     добавленной кнопке (LSC-DL-003 (s)). */
+
+  /* Убираем специфичные стили для .filter-toggle-btn.active */
+  footer .filter-toggle-btn.active {
+    background: transparent;
+    opacity: 1;
+    color: var(--primary-purple);
+    font-weight: 600;
+  }
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 6. MODAL - fullscreen на мобильных                                      */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  /* Высота — по видимой области (та же причина, что и у body):
+     иначе на Chrome/Android низ полноэкранной модалки уходит под тулбар. */
+  .modal-content {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 100vw;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    margin: 0;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+  }
+
+  .modal-close {
+    width: 32px;
+    height: 32px;
+    font-size: 24px;
+  }
+
+  /* Карточки активностей в одну колонку */
+  .activities-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  /* Одинаковые отступы в заголовках карточек */
+  .activity-card-title {
+    min-height: auto;
+    margin-bottom: 12px;
+  }
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* 7. TOUCH TARGETS - минимум 44x44px                                      */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  /* Для кнопок и других элементов (кроме чекбоксов в таблице) */
+  button:not(footer button),
+  .button,
+  a.button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Для чекбоксов в таблице - кастомный размер с расширенной зоной касания */
+  /* (уже настроено выше через padding ячейки) */
+
+  /* Общий padding для всех строк */
+  #mainTable tr td {
+    padding: 12px 16px; /* компактнее, но не критично */
+    border-bottom: 1px solid var(--border-lighter); /* мягче */
+    transition: background-color 0.2s ease;
+  }
+
+  /* Hover эффект на строках */
+  #mainTable tbody tr:not(.category-row):hover {
+    background-color: #FAFAFA;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* ДОПОЛНИТЕЛЬНО: Portrait/Landscape ориентация                              */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 767px) and (orientation: landscape) {
+  header {
+    padding: 6px 12px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* SLIDE-UP, ОБЩАЯ ДЛЯ БАННЕРОВ ОБОЛОЧКИ                                        */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+/* L3-P3: здесь стоял блок правил предложения установить PWA (#installBanner,
+   #iosBanner и их кнопки). Он удалён вместе с самим предложением: продукт — это
+   нативное приложение, а веб-канал — витрина и точка входа, и витрина, которая
+   предлагает установить себя, обещает не тот продукт (PDR-034 §1, аннотация
+   владельца 2026-08-18). Анимация пережила блок, потому что она никогда ему не
+   принадлежала: её же используют .app-banner (подтверждение архива) и
+   #updateBanner (новая версия). */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* ПОДТВЕРЖДЕНИЕ СОХРАНЁННОГО АРХИВА (DIA-P2)                                   */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+/* Тот же язык, что у баннеров оболочки выше, и намеренно ДРУГОЙ переключатель:
+   здесь .show, а не .visible. Причина не в стиле — .show-правила покрывает
+   app/tests/show-rule-coverage.spec.js, который падает, если модуль добавляет
+   класс, а таблица стилей его не разрешает (EMV-P1-INV-001). Это ровно тот
+   класс дефекта, которым баннер подтверждения рискует: обработчик отработает,
+   а родитель ничего не увидит. Поэтому поверхность вступает в охраняемую
+   идиому, вместо того чтобы повторять неохраняемую.
+
+   Класс, а не только id: правило вида `#id.show` тот сканер не разрешает — он
+   ищет `.класс.show`, — и элемент без класса он честно объявляет непокрытым. */
+.app-banner {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-white);
+    border-top: 2px solid var(--success-green);
+    padding: 16px 20px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    animation: slideUp 0.3s ease-out;
+}
+
+.app-banner.show {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.app-banner span {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+#exportDoneDismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 8px;
+    margin-left: 8px;
+    transition: color 0.2s;
+}
+
+#exportDoneDismiss:hover {
+    color: var(--primary-purple);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* ПЛАТФОРМЕННАЯ ЗАМЕТКА В ОКНЕ УСТАНОВКИ (PPR-P2)                             */
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*
+   Здесь стоял блок «СОГЛАСИЕ НА АНАЛИТИКУ (PPR-P2)»: .cookie-banner,
+   .cookie-banner-actions, .cookie-banner-btn(:hover) и .footer-legal-btn(:hover).
+   Он снят целиком в UIP-P1 вместе со всей аналитикой (аннотация к ADR-043 от
+   2026-08-25, класс: разворот) — правила, одевающие удалённую поверхность, это
+   то, как поверхность возвращается (FIU-P3-INV-003).
+
+   ПОЗИЦИОННОЕ ПРАВИЛО В ПОДВАЛ НЕ ВОЗВРАЩАЕТСЯ И ЗАМЕНЫ ЕМУ НЕ ТРЕБУЕТСЯ.
+   Правый край подвала держит #activitiesBtn { margin-left: auto } выше по файлу
+   — оно старше «Cookie» и стоит без изменений. У .footer-legal-btn было ВТОРОЕ
+   margin-left: auto, а flexbox делит свободное место между авто-отступами
+   поровну: именно поэтому «Подходящие активности» уехала от правого края. Снятие
+   второго правила возвращает край первому, и `footer button:nth-child(3)` не
+   возвращается — позиционная форма снова взвела бы ту же ловушку при следующей
+   добавленной кнопке (LSC-DL-003 (s)). */
+
+/* ЧЕСТНЫЙ ОТВЕТ ВМЕСТО ССЫЛКИ НА APK (PPR-P2). Занимает место, которое заняла
+   бы ссылка, и выровнен по ней: слот один, содержимое зависит от платформы. */
+.modal-platform-note {
+    flex: 1 1 auto;
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.4;
+    text-align: right;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* PWA UPDATE-AVAILABLE BANNER                                                  */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+#updateBanner {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-white);
+    border-top: 2px solid var(--primary-purple);
+    padding: 16px 20px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    animation: slideUp 0.3s ease-out;
+}
+
+#updateBanner.visible {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#updateBanner span {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+#updateReloadBtn {
+    background: var(--primary-purple);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+#updateReloadBtn:hover {
+    background: var(--primary-purple-light);
+}
+
+#updateDismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 8px;
+    margin-left: 8px;
+    transition: color 0.2s;
+}
+
+#updateDismiss:hover {
+    color: var(--text-primary);
+}
+
+@media (max-width: 480px) {
+    #updateBanner {
+        padding: 14px 16px;
+    }
+
+    #updateBanner span {
+        font-size: 13px;
+    }
+
+    #updateReloadBtn {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+}

@@ -103,7 +103,7 @@ async function bootWithEmptyStore(page) {
 
 /** Opens the diary and switches to the compose form, as a parent does. */
 async function openCompose(page) {
-    await page.locator('#diaryBtn').click();
+    await page.locator('#surfaceDiaryBtn').click();
     // The list renders asynchronously, and that render decides whether the
     // compose control is offered at all — pressing it in the same turn would
     // sometimes press a button the app had not finished deciding about.
@@ -137,7 +137,7 @@ test.describe('a parent writes an entry and the app shows it back', () => {
         // visible and `#diaryNewBtn` is withheld. If this init script silently
         // failed, the legs below would drive the refusal path and could not tell.
         await bootWithStore(page);
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
 
         await expect(page.locator('#diaryNoStore')).toBeHidden();
         await expect(page.locator('#diaryNoChild')).toBeHidden();
@@ -328,7 +328,7 @@ test.describe('a store that refuses the LIST is stated, not shown as an empty di
         await bootWithStore(page);
         await refuseTheList(page, 'database or disk is full (code 13)');
 
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryModal')).toBeVisible();
 
         const status = page.locator('#diaryListStatus');
@@ -365,7 +365,7 @@ test.describe('a store that refuses the LIST is stated, not shown as an empty di
         const lines = watchConsole(page);
         await bootWithStore(page);
 
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryEmpty')).toBeVisible();
         await expect(page.locator('#diaryListStatus')).toBeHidden();
 
@@ -583,7 +583,7 @@ test.describe('a profile just created opens the diary on its first entry', () =>
 
         // NOT A DEAD END: the ordinary door is where it always was, and behind it
         // the diary is empty and says so.
-        await page.locator('#diaryBtn').click();
+        await page.locator('#surfaceDiaryBtn').click();
         await expect(page.locator('#diaryEmpty')).toBeVisible();
         await expect(page.locator('#diaryNewBtn')).toBeVisible();
 

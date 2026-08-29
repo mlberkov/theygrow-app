@@ -65,6 +65,18 @@ const DECLARED_POLICY_STATE = new RegExp(
 // state a rollback returns to — the one worth executing a page against.
 const POLICY_WITHHELD_VALUE = 'none';
 
+// The Play token, read out of the shipped knob for the same reason every other
+// value in this header is (NAV-P2): a test that wrote it down again would agree
+// with itself after the knob changed.
+const PLAY_INSTALLER = /playInstallerPackage:\s*'([^']+)'/.exec(CONFIG_SOURCE)[1];
+
+// The row's accessible name, read the same way — out of the SHELL, not restated.
+// The published policy quotes this string (edition 1.3, §6), and
+// app/tests/privacy-page.spec.js reads it from the same place.
+const UPDATE_ROW_NAME = /<button\b[^>]*\bid="menuUpdateBtn"[^>]*>/
+    .exec(SHELL)[0]
+    .match(/\baria-label="([^"]+)"/)[1];
+
 /**
  * Rewrites one <meta> declaration before the app boots.
  *
@@ -102,6 +114,34 @@ async function simulateNativeShell(page) {
     await page.addInitScript(() => {
         window.Capacitor = { isNativePlatform: () => true };
     });
+}
+
+/**
+ * Opens the intro window through whichever entry THIS channel offers (NAV-P1).
+ *
+ * WHY A BRANCH IS SOUND HERE AND WOULD NOT BE ANYWHERE ELSE. The entry moved
+ * per channel: the web keeps the header control #aboutBtn, the app reaches the
+ * same window through the header menu. A leg about the POLICY LINK or the
+ * BROWSER-ONLY SENTENCE is not a leg about where the door is, and hard-coding
+ * one door would make those legs red for a reason they are not about.
+ *
+ * The branch is only safe because the composition itself is asserted elsewhere,
+ * per channel and without a branch — see the NAV-P1 block below, which pins that
+ * the app offers the menu and NOT the header control, and the web the reverse.
+ * Without those, this helper would happily pass on a channel showing both doors.
+ */
+async function openIntroWindow(page) {
+    if (await page.locator('#headerMenu').isVisible()) {
+        // Pressing the toggle unconditionally would CLOSE a panel a caller had
+        // already opened, and the failure would read as "the row is not visible"
+        // rather than as "this helper shut it".
+        if (!(await page.locator('#headerMenuPanel').isVisible())) {
+            await page.locator('#menuBtn').click();
+        }
+        await page.locator('#menuAboutBtn').click();
+        return;
+    }
+    await page.locator('#aboutBtn').click();
 }
 
 test.describe('the web channel offers what it can deliver, and nothing else', () => {
@@ -440,7 +480,16 @@ test.describe('the native branch offers the archive, and its modal is actually v
     test('the archive control is offered, and the download control is not', async ({ page }) => {
         await gotoApp(page, { state: STATES.seeded });
 
+        // NAV-P1: the archive is offered BEHIND THE MENU on this channel, so the
+        // offer is now two facts rather than one — the menu is there, and the
+        // archive is inside it. Asserted in that order: a menu that failed to
+        // open would otherwise read as an archive that was never offered.
+        await expect(page.locator('#headerMenu')).toBeVisible();
+        await expect(page.locator('#exportBtn')).toBeHidden();
+
+        await page.locator('#menuBtn').click();
         await expect(page.locator('#exportBtn')).toBeVisible();
+
         await expect(page.locator('#apkBtn')).toBeHidden();
 
         // The browser-only sentence does not follow the app inside: on this
@@ -452,7 +501,7 @@ test.describe('the native branch offers the archive, and its modal is actually v
         // `toBeHidden()` true for the wrong reason — an element inside a
         // `display: none` modal is hidden whatever the channel gate decided.
         // Opening it puts the channel branch back in front of the assertion.
-        await page.locator('#aboutBtn').click();
+        await openIntroWindow(page);
         await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
         await expect(page.locator('#webChannelNote')).toHaveCount(1);
         await expect(page.locator('#webChannelNote')).toBeHidden();
@@ -467,6 +516,10 @@ test.describe('the native branch offers the archive, and its modal is actually v
 
         await expect(page.locator('#exportModal')).toBeHidden();
 
+        // NAV-P1 put the control inside the menu; the handler behind it is the
+        // same listener surfaces/export.js has always installed, which is the
+        // point of the relocation being a relocation.
+        await page.locator('#menuBtn').click();
         await page.locator('#exportBtn').click();
 
         await expect(page.locator('#exportModal')).toBeVisible();
@@ -478,6 +531,271 @@ test.describe('the native branch offers the archive, and its modal is actually v
     });
 });
 
+test.describe('the header menu is the app\'s entry and the web has none (NAV-P1-INV-001)', () => {
+    // WHAT THIS BLOCK IS FOR. NAV-P1 moved two controls without changing what
+    // either of them does, and "without changing" is exactly the kind of claim
+    // that passes by inspection and fails in the hand. So every leg here RUNS
+    // the product: a real page loads, a real control is pressed, and the window
+    // that comes up is the one the handler was always wired to.
+    //
+    // IT ALSO PINS THE PANEL'S COMPOSITION, WHICH NAV-P2 CHANGED. The panel
+    // carried exactly two rows through NAV-P1, as a boundary pin rather than a
+    // promise, and «Обновление» has now arrived with the thing it does — the
+    // first network call this channel makes and edition v1.3 of the policy
+    // (vault ADR-052 §1). So the count is three, and the third row's OWN
+    // behaviour — that it reaches the network only on a press, and what that
+    // request is made of — is app/tests/update-check.spec.js, deliberately not
+    // this file: what is asserted here is composition, which is this file's
+    // subject.
+    //
+    // THE THIRD ROW SHIPS HIDDEN AND STAYS HIDDEN IN THIS BLOCK'S FIRST TWO
+    // SUB-BLOCKS, AND THAT IS NOT AN OVERSIGHT. Revealing it needs a second fact
+    // that only the device can give — which build is installed and who installed
+    // it (the first-party TheyGrowBuild plugin) — and simulateNativeShell()
+    // installs no plugin. The sub-block below plants one, which is the only
+    // place in this file where the row is expected to be visible.
+
+    test.describe('the web channel', () => {
+        test('keeps the header control and is offered no menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            // ANTI-VACUITY: both entries are IN the document on both channels —
+            // one build, one set of bytes (LSC-P1-INV-002). What differs is
+            // which one this channel reveals.
+            await expect(page.locator('#aboutBtn')).toHaveCount(1);
+            await expect(page.locator('#headerMenu')).toHaveCount(1);
+            await expect(page.locator('#menuAboutBtn')).toHaveCount(1);
+
+            await expect(page.locator('#aboutBtn')).toBeVisible();
+            await expect(page.locator('#headerMenu')).toBeHidden();
+            // The hidden attribute is only worth having if the class does not
+            // defeat it — the fourth case of the rule .header-help[hidden]
+            // announced in advance. A missing .header-menu[hidden] rule shows up
+            // here as a menu standing open on the showcase.
+            await expect(page.locator('#headerMenu')).toHaveCSS('display', 'none');
+        });
+
+        test('the header control still opens the intro, unchanged', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#onboardingModal')).toBeHidden();
+            await page.locator('#aboutBtn').click();
+            await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+            await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
+        });
+    });
+
+    test.describe('the native channel', () => {
+        test.beforeEach(async ({ page }) => {
+            await simulateNativeShell(page);
+        });
+
+        test('took the native branch', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+            expect(await page.evaluate(() => window.IS_NATIVE_SHELL)).toBe(true);
+        });
+
+        test('offers the menu and not the header control, with the panel shut', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#headerMenu')).toBeVisible();
+            await expect(page.locator('#menuBtn')).toBeVisible();
+
+            await expect(page.locator('#aboutBtn')).toHaveCount(1);
+            await expect(page.locator('#aboutBtn')).toBeHidden();
+            await expect(page.locator('#aboutBtn')).toHaveCSS('display', 'none');
+
+            // Shut by default, and said so where a screen reader reads it.
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+        });
+
+        test('pressing it opens three named rows, and no fourth', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+
+            await expect(page.locator('#headerMenuPanel')).toHaveClass(/show/);
+            await expect(page.locator('#headerMenuPanel')).toHaveCSS('display', 'block');
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'true');
+
+            const rows = page.locator('#headerMenuPanel button');
+            await expect(rows).toHaveCount(3);
+            await expect(rows.nth(0)).toHaveAttribute('aria-label', 'О приложении');
+            await expect(rows.nth(1)).toHaveAttribute('aria-label', 'Сохранить архив');
+            await expect(rows.nth(2)).toHaveAttribute('aria-label', UPDATE_ROW_NAME);
+
+            // The rows are readable, not only reachable: in a list an unlabelled
+            // row says nothing, so the archive's caption is visible here even on
+            // the narrow layout where the header row hides it.
+            await expect(rows.nth(0)).toBeVisible();
+            await expect(rows.nth(1)).toBeVisible();
+            await expect(page.locator('#menuAboutBtn .header-menu-item-label')).toBeVisible();
+            await expect(page.locator('#exportBtn .header-action-label')).toBeVisible();
+
+            // The third row is present and WITHHELD, because this shell carries
+            // no build-info plugin. Asserted rather than skipped: a row revealed
+            // without knowing which build is installed would be a check with
+            // nothing to compare against.
+            await expect(rows.nth(2)).toBeHidden();
+            await expect(rows.nth(2)).toHaveCSS('display', 'none');
+
+            // And no outcome is showing before anything has been checked.
+            await expect(page.locator('#updateInstallLink')).toBeHidden();
+            for (const id of [
+                'updateStatusChecking',
+                'updateStatusCurrent',
+                'updateStatusAvailable',
+                'updateStatusOffline',
+                'updateStatusTimeout',
+                'updateStatusRateLimited',
+                'updateStatusServerError',
+                'updateStatusUnreadable',
+            ]) {
+                await expect(page.locator(`#${id}`)).toBeHidden();
+            }
+        });
+
+        test('the update row is revealed once a build-info plugin answers', async ({ page }) => {
+            // The reveal, executed. simulateNativeShell() alone leaves the row
+            // withheld (the leg above), so this leg varies exactly one thing:
+            // the plugin the reveal depends on.
+            await page.addInitScript(() => {
+                window.Capacitor.nativePromise = (plugin, method) => {
+                    if (plugin === 'TheyGrowBuild' && method === 'info') {
+                        return Promise.resolve({
+                            versionCode: 221,
+                            versionName: '0.1.221',
+                            installer: null,
+                        });
+                    }
+                    return Promise.reject(new Error(`unexpected plugin call ${plugin}.${method}`));
+                };
+            });
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            const row = page.locator('#menuUpdateBtn');
+            await expect(row).toBeVisible();
+            await expect(row).toHaveAttribute('aria-label', UPDATE_ROW_NAME);
+            await expect(page.locator('#menuUpdateBtn .header-menu-item-label')).toBeVisible();
+
+            // The address is wired from the knob whichever branch is taken, the
+            // same rule #installDownloadLink follows: a link that will one day
+            // be shown must never be a link to nowhere while it waits.
+            await expect(page.locator('#updateInstallLink')).toHaveAttribute('href', RELEASE_URL);
+        });
+
+        test('a copy installed from Play is offered no update row', async ({ page }) => {
+            // The branch that has never existed in the wild, executed against a
+            // real page rather than only as a truth table: the reveal reads the
+            // installer, not merely the channel.
+            await page.addInitScript((play) => {
+                // Only the build-info plugin answers. Resolving EVERY call would
+                // also make store/bridge.js believe a device store is present,
+                // and the page would open the create-profile window over the menu
+                // this leg is about — measured, not guessed.
+                window.Capacitor.nativePromise = (plugin, method) => {
+                    if (plugin === 'TheyGrowBuild' && method === 'info') {
+                        return Promise.resolve({
+                            versionCode: 221,
+                            versionName: '0.1.221',
+                            installer: play,
+                        });
+                    }
+                    return Promise.reject(new Error(`unexpected plugin call ${plugin}.${method}`));
+                };
+            }, PLAY_INSTALLER);
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            // ANTI-VACUITY: the panel really opened and its other rows are there,
+            // so "hidden" below is about the installer and not about a menu that
+            // never opened.
+            await expect(page.locator('#exportBtn')).toBeVisible();
+            await expect(page.locator('#menuUpdateBtn')).toBeHidden();
+            await expect(page.locator('#menuUpdateBtn')).toHaveCSS('display', 'none');
+        });
+
+        test('«О приложении» opens the intro and closes the menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#onboardingModal')).toBeHidden();
+
+            await page.locator('#menuBtn').click();
+            await page.locator('#menuAboutBtn').click();
+
+            // The same window the web control opens, by the same handler.
+            await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
+            await expect(page.locator('#onboardingModal')).toHaveCSS('display', 'flex');
+            await expect(page.locator('#onboardingModal h2')).toBeVisible();
+
+            // And the list gets out of the way of what it opened.
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+        });
+
+        test('«Сохранить архив» opens the archive window and closes the menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#exportModal')).toBeHidden();
+
+            await page.locator('#menuBtn').click();
+            await page.locator('#exportBtn').click();
+
+            await expect(page.locator('#exportModal')).toBeVisible();
+            await expect(page.locator('#exportModal')).toHaveCSS('display', 'block');
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+        });
+
+        test('Escape closes the menu and hands the focus back', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            await expect(page.locator('#headerMenuPanel')).toHaveClass(/show/);
+
+            await page.keyboard.press('Escape');
+
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+            // Closing with the keyboard must not lose the place: without the
+            // focus return the next Tab starts from the top of the document.
+            await expect(page.locator('#menuBtn')).toBeFocused();
+        });
+
+        test('a click outside closes the menu', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            await expect(page.locator('#headerMenuPanel')).toHaveClass(/show/);
+
+            await page.locator('header h1').click({ force: true });
+
+            await expect(page.locator('#headerMenuPanel')).toBeHidden();
+            await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
+        });
+    });
+
+    test('the two channels name the intro entry with the SAME string', async ({ page }) => {
+        // THE POLICY QUOTES THIS STRING (vault PDR-035, annotation 2026-08-27),
+        // and app/tests/privacy-page.spec.js reads it off #aboutBtn. If the app's
+        // row drifted from the web control's name, that guard would stay green
+        // while the document named a control half the readers cannot find. This
+        // leg is the half that guard cannot see: it compares the two entries to
+        // each other, in the running page.
+        await gotoApp(page, { state: STATES.seeded });
+
+        const names = await page.evaluate(() => [
+            document.getElementById('aboutBtn').getAttribute('aria-label'),
+            document.getElementById('menuAboutBtn').getAttribute('aria-label'),
+        ]);
+
+        expect(names[0], 'the web control lost its accessible name').toBeTruthy();
+        expect(names[1], 'the menu row lost its accessible name').toBeTruthy();
+        expect(names[1], 'the two channels now name the same window differently').toBe(names[0]);
+    });
+});
+
 test.describe('the offer decision itself, both branches (module-level)', () => {
     // NOT A RUNTIME CLAIM ABOUT THE PRODUCT, and labelled so. This block imports
     // the SHIPPED decision function and drives its truth table off-device. It
@@ -486,6 +804,7 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
     // declares a published release, and an unknown state token.
     let shouldOfferApk = null;
     let shouldOfferPolicy = null;
+    let shouldOfferUpdate = null;
 
     test.beforeAll(async () => {
         // The same Node plumbing store-unit.spec.js documents: a real dynamic
@@ -507,7 +826,7 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
                 `${sub}/${path.basename(from)} was not copied verbatim — this spec would test a different file`
             ).toBeTruthy();
         }
-        ({ shouldOfferApk, shouldOfferPolicy } = await dynamicImport(
+        ({ shouldOfferApk, shouldOfferPolicy, shouldOfferUpdate } = await dynamicImport(
             `file://${path.join(root, 'surfaces', 'channel.js')}`
         ));
     });
@@ -548,7 +867,64 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
             expect(shouldOfferPolicy(state), `"${state}" was treated as published`).toBe(false);
         }
     });
+
+    // THE PLAY BRANCH, WHICH NO PAGE IN THIS SUITE CAN REACH (NAV-P2).
+    //
+    // There is no Play copy of this app — closed testing has not started (vault
+    // ADR-050) — so the branch that withholds the row exists and has never run
+    // anywhere. This is the only place it is executed, and it is executed as a
+    // truth table off-device, which is what that kind of claim is worth. The
+    // on-device leg, BuildInfoTest, asserts the OTHER side: an adb-installed
+    // build does not report Play, so the row is offered on this channel.
+    test('the update row needs the native shell AND a copy that did not come from Play', () => {
+        expect(shouldOfferUpdate(true, null)).toBe(true);
+        expect(shouldOfferUpdate(true, PLAY_INSTALLER)).toBe(false);
+        expect(shouldOfferUpdate(false, null)).toBe(false);
+        expect(shouldOfferUpdate(false, PLAY_INSTALLER)).toBe(false);
+    });
+
+    test('the Play token is the only installer that withholds the row', () => {
+        // THE DIRECTION OF THIS GATE IS THE OPPOSITE OF ITS TWO NEIGHBOURS, and
+        // this test is what pins that it stays that way. shouldOfferApk and
+        // shouldOfferPolicy fail CLOSED — anything that is not the declared value
+        // means no. This one fails OPEN on the installer, because there is no
+        // positive token meaning "this came from our release page": a sideload
+        // reports null, or the browser or file manager the .apk was opened from.
+        // Gating on absence would withhold the row from every GitHub-channel
+        // user, who are exactly the people it exists for (vault PDR-022 §2).
+        for (const installer of [
+            null,
+            undefined,
+            '',
+            'com.android.chrome',
+            'com.google.android.packageinstaller',
+            'com.android.shell',
+            'org.mozilla.firefox',
+            ' com.android.vending',
+            'com.android.vending.x',
+        ]) {
+            expect(
+                shouldOfferUpdate(true, installer),
+                `"${installer}" was treated as Google Play`
+            ).toBe(true);
+        }
+    });
+
+    test('the native argument is strict, because it carries a second fact', () => {
+        // surfaces/update.js passes "the native shell WITH the build-info plugin
+        // actually present", not a loose truthy channel probe: without the
+        // plugin the installed versionCode is unknown and there is nothing to
+        // compare against. A truthy-but-not-true value must therefore not offer
+        // the row.
+        for (const native of [undefined, null, 0, 1, '', 'true', {}]) {
+            expect(
+                shouldOfferUpdate(native, null),
+                `${JSON.stringify(native)} was treated as the native shell`
+            ).toBe(false);
+        }
+    });
 });
+
 
 test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)', () => {
     // BOTH LEGS EXECUTE, AND SINCE PPR-P3 BOTH DECLARE THEIR OWN STATE. The
@@ -634,8 +1010,10 @@ test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)
             ).toBe(POLICY_PUBLISHED_VALUE);
 
             // The window opens on the control since UIP-P3 — the intro no longer
-            // comes up by itself on a first run, on either channel.
-            await page.locator('#aboutBtn').click();
+            // comes up by itself on a first run, on either channel. Since NAV-P1
+            // the control is not the same one on both: the web keeps the header
+            // button, the app reaches it through the menu.
+            await openIntroWindow(page);
             await expect(page.locator('#onboardingModal')).toHaveClass(/show/);
 
             const link = page.locator('#introPolicyLink');
@@ -646,4 +1024,98 @@ test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)
             await expect(link).toHaveAttribute('rel', /noopener/);
         });
     }
+});
+
+test.describe('the surface switcher belongs to the channel that has a second surface (NAV-P3)', () => {
+    // WHAT THIS BLOCK IS FOR. NAV-P3 removed #diaryBtn from the shell and put
+    // the diary behind a pager whose non-gesture entry is #surfaceNav. That is
+    // a composition change of exactly the kind this file is about: one channel
+    // gains a control, the other must not, and both facts are read off a
+    // rendered page rather than out of the markup.
+    //
+    // WHAT IS NOT HERE, DELIBERATELY. That the GESTURE is unreachable on the
+    // web, and that it turns the page on the app, is
+    // app/tests/surface-pager.spec.js — a claim about pointer events rather
+    // than about composition. That the hardware back button resolves in three
+    // cases is app/tests/back-button.spec.js off-device and BackButtonTest on a
+    // device. Splitting them keeps each file answering one question.
+
+    test('the diary control is gone from the shell entirely', async ({ page }) => {
+        await gotoApp(page, { state: STATES.seeded });
+
+        // ANTI-VACUITY FIRST: a shell that failed to boot would make every
+        // count zero, so a control that IS expected is counted in the same shot.
+        await expect(page.locator('#surfaceNav')).toHaveCount(1);
+        // Not hidden — ABSENT. The button was not folded into the menu and was
+        // not left behind hidden: the gesture and the switcher replace it.
+        await expect(page.locator('#diaryBtn')).toHaveCount(0);
+    });
+
+    test('the web channel is offered no switcher', async ({ page }) => {
+        await gotoApp(page, { state: STATES.seeded });
+
+        await expect(page.locator('#surfaceSkillsBtn')).toHaveCount(1);
+        await expect(page.locator('#surfaceDiaryBtn')).toHaveCount(1);
+
+        await expect(page.locator('#surfaceNav')).toBeHidden();
+        // The hidden attribute is only worth having if the class does not defeat
+        // it — the fifth case of the rule .header-help[hidden] announced in
+        // advance. A missing .surface-nav[hidden] rule shows up here as a
+        // showcase offering a section it does not have.
+        await expect(page.locator('#surfaceNav')).toHaveCSS('display', 'none');
+        await expect(page.locator('#diaryModal')).toBeHidden();
+    });
+
+    test.describe('the native channel', () => {
+        test.beforeEach(async ({ page }) => {
+            await simulateNativeShell(page);
+        });
+
+        test('took the native branch', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+            expect(await page.evaluate(() => window.IS_NATIVE_SHELL)).toBe(true);
+        });
+
+        test('is offered the switcher, and it names the surfaces in order', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#surfaceNav')).toBeVisible();
+
+            // THE ORDER IS THE MECHANISM, NOT DECORATION: leftmost is the start
+            // surface, and the third surface the owner has converged on arrives
+            // by INSERTION at the left end. Pinning the order here is what makes
+            // a rewrite of that list visible.
+            const names = await page.locator('#surfaceNav button').allInnerTexts();
+            expect(names).toEqual(['Навыки', 'Дневник']);
+
+            // Exactly two, and no third: a row that promises a surface which
+            // does not exist is the shape NAV-P1 refused for the update row.
+            await expect(page.locator('#surfaceNav button')).toHaveCount(2);
+        });
+
+        test('the switcher opens the diary and comes back, by pointer and by keyboard', async ({ page }) => {
+            await gotoApp(page, { state: STATES.seeded });
+
+            await expect(page.locator('#diaryModal')).toBeHidden();
+            await expect(page.locator('#surfaceSkillsBtn')).toHaveAttribute('aria-current', 'page');
+
+            await page.locator('#surfaceDiaryBtn').click();
+            await expect(page.locator('#diaryModal')).toBeVisible();
+            await expect(page.locator('#surfaceDiaryBtn')).toHaveAttribute('aria-current', 'page');
+            expect(await page.locator('#surfaceSkillsBtn').getAttribute('aria-current')).toBeNull();
+
+            // Back out through the window's own control, which the pager does
+            // not own and must not desync from: the switcher's mark has to
+            // follow it.
+            await page.locator('#diaryCloseBtn').click();
+            await expect(page.locator('#diaryModal')).toBeHidden();
+            await expect(page.locator('#surfaceSkillsBtn')).toHaveAttribute('aria-current', 'page');
+
+            // AND BY KEYBOARD, which is the whole reason this control exists:
+            // the gesture reaches nobody who does not use one.
+            await page.locator('#surfaceDiaryBtn').focus();
+            await page.keyboard.press('Enter');
+            await expect(page.locator('#diaryModal')).toBeVisible();
+        });
+    });
 });
