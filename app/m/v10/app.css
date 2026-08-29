@@ -384,6 +384,118 @@ header h1 {
     display: inline;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   ОБНОВЛЕНИЕ (NAV-P2): строка, которая заливается, и исход под ней.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Скрытая строка остаётся скрытой и здесь — по тому же доводу, что у
+   .header-menu-panel .header-action[hidden] выше: правило состава задаёт display
+   для .header-menu-item, а `hidden` — пользовательский стиль браузера, и он
+   слабее класса. Строка приходит скрытой и раскрывается только на нативном
+   канале и только в копии не из Play, поэтому без этого правила Play-копия
+   увидела бы пункт, которого в ней быть не должно. */
+.header-menu-panel .header-menu-item[hidden] {
+    display: none;
+}
+
+/* Заливка живёт ПОД содержимым строки, а не вместо него: значок и подпись
+   остаются читаемыми всё время проверки. */
+.header-menu-item-update {
+    position: relative;
+    isolation: isolate;
+}
+
+.header-menu-item-fill {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgba(139, 92, 246, 0.18);
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+}
+
+/* ЗАЛИВКА — ЭТО ОБРАТНЫЙ ОТСЧЁТ ДО ОТКАЗА, А НЕ ДОЛЯ ЗАГРУЖЕННОГО. Ответ здесь
+   один маленький JSON, событий прогресса у него нет, и любая полоса, называющая
+   долю выполненного, называла бы выдуманное число. Эта называет настоящее: она
+   доходит до края ровно тогда, когда истекает срок из
+   CHANNEL_CONFIG.updateCheckTimeoutMs и запрос отменяется. Ответ раньше срока
+   останавливает её раньше.
+
+   Длительность приходит переменной, которую surfaces/update.js ставит на элемент
+   из той же ручки. ЗАПАСНОГО ЗНАЧЕНИЯ ЗДЕСЬ НЕТ НАМЕРЕННО: непоставленная
+   переменная означает «нет анимации», а не «другая длительность», — второй
+   литерал был бы заливкой, которая врёт о сроке.
+
+   Форма кривой: быстро в начале, медленно к концу. Так строка отвечает на
+   нажатие сразу и при этом никогда не обещает, что вот-вот закончит. */
+@keyframes header-menu-update-fill {
+    0%   { transform: scaleX(0); }
+    12%  { transform: scaleX(0.45); }
+    40%  { transform: scaleX(0.72); }
+    100% { transform: scaleX(1); }
+}
+
+.header-menu-item-update.is-checking .header-menu-item-fill {
+    animation-name: header-menu-update-fill;
+    animation-duration: var(--update-fill-duration);
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+    animation-iteration-count: 1;
+}
+
+.header-menu-item-update[disabled] {
+    cursor: default;
+}
+
+/* Кому анимация мешает — тому статичная заливка вместо движущейся. Строка
+   по-прежнему говорит «идёт проверка», и то же самое говорит абзац под ней,
+   который читает диктор. */
+@media (prefers-reduced-motion: reduce) {
+    .header-menu-item-update.is-checking .header-menu-item-fill {
+        animation: none;
+        transform: scaleX(1);
+    }
+}
+
+/* ИСХОД. Один абзац за раз; пустой блок не занимает места, поэтому у панели нет
+   «хвоста» под последней строкой, пока проверку не запустили. */
+.header-menu-status:empty {
+    display: none;
+}
+
+.header-menu-status-line {
+    margin: 0;
+    padding: 10px 16px 10px 52px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.35;
+    background: #fbfafd;
+}
+
+.header-menu-status-line[hidden] {
+    display: none;
+}
+
+.header-menu-status-link {
+    display: block;
+    padding: 10px 16px 12px 52px;
+    color: var(--primary-purple);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    background: #fbfafd;
+}
+
+.header-menu-status-link[hidden] {
+    display: none;
+}
+
+.header-menu-status-link:focus-visible {
+    outline: 3px solid rgba(139, 92, 246, 0.4);
+    outline-offset: -3px;
+}
+
 /* Выпадающее меню профилей */
 .profile-dropdown {
     position: absolute;

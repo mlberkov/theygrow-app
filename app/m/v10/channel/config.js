@@ -29,6 +29,18 @@
 // link is offered on BOTH channels, because the person who needs it is the one
 // entering data.
 //
+// NAV-P2 ADDS FOUR MORE, AND THEY ARE THE FIRST KNOBS ON THIS SURFACE THAT
+// DESCRIBE A NETWORK REQUEST. Until this packet the app made none at all: every
+// `fetch` under the mount addressed a same-origin asset, which inside the
+// WebView is a local read. The update check adds exactly one outbound request,
+// made only when a parent presses the «Обновление» row, and its address, its
+// deadline, the shape of the release asset it reads and the token that means
+// «this copy came from Play» are declared here rather than written into the
+// surface. The reason is the one LSC-P3-INV-002 already gave for the export
+// contour: a new off-device read must be DECLARED before it can compile past the
+// gate. There is still no analytics, no counter and no signal behind any of it —
+// see surfaces/update.js, which says so where the next reader will look.
+//
 // WHAT THIS SURFACE IS FOR, in one paragraph. PDR-034 §1 splits the roles: the
 // native app is the product, and the web channel is a showcase and an ENTRY
 // POINT that accepts no new family data. So the web channel stops offering the
@@ -153,4 +165,81 @@ export const CHANNEL_CONFIG = Object.freeze({
     // token as releaseStatePublished: two declarations of the same shape, and an
     // owner who has learnt one has learnt both.
     policyStatePublished: 'published',
+
+    // changed_in: NAV-DL-002 — THE ONE ADDRESS THE APP EVER REQUESTS, and the
+    // first outbound request this product makes at all (vault ADR-052 §1).
+    //
+    // It is a knob and not a literal in the surface for the reason
+    // LSC-P3-INV-002 already established for the export contour: a new
+    // off-device read has to be DECLARED here before it can compile past the
+    // gate, so "where does this app reach" is answerable by reading one file
+    // rather than by trusting a sweep. app/tests/update-contour.spec.js refuses
+    // to see this address anywhere else in the shipped tree, and refuses a
+    // `fetch(` in surfaces/update.js whose argument is not this knob.
+    //
+    // UNAUTHENTICATED, AND THAT IS THE WHOLE FORM. No token, no query string, no
+    // user, device or install identifier, no cookie, nothing derived from family
+    // data. What GitHub observes is the IP address and the standard headers a
+    // browser sends, which is named in exactly those words in the published
+    // policy (edition 1.3, §6) rather than left for a reader to infer.
+    //
+    // `releases/latest` and not the listing, on the same argument as
+    // apkReleaseUrl above: one answer, about the newest release, is the whole
+    // question the row asks. It is the API host, api.github.com, and not the
+    // page host — the page is what «Установить» opens, in the browser.
+    updateApiUrl: 'https://api.github.com/repos/mlberkov/theygrow-app/releases/latest',
+
+    // changed_in: NAV-DL-002 — how long the check waits before giving up, and
+    // the ONLY cancellation there is.
+    //
+    // ONE LITERAL FOR TWO THINGS ON PURPOSE. This value is both the
+    // AbortController's deadline and the duration of the row's progress fill:
+    // the fill IS the countdown to this deadline, so a second literal in the
+    // stylesheet would be a fill that lies about when the app gives up.
+    // surfaces/update.js writes it onto the element as a custom property, and
+    // app.css reads that property with no fallback — an unset property means no
+    // animation, never a different duration.
+    //
+    // Nothing retries. A check that ends in a failure ends there, and the only
+    // thing that starts another is a parent pressing the row again.
+    updateCheckTimeoutMs: 10000,
+
+    // changed_in: NAV-DL-002 — the shape of the published release asset, and
+    // through it the ONE number the comparison is made on.
+    //
+    // WHY THE ASSET NAME AND NOT THE TAG. docs/RUNBOOK.md § Running the release
+    // build says it outright: «The tag name does not set the version» — it
+    // selects a commit. The asset name is derived from the build's own
+    // output-metadata.json and carries `versionCode`, which
+    // native/android/app/build.gradle derives from `git rev-list --count HEAD`
+    // *because* it is reproducible from the commit and monotone along ancestry,
+    // «which is what an update chain needs». So the update chain's own number is
+    // what the update check compares.
+    //
+    // FAIL-CLOSED: a release whose assets do not match this shape yields no
+    // number, and no number is reported as an answer that could not be read —
+    // never as «обновлений нет», which would be a false all-clear.
+    releaseAssetPattern: '^theygrow-v\\d+\\.\\d+\\.\\d+-(\\d+)\\.apk$',
+
+    // changed_in: NAV-DL-002 — the single token that means "this copy came from
+    // Google Play", and with it the only reason the row is ever withheld from a
+    // native channel.
+    //
+    // WHY WITHHELD THERE (vault ADR-052 §1.5 leaves this to the packet). The
+    // GitHub-channel APK is signed by `theygrow-release` and the Play copy by
+    // Google's key (vault ADR-047, annotation 2026-08-25): the two channels
+    // carry different signatures, so the release page this row would send a Play
+    // user to holds a binary that cannot install over what they have. Offering
+    // it is offering something that cannot be acted on, and crossing channels
+    // costs the family's local database.
+    //
+    // THE DIRECTION OF THE GATE IS ARGUED, NOT ASSUMED. The rule is «withhold on
+    // this positive token», not «offer only on a positive GitHub token», because
+    // there is no positive GitHub token: a sideloaded install reports null, or
+    // the browser or file manager it was opened from. Gating on absence would
+    // withhold the row from every GitHub-channel user — that is, from everyone
+    // this row exists for (vault PDR-022 §2, the only in-app channel for a
+    // safety fix). The truth table is executed off-device in
+    // app/tests/channel-composition.spec.js.
+    playInstallerPackage: 'com.android.vending',
 });

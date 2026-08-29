@@ -179,6 +179,15 @@ const DECLARED_SKIPS = Object.freeze([
         reason: "the suite's own evaluate() plumbing, same as BridgeSmokeTest's",
     },
     {
+        file: 'BuildInfoTest.java',
+        line: 121,
+        argument: 'expression',
+        reason:
+            "the suite's own pollFor() plumbing, same as BridgeSmokeTest's — the one script this"
+            + ' file embeds is the literal chain at its single call site, which this guard reads'
+            + ' there',
+    },
+    {
         file: 'StoreLifecycleTest.java',
         line: 200,
         argument: '"window." + slot',

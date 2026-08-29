@@ -65,6 +65,18 @@ const DECLARED_POLICY_STATE = new RegExp(
 // state a rollback returns to — the one worth executing a page against.
 const POLICY_WITHHELD_VALUE = 'none';
 
+// The Play token, read out of the shipped knob for the same reason every other
+// value in this header is (NAV-P2): a test that wrote it down again would agree
+// with itself after the knob changed.
+const PLAY_INSTALLER = /playInstallerPackage:\s*'([^']+)'/.exec(CONFIG_SOURCE)[1];
+
+// The row's accessible name, read the same way — out of the SHELL, not restated.
+// The published policy quotes this string (edition 1.3, §6), and
+// app/tests/privacy-page.spec.js reads it from the same place.
+const UPDATE_ROW_NAME = /<button\b[^>]*\bid="menuUpdateBtn"[^>]*>/
+    .exec(SHELL)[0]
+    .match(/\baria-label="([^"]+)"/)[1];
+
 /**
  * Rewrites one <meta> declaration before the app boots.
  *
@@ -526,11 +538,22 @@ test.describe('the header menu is the app\'s entry and the web has none (NAV-P1-
     // the product: a real page loads, a real control is pressed, and the window
     // that comes up is the one the handler was always wired to.
     //
-    // IT ALSO PINS THE PACKET BOUNDARY. The panel carries exactly two rows. The
-    // «Обновление» item belongs to the next packet, together with the first
-    // network call this channel makes and edition v1.3 of the policy (vault
-    // ADR-052 §1); a placeholder row landing early would red here rather than
-    // ship a control that promises something nothing does.
+    // IT ALSO PINS THE PANEL'S COMPOSITION, WHICH NAV-P2 CHANGED. The panel
+    // carried exactly two rows through NAV-P1, as a boundary pin rather than a
+    // promise, and «Обновление» has now arrived with the thing it does — the
+    // first network call this channel makes and edition v1.3 of the policy
+    // (vault ADR-052 §1). So the count is three, and the third row's OWN
+    // behaviour — that it reaches the network only on a press, and what that
+    // request is made of — is app/tests/update-check.spec.js, deliberately not
+    // this file: what is asserted here is composition, which is this file's
+    // subject.
+    //
+    // THE THIRD ROW SHIPS HIDDEN AND STAYS HIDDEN IN THIS BLOCK'S FIRST TWO
+    // SUB-BLOCKS, AND THAT IS NOT AN OVERSIGHT. Revealing it needs a second fact
+    // that only the device can give — which build is installed and who installed
+    // it (the first-party TheyGrowBuild plugin) — and simulateNativeShell()
+    // installs no plugin. The sub-block below plants one, which is the only
+    // place in this file where the row is expected to be visible.
 
     test.describe('the web channel', () => {
         test('keeps the header control and is offered no menu', async ({ page }) => {
@@ -587,7 +610,7 @@ test.describe('the header menu is the app\'s entry and the web has none (NAV-P1-
             await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'false');
         });
 
-        test('pressing it opens exactly two named rows, and no third', async ({ page }) => {
+        test('pressing it opens three named rows, and no fourth', async ({ page }) => {
             await gotoApp(page, { state: STATES.seeded });
 
             await page.locator('#menuBtn').click();
@@ -597,17 +620,101 @@ test.describe('the header menu is the app\'s entry and the web has none (NAV-P1-
             await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'true');
 
             const rows = page.locator('#headerMenuPanel button');
-            await expect(rows).toHaveCount(2);
+            await expect(rows).toHaveCount(3);
             await expect(rows.nth(0)).toHaveAttribute('aria-label', 'О приложении');
             await expect(rows.nth(1)).toHaveAttribute('aria-label', 'Сохранить архив');
+            await expect(rows.nth(2)).toHaveAttribute('aria-label', UPDATE_ROW_NAME);
 
             // The rows are readable, not only reachable: in a list an unlabelled
             // row says nothing, so the archive's caption is visible here even on
             // the narrow layout where the header row hides it.
             await expect(rows.nth(0)).toBeVisible();
             await expect(rows.nth(1)).toBeVisible();
-            await expect(page.locator('.header-menu-item-label')).toBeVisible();
+            await expect(page.locator('#menuAboutBtn .header-menu-item-label')).toBeVisible();
             await expect(page.locator('#exportBtn .header-action-label')).toBeVisible();
+
+            // The third row is present and WITHHELD, because this shell carries
+            // no build-info plugin. Asserted rather than skipped: a row revealed
+            // without knowing which build is installed would be a check with
+            // nothing to compare against.
+            await expect(rows.nth(2)).toBeHidden();
+            await expect(rows.nth(2)).toHaveCSS('display', 'none');
+
+            // And no outcome is showing before anything has been checked.
+            await expect(page.locator('#updateInstallLink')).toBeHidden();
+            for (const id of [
+                'updateStatusChecking',
+                'updateStatusCurrent',
+                'updateStatusAvailable',
+                'updateStatusOffline',
+                'updateStatusTimeout',
+                'updateStatusRateLimited',
+                'updateStatusServerError',
+                'updateStatusUnreadable',
+            ]) {
+                await expect(page.locator(`#${id}`)).toBeHidden();
+            }
+        });
+
+        test('the update row is revealed once a build-info plugin answers', async ({ page }) => {
+            // The reveal, executed. simulateNativeShell() alone leaves the row
+            // withheld (the leg above), so this leg varies exactly one thing:
+            // the plugin the reveal depends on.
+            await page.addInitScript(() => {
+                window.Capacitor.nativePromise = (plugin, method) => {
+                    if (plugin === 'TheyGrowBuild' && method === 'info') {
+                        return Promise.resolve({
+                            versionCode: 221,
+                            versionName: '0.1.221',
+                            installer: null,
+                        });
+                    }
+                    return Promise.reject(new Error(`unexpected plugin call ${plugin}.${method}`));
+                };
+            });
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            const row = page.locator('#menuUpdateBtn');
+            await expect(row).toBeVisible();
+            await expect(row).toHaveAttribute('aria-label', UPDATE_ROW_NAME);
+            await expect(page.locator('#menuUpdateBtn .header-menu-item-label')).toBeVisible();
+
+            // The address is wired from the knob whichever branch is taken, the
+            // same rule #installDownloadLink follows: a link that will one day
+            // be shown must never be a link to nowhere while it waits.
+            await expect(page.locator('#updateInstallLink')).toHaveAttribute('href', RELEASE_URL);
+        });
+
+        test('a copy installed from Play is offered no update row', async ({ page }) => {
+            // The branch that has never existed in the wild, executed against a
+            // real page rather than only as a truth table: the reveal reads the
+            // installer, not merely the channel.
+            await page.addInitScript((play) => {
+                // Only the build-info plugin answers. Resolving EVERY call would
+                // also make store/bridge.js believe a device store is present,
+                // and the page would open the create-profile window over the menu
+                // this leg is about — measured, not guessed.
+                window.Capacitor.nativePromise = (plugin, method) => {
+                    if (plugin === 'TheyGrowBuild' && method === 'info') {
+                        return Promise.resolve({
+                            versionCode: 221,
+                            versionName: '0.1.221',
+                            installer: play,
+                        });
+                    }
+                    return Promise.reject(new Error(`unexpected plugin call ${plugin}.${method}`));
+                };
+            }, PLAY_INSTALLER);
+            await gotoApp(page, { state: STATES.seeded });
+
+            await page.locator('#menuBtn').click();
+            // ANTI-VACUITY: the panel really opened and its other rows are there,
+            // so "hidden" below is about the installer and not about a menu that
+            // never opened.
+            await expect(page.locator('#exportBtn')).toBeVisible();
+            await expect(page.locator('#menuUpdateBtn')).toBeHidden();
+            await expect(page.locator('#menuUpdateBtn')).toHaveCSS('display', 'none');
         });
 
         test('«О приложении» opens the intro and closes the menu', async ({ page }) => {
@@ -697,6 +804,7 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
     // declares a published release, and an unknown state token.
     let shouldOfferApk = null;
     let shouldOfferPolicy = null;
+    let shouldOfferUpdate = null;
 
     test.beforeAll(async () => {
         // The same Node plumbing store-unit.spec.js documents: a real dynamic
@@ -718,7 +826,7 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
                 `${sub}/${path.basename(from)} was not copied verbatim — this spec would test a different file`
             ).toBeTruthy();
         }
-        ({ shouldOfferApk, shouldOfferPolicy } = await dynamicImport(
+        ({ shouldOfferApk, shouldOfferPolicy, shouldOfferUpdate } = await dynamicImport(
             `file://${path.join(root, 'surfaces', 'channel.js')}`
         ));
     });
@@ -759,7 +867,64 @@ test.describe('the offer decision itself, both branches (module-level)', () => {
             expect(shouldOfferPolicy(state), `"${state}" was treated as published`).toBe(false);
         }
     });
+
+    // THE PLAY BRANCH, WHICH NO PAGE IN THIS SUITE CAN REACH (NAV-P2).
+    //
+    // There is no Play copy of this app — closed testing has not started (vault
+    // ADR-050) — so the branch that withholds the row exists and has never run
+    // anywhere. This is the only place it is executed, and it is executed as a
+    // truth table off-device, which is what that kind of claim is worth. The
+    // on-device leg, BuildInfoTest, asserts the OTHER side: an adb-installed
+    // build does not report Play, so the row is offered on this channel.
+    test('the update row needs the native shell AND a copy that did not come from Play', () => {
+        expect(shouldOfferUpdate(true, null)).toBe(true);
+        expect(shouldOfferUpdate(true, PLAY_INSTALLER)).toBe(false);
+        expect(shouldOfferUpdate(false, null)).toBe(false);
+        expect(shouldOfferUpdate(false, PLAY_INSTALLER)).toBe(false);
+    });
+
+    test('the Play token is the only installer that withholds the row', () => {
+        // THE DIRECTION OF THIS GATE IS THE OPPOSITE OF ITS TWO NEIGHBOURS, and
+        // this test is what pins that it stays that way. shouldOfferApk and
+        // shouldOfferPolicy fail CLOSED — anything that is not the declared value
+        // means no. This one fails OPEN on the installer, because there is no
+        // positive token meaning "this came from our release page": a sideload
+        // reports null, or the browser or file manager the .apk was opened from.
+        // Gating on absence would withhold the row from every GitHub-channel
+        // user, who are exactly the people it exists for (vault PDR-022 §2).
+        for (const installer of [
+            null,
+            undefined,
+            '',
+            'com.android.chrome',
+            'com.google.android.packageinstaller',
+            'com.android.shell',
+            'org.mozilla.firefox',
+            ' com.android.vending',
+            'com.android.vending.x',
+        ]) {
+            expect(
+                shouldOfferUpdate(true, installer),
+                `"${installer}" was treated as Google Play`
+            ).toBe(true);
+        }
+    });
+
+    test('the native argument is strict, because it carries a second fact', () => {
+        // surfaces/update.js passes "the native shell WITH the build-info plugin
+        // actually present", not a loose truthy channel probe: without the
+        // plugin the installed versionCode is unknown and there is nothing to
+        // compare against. A truthy-but-not-true value must therefore not offer
+        // the row.
+        for (const native of [undefined, null, 0, 1, '', 'true', {}]) {
+            expect(
+                shouldOfferUpdate(native, null),
+                `${JSON.stringify(native)} was treated as the native shell`
+            ).toBe(false);
+        }
+    });
 });
+
 
 test.describe('the privacy policy is linked only once it exists (FIU-P3-INV-002)', () => {
     // BOTH LEGS EXECUTE, AND SINCE PPR-P3 BOTH DECLARE THEIR OWN STATE. The

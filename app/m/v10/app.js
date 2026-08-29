@@ -37,6 +37,7 @@ import { restoreZpdFilter, wireZpdFilter } from './surfaces/zpd-filter.js';
 import { buildTableHeader, buildTableBody, setFixedSkillColumnWidth } from './surfaces/table.js';
 import { wireOnboarding } from './surfaces/onboarding.js';
 import { wireMenu } from './surfaces/menu.js';
+import { wireUpdate } from './surfaces/update.js';
 import { wireSkillCompletion } from './surfaces/skill-completion.js';
 import { wireSkillModal } from './surfaces/skill-modal.js';
 import { wireActivities } from './surfaces/activities.js';
@@ -123,6 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // родитель не увидел бы архива вообще. Отказ по умолчанию должен сниматься
     // раньше всего, что может не сбыться.
     wireChannel();
+
+    // ПРОВЕРКА ОБНОВЛЕНИЯ — РЯДОМ С СОСТАВОМ КАНАЛА И ПО ТОМУ ЖЕ ДОВОДУ, но
+    // отдельной строкой, потому что она асинхронна: раскрытие пункта зависит от
+    // ответа плагина о том, какая сборка установлена и кто её поставил. Не
+    // ожидается намеренно — загрузка шелла не должна зависеть от плагина, а до
+    // ответа пункт просто остаётся скрытым, что и есть отказ по умолчанию.
+    //
+    // ЗДЕСЬ НЕ ДЕЛАЕТСЯ НИ ОДНОГО СЕТЕВОГО ЗАПРОСА. wireUpdate() только вешает
+    // слушатели и решает, показывать ли строку; в сеть уходит ровно одно — по
+    // нажатию (surfaces/update.js, vault ADR-052 §1).
+    void wireUpdate();
 
     // L1-P2 opened the native store here without awaiting it. L1-P4 AWAITS it,
     // because the answer decides where the family is read from and written to:

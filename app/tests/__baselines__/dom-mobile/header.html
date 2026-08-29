@@ -163,12 +163,14 @@
                      стоят в шапке. Здесь второе: за ним не уточнения к таблице, а
                      то, что приложение умеет помимо неё.
 
-                     ЗДЕСЬ РОВНО ДВА ПУНКТА, И ЭТО ГРАНИЦА ПАКЕТА, А НЕ ЗАГОТОВКА.
-                     Панель размечена под две строки и не оставляет места под
-                     третью: «Обновление» приходит отдельным пакетом вместе с
-                     первым сетевым вызовом канала и редакцией политики v1.3
-                     (vault ADR-052 §1), и до тех пор его здесь нет — ни строкой,
-                     ни пустым слотом, ни намёком в разметке.
+                     ЗДЕСЬ ТРИ ПУНКТА С NAV-P2, И ТРЕТИЙ ПРИШЁЛ ВМЕСТЕ С ТЕМ,
+                     ЧТО ОН ДЕЛАЕТ. NAV-P1 отказался ставить «Обновление»
+                     заготовкой — строка, которая ничего не делает, это обещание,
+                     а не подготовка, — и пункт приходит теперь одним пакетом с
+                     первым сетевым вызовом этого канала и редакцией политики
+                     v1.3 (vault ADR-052 §1). Панель растёт по содержимому;
+                     четвёртого пункта здесь нет и по тому же правилу не будет,
+                     пока не появится то, что он делает.
 
                      ДНЕВНИК СЮДА НЕ ПЕРЕЕХАЛ И НЕ ПЕРЕЕДЕТ: его кнопка уходит из
                      шапки вместе с появлением жеста влево из таблицы навыков,
@@ -256,6 +258,87 @@
                             </svg>
                             <span class="header-action-label">Сохранить архив</span>
                         </button>
+                        <!-- ОБНОВЛЕНИЕ (NAV-P2). ЕДИНСТВЕННОЕ МЕСТО, ОТКУДА ЭТО
+                             ПРИЛОЖЕНИЕ ВООБЩЕ ХОДИТ В СЕТЬ. Нажатие — и только
+                             нажатие — отправляет один неаутентифицированный GET
+                             к объявленному адресу (CHANNEL_CONFIG.updateApiUrl).
+                             Ни на загрузке, ни по таймеру, ни в service worker,
+                             ни повторно после отказа: за это отвечает
+                             app/tests/update-check.spec.js, где инструментом
+                             служит сетевой лог настоящей страницы, а не шпион в
+                             нашей же обёртке (vault ADR-052 §4).
+
+                             data-keeps-menu-open — НЕ УКРАШЕНИЕ. Панель закрывает
+                             себя одним делегированным слушателем на любое нажатие
+                             кнопки внутри (surfaces/menu.js), и без этого атрибута
+                             строка закрывала бы список ровно в тот момент, когда
+                             начинает отвечать. Атрибут, а не идентификатор в
+                             menu.js: тот файл намеренно не знает своих строк по
+                             именам.
+
+                             ПРИХОДИТ СКРЫТОЙ и раскрывается в surfaces/update.js
+                             по решению surfaces/channel.js — нативный канал и
+                             копия НЕ из Play (vault ADR-052 §1.5; довод — у
+                             каналов разные подписи, ADR-047, надстройка
+                             2026-08-25). Раскрытие здесь асинхронное, потому что
+                             второй факт приходит от плагина; поэтому строка
+                             скрыта в разметке, а не показана и потом убрана —
+                             мигнуть пунктом, которого в этой копии быть не
+                             должно, хуже, чем показать его на кадр позже. -->
+                        <button type="button" class="header-menu-item header-menu-item-update" id="menuUpdateBtn" hidden="" data-keeps-menu-open="" title="Обновление" aria-label="Обновление">
+                            <span class="header-menu-item-fill" id="updateFill" aria-hidden="true">
+</span>
+                            <svg class="header-menu-item-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                <path d="M12 21v-11">
+</path>
+                                <path d="M8 14l4-4 4 4">
+</path>
+                                <path d="M4 5h16">
+</path>
+                            </svg>
+                            <span class="header-menu-item-label">Обновление</span>
+                        </button>
+                        <!-- ИСХОД ПРОВЕРКИ — ГОТОВЫЕ ПРЕДЛОЖЕНИЯ В ОБОЛОЧКЕ, А НЕ
+                             СТРОКИ, СОБИРАЕМЫЕ КОДОМ. surfaces/update.js не
+                             присваивает textContent и не строит ни одной строки:
+                             он снимает hidden ровно с одного из этих абзацев.
+                             Так обещание «ни одно сообщение об ошибке не несёт
+                             семейных данных» становится СВОЙСТВОМ, а не
+                             обязательством — несущей данные строки просто неоткуда
+                             взяться, и app/tests/update-contour.spec.js читает это
+                             как свойство дерева.
+
+                             role="status" с aria-live="polite": исход объявляется
+                             диктору там же, где появляется глазу. Показывается не
+                             больше одного абзаца за раз.
+
+                             ОТКАЗЫ РАЗЛИЧЕНЫ, А НЕ СВЕДЕНЫ В ОДИН. «Слишком много
+                             запросов» — единственный отказ, за которым стоит
+                             другое действие (подождать), поэтому у него своя
+                             фраза; остальные честно говорят, что произошло, и не
+                             предлагают ничего.
+
+                             «Установить» — ССЫЛКА, А НЕ КНОПКА, и адрес ей
+                             проставляет surfaces/update.js из объявленного
+                             CHANNEL_CONFIG.apkReleaseUrl, а не из ответа сервера:
+                             адрес продукта объявлен в одном месте. target="_blank"
+                             — тот же приём, что у #installDownloadLink и
+                             #introPolicyLink: приложение НЕ скачивает файл, не
+                             готовит его и не запускает установку, а открывает
+                             страницу релиза в системном браузере. Разрешение
+                             REQUEST_INSTALL_PACKAGES не вводится (vault ADR-052
+                             §1.3). -->
+                        <div class="header-menu-status" id="updateStatus" role="status" aria-live="polite">
+                            <p class="header-menu-status-line" id="updateStatusChecking" hidden="">Проверяем обновление</p>
+                            <p class="header-menu-status-line" id="updateStatusCurrent" hidden="">Обновлений нет</p>
+                            <p class="header-menu-status-line" id="updateStatusAvailable" hidden="">Есть новая версия</p>
+                            <p class="header-menu-status-line" id="updateStatusOffline" hidden="">Не удалось проверить: нет соединения</p>
+                            <p class="header-menu-status-line" id="updateStatusTimeout" hidden="">Не удалось проверить: сервер не ответил</p>
+                            <p class="header-menu-status-line" id="updateStatusRateLimited" hidden="">Не удалось проверить: слишком много запросов, попробуйте позже</p>
+                            <p class="header-menu-status-line" id="updateStatusServerError" hidden="">Не удалось проверить: сервер ответил ошибкой</p>
+                            <p class="header-menu-status-line" id="updateStatusUnreadable" hidden="">Не удалось проверить: непонятный ответ</p>
+                            <a class="header-menu-status-link" id="updateInstallLink" hidden="" target="_blank" rel="noopener noreferrer" href="https://github.com/mlberkov/theygrow-app/releases/latest">Установить</a>
+                        </div>
                     </div>
                 </div>
             </div>

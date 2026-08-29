@@ -3,7 +3,7 @@
 // The privacy policy page, as a property of the tree (PPR-P1).
 //
 // WHAT THIS FILE IS FOR. app/privacy.html is a CONVERSION of the CURRENT
-// edition of the document — docs/privacy-policy-v1.2.md since UIP-P8 — written
+// edition of the document — docs/privacy-policy-v1.3.md since NAV-P2 — written
 // by hand because this repository is buildless by contract: there is no
 // renderer to trust and no build step to blame. A conversion drifts silently:
 // someone fixes a sentence in one file, the other keeps saying the old thing,
@@ -65,7 +65,7 @@ const ROUTE = '/privacy';
 
 // The edition this page converts. Named once; every leg below derives from it,
 // and the "no newer edition on disk" leg is what stops it going stale silently.
-const EDITION = '1.2';
+const EDITION = '1.3';
 const DOCS_DIR = path.join(REPO_ROOT, 'docs');
 const SOURCE_NAME = `privacy-policy-v${EDITION}.md`;
 const SOURCE_DOCUMENT = path.join(DOCS_DIR, SOURCE_NAME);

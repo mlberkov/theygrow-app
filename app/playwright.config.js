@@ -176,12 +176,22 @@ module.exports = defineConfig({
       // carries no script, that every link it does carry is on a declared
       // allowlist and none of them is its own address (UIP-P2, which replaced
       // the blanket no-<a> rule), and that it still says what the CURRENT
-      // edition — docs/privacy-policy-v1.2.md — says. It is here because all of that is
+      // edition — docs/privacy-policy-v1.3.md — says. It is here because all of that is
       // read from files and boots nothing. What a browser does at the address —
       // that the shell is not served there, that no third party is reached, and
       // that the visit leaves the cached shell alone — is privacy-surface.spec.js
       // in `behavior`, deliberately not this one.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence)\.spec\.js/,
+      // NAV-P2 adds one: update-contour, the static half of the packet that gives
+      // this app its first outbound request. Two of its claims are ABSENCES over
+      // the tree, which is the admissible static kind (AGENTS.md §11) and is why
+      // it is here — that the update surface has ONE address and no second
+      // request primitive, and that it writes no text at all, so a message
+      // carrying anything about the family has nowhere to come from. A running
+      // page could only show that the messages it happened to display were clean.
+      // Its executing twin — when the request happens and what it is made of,
+      // read off the network log of a real page — is update-check.spec.js in
+      // `behavior`, and both files say so about each other on purpose.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence|update-contour)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {
@@ -261,7 +271,22 @@ module.exports = defineConfig({
       // observer must record a request that IS expected, or a zero means only
       // that the instrument saw nothing. Its static half — that the vocabulary
       // is absent from the tree — is in `contract` as analytics-absence.
-      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress)\.spec\.js/,
+      // NAV-P2 adds update-check, and it is the packet's real deliverable: this
+      // app now makes ONE outbound request, and both halves of that — that it
+      // happens on a press and nowhere else, and that it carries no credential
+      // and no identifier — are claims about a request a browser did or did not
+      // make. That is the definition of a claim no source scan can carry, and it
+      // is the instrument vault ADR-052 §4 names, borrowed from analytics-egress
+      // above. Every leg carries its own anti-vacuity assertion on the same
+      // observer: the document and the knowledge base must both have been
+      // recorded, or a zero means only that the instrument saw nothing. Nothing
+      // in it dials out — one catch-all route over every off-origin address
+      // either fulfils the answer the leg is about or aborts, and the RECORDING
+      // is the evidence rather than the abort. It is NOT in `native` below, on
+      // the argument diary-save.spec.js records: that project serves a different
+      // web root, and a leg that also simulates the shell would vary two things
+      // at once.
+      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress|update-check)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

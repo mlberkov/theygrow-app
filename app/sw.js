@@ -94,6 +94,16 @@
 // the first generation LARGER than the one before it since PPR-P2 — it adds a
 // module rather than dropping one, which is why the previous-generation fixture
 // has something to drop again (app/tests/support/prev-generation.js).
+//
+// NAV-P2 ADDS A FILE TO THIS LIST AND DOES NOT BUMP THE VERSION, AND THAT IS THE
+// RULE RATHER THAN AN EXCEPTION. `surfaces/update.js` joins the precache below
+// with the «Обновление» row it serves. What forces a bump is a byte at a
+// PUBLISHED mount URL (A1-DL-004, docs/RUNBOOK.md § Module mount); /m/v10/ and
+// v20 arrived together at NAV-P1 and neither has been promoted, so this
+// generation is still the one being written rather than one being replaced.
+// NAV-DL-001 (g) says the same thing forward: the milestone takes exactly one
+// copy-forward, and NAV-P2–P4 edit /m/v10/ in place. A second bump inside one
+// milestone would ship an eleventh generation to buy nothing.
 const CACHE_VERSION = 'v20';
 const CACHE_NAME = 'theygrow-' + CACHE_VERSION;
 
@@ -141,6 +151,7 @@ const OFFLINE_URLS = [
   '/m/v10/surfaces/onboarding.js',
   '/m/v10/surfaces/accordion.js',
   '/m/v10/surfaces/menu.js',
+  '/m/v10/surfaces/update.js',
   // L1-P2: the native store. These ship to BOTH channels byte-identically
   // (LSC-P1-INV-002) and are inert on the web — boot.js returns before touching
   // anything when there is no Capacitor bridge. They are precached because the

@@ -349,16 +349,76 @@ decides the order you do things in.
    It must be that address: the apex, not a subdomain; an HTML page, not a PDF; reachable without a
    geo-block. A parent reads it on a phone before they have installed anything, and a PDF on a phone is a
    download and a pinch-zoom rather than a document. The page is a hand conversion of the CURRENT edition
-   — `docs/privacy-policy-v1.2.md` since UIP-P8 — and the two are paired by
+   — `docs/privacy-policy-v1.3.md` since NAV-P2 — and the two are paired by
    `app/tests/privacy-page.spec.js` heading by heading so a drift is a red test rather than a discovery
    months later. **One address, and since UIP-P2 exactly one:** `/privacy/` and `/privacy.html` both
    answer `301` to `/privacy`, so the document cannot accumulate a second bookmarked address across
    editions. **Superseded editions stay in `docs/` and are never republished** — `docs/privacy-policy-v1.0.md`
-   (effective date `23.08.2026`) and `docs/privacy-policy-v1.1.md` (`27.08.2026`) are kept byte-untouched as
+   (effective date `23.08.2026`), `docs/privacy-policy-v1.1.md` (`27.08.2026`) and
+   `docs/privacy-policy-v1.2.md` (`28.08.2026`) are kept byte-untouched as
    history, because §10 of the document promises that the address always carries the edition currently in
-   force. **An edition freezes the moment the next one is written**, which is what UIP-P8 did to 1.1. **Whether a parent ever read edition
+   force. **An edition freezes the moment the next one is written**, which is what UIP-P8 did to 1.1 and NAV-P2 did to 1.2. **Whether a parent ever read edition
    1.0 is not a repository fact** — the PPR milestone is merged and NOT promoted — so the history table
    records the edition and its stated effective date, and claims nothing about a window of force.
+1a. **PUBLISHING A NEW EDITION — the seven places that move together, and the order they move in.**
+   *(Added at NAV-P2, `NAV-DL-002`. This step is the debt `UIP-DL-008` recorded and named: step 6 below
+   covered the effective DATE and nothing covered the act of publishing edition N+1 and repointing the
+   references that name the current one. UIP-P8 moved them by hand and enumerated them; this is that list
+   turned into a procedure, written from the run that produced edition 1.3. It is numbered `1a` rather
+   than inserted as a new `2` for the reason `PPR-DL-003` (g) recorded for the other section: steps 2–7
+   are named by number from inside this section and from elsewhere in this file, and renumbering them to
+   make room breaks references that name a step by its number.)*
+   **When this step applies:** when the described handling of data changes. §10 of the document promises
+   a new edition for exactly that, and the boundary is by SUBJECT, not by the size of the diff (vault
+   `PDR-035`, annotation 2026-08-27): an interface-only change — a control renamed, a glyph redrawn — is
+   corrected **inside** the edition in force, and the version, the effective date and the history table do
+   not move. NAV-P2 is the clearest case of the other side: the app began making a network request, which
+   is data handling, so edition 1.3 was not optional.
+   1. **Write the new file, never edit the old one.** Copy `docs/privacy-policy-v{current}.md` to
+      `docs/privacy-policy-v{new}.md` and edit the copy. The superseded file is frozen from this moment —
+      byte-untouched, including its history row. `app/tests/privacy-page.spec.js` compares the two change
+      tables row for row in both files, so a "tidying" edit of a frozen row is red twice.
+   2. **Inside the new file, four things move together:** `**Версия:**`, `**Дата вступления в силу:**`, a
+      NEW top row in the change-history table carrying that version and that date, and the body text the
+      edition is actually about. Do not strip the trailing double spaces on the header lines — they are
+      Markdown hard line breaks, which is why `docs/privacy-policy-v` is excluded from the hygiene hooks
+      by version-agnostic prefix.
+   3. **Sweep the whole document for statements the change has made misleading, and repair them in the
+      same edition.** This is the half that is easy to skip and expensive to skip: edition 1.3 added one
+      paragraph to §6 and had to correct three sentences elsewhere that a reader would otherwise take as
+      "this app never goes to the network" — the summary bullet, §3.2 and §7. A sentence that outlives the
+      product it describes is the defect edition 1.2 existed to fix.
+   4. **Convert it into `app/privacy.html` by hand, and change nothing else there.** The page is a
+      translation, not a second edition: same headings, same words, same history table with the new row on
+      top. Its `.meta` block carries the same version and date, and its head comment names the new source
+      file and the newly frozen one.
+   5. **Repoint the references that name the CURRENT edition.** They are, today, exactly six, and every
+      one of them is a place where a stale name is silently wrong rather than red:
+      `app/tests/privacy-page.spec.js` — `const EDITION` and the sentence in its head comment;
+      `app/playwright.config.js` — the sentence naming the edition in the `contract` project's prose;
+      `app/privacy.html` — the head comment's `ИСТОЧНИК ТЕКСТА` line and its frozen-editions paragraph;
+      `docs/RUNBOOK.md` — step 1 above (the "CURRENT edition" clause and the frozen list) and step 6's two
+      source-document bullets. `const EDITION` is the load-bearing one: it selects the whole paired source,
+      so leaving it behind is six red tests rather than one (measured at `UIP-DL-008`, mutation 1).
+   6. **Re-stage the APK web root** — `node native/tools/stage-webdir.js`. `app/privacy.html` ships in
+      both channels and `LSC-P1-INV-002` compares them byte for byte, so an edition published without
+      re-staging is red on the native channel and green on the web one.
+   7. **Then step 6 below, before you promote**, because the date you have just written is a guess until
+      the promotion day is chosen. And `docs/INVARIANTS.md` is deliberately NOT edited: `UIP-P2-INV-001`
+      names no edition filename, by design, so that a new edition costs no invariant edit.
+   **The edition and the code it describes go out in ONE promotion, and that is a rule rather than a
+   habit** (vault `ADR-020`: nothing reaches people before promotion; vault `ADR-052` §4 states the pairing
+   for edition 1.3 by name). Edition 1.3 describes a network call the app did not make before, so a
+   promotion carrying the code without the edition publishes an app doing something its live policy does
+   not mention, and a promotion carrying the edition without the code publishes a document describing a
+   feature nobody has. Both halves live on one branch by construction — the same arrangement step 0 of
+   § *Promotion + rollback* keeps for `UIP-P1`/`UIP-P2` — so the condition holds unless someone splits
+   them deliberately. **Check, one command:** `grep -c 'api.github.com' app/privacy.html` and
+   `grep -c updateApiUrl app/m/v*/channel/config.js | grep -v ':0'` must both be non-zero in the revision
+   you are about to promote.
+   **What still has no home in this repository:** the Google Play **Data safety** answers. A new edition
+   that changes what the app does with data can change them too, and the form is owner-side — see the
+   named debt in `NAV-DL-002`.
 2. **Then declare it. — DONE at PPR-P3.** In `app/index.html`,
    `<meta name="theygrow-privacy-policy" content="published">`. Anything that is not exactly `published` — a
    missing tag, an empty value, a typo, a stale `none` — means "no document", and no link is offered
@@ -389,8 +449,8 @@ decides the order you do things in.
    **four** places and they must agree. **Addressed by content, not by line number** — the numbers this
    step used to carry (`app/privacy.html:103` and `:263`) had already gone stale to `:107` and `:267`
    by the time anyone read them, which is the failure mode of addressing a moving file by offset:
-   - `docs/privacy-policy-v1.2.md` — the header block, the line beginning `**Дата вступления в силу:**`
-   - `docs/privacy-policy-v1.2.md` — the **top** row of the change-history table, i.e. the row whose
+   - `docs/privacy-policy-v1.3.md` — the header block, the line beginning `**Дата вступления в силу:**`
+   - `docs/privacy-policy-v1.3.md` — the **top** row of the change-history table, i.e. the row whose
      first cell is the version the header declares
    - `app/privacy.html` — the same header block, `<strong>Дата вступления в силу:</strong>`
    - `app/privacy.html` — the same top row of its change-history table
@@ -413,7 +473,11 @@ decides the order you do things in.
    it came into force. UIP-P6 set it to `27.08.2026`, **the day of promotion**, before publication rather
    than after. UIP-P8 set edition 1.2 to `28.08.2026` on the same rule and for the same reason — the day
    it is promoted, chosen before publication; if the promotion slips to another day, the four literals
-   move together **before** you promote, not after. **The date this step names is the day the revision reaches a parent, not the day it was
+   move together **before** you promote, not after. **NAV-P2 wrote `29.08.2026` into edition 1.3 as a
+   value it could not know**: the `NAV` milestone opens a PR at its close, so the promotion day was not
+   fixed when the edition was written. Treat that literal as unset until you have picked the day —
+   this step is where it is picked, and edition 1.3 is the first one written several packets before
+   its own promotion rather than in the packet that promotes. **The date this step names is the day the revision reaches a parent, not the day it was
    written**, and a merged-but-unpromoted revision is corrected here rather than superseded by a new
    edition.
 7. **What this does NOT do.** It asks the parent to accept nothing — no checkbox, no blocked close. Making
@@ -770,10 +834,23 @@ buildless, as `native/package.json` says.
    - **since PPR-P3, check that the privacy-policy link IS there and opens the real page.** With the
      greeting open, scroll to the bottom: «Политика конфиденциальности» must be there, and pressing it must
      open the document — the real page, in a new tab, not a 404 and not the skills table.
-   - **since NAV-P1, check the menu itself.** It must carry exactly **two** rows — «О приложении» and
-     «Сохранить архив» — and choosing either must close the menu and open its window. Pressing the archive
-     row must reach the same archive window the header button used to open; nothing about the archive
-     itself changed. *(Rewritten
+   - **since NAV-P1, check the menu itself.** Since NAV-P2 it must carry exactly **three** rows — «О
+     приложении», «Сохранить архив» and «Обновление». Choosing either of the first two must close the menu
+     and open its window; pressing the archive row must reach the same archive window the header button
+     used to open, and nothing about the archive itself changed.
+   - **since NAV-P2, press «Обновление» — this is the one check no test in this repository can stand in
+     for.** The row must fill while it works and land on one of two answers: «Обновлений нет», or «Есть
+     новая версия» with an «Установить» link under it. **Pressing «Установить» must open the release page
+     in the phone's own browser, outside the app.** That last hop is Capacitor's default handling of a
+     `target="_blank"` anchor and is **unmeasured in this repository** — no anchor has ever been clicked
+     inside a real WebView here, and no emulator leg asserts it — so this is where it is first observed.
+     Record what happened; if the link does nothing, the row is offering an install nobody can complete.
+     **With the phone in airplane mode the same press must say «Не удалось проверить: нет соединения» and
+     leave the menu working** — the honest-failure half, and it costs one toggle.
+     **What the row must NOT do, and is worth looking for once:** nothing may happen on launch, on opening
+     the menu, or at any other moment. The executing evidence for that is
+     `app/tests/update-check.spec.js` on every push, against a real browser's network log; the phone check
+     is a second pair of eyes on it, not the evidence. *(Rewritten
      at PPR-P3. This step used to say the opposite — that there must be **no** link there yet, because the
      document was not published and the declaration fails closed. Both halves have happened: PPR-P1 put the
      document at `/privacy` and PPR-P3 set `content="published"`.)* **On a phone this checks the build in
