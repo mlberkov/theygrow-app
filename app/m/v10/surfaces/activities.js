@@ -2,6 +2,18 @@
 //
 // Двухтировый отбор (ADR-022 §3): окна KB переупорядочивают, но никого не
 // удаляют. Сама urgency-арифметика вынесена в core/urgency.js.
+//
+// NAV-P4 УБИРАЕТ ОТСЮДА ЛОЖНЫЙ ОТВЕТ, И ЭТО НЕ ПРАВКА ТЕКСТА, А ПРАВКА УСЛОВИЯ.
+// До этого пакета getRelevantUncompletedSkills() возвращала пустой список ДО
+// того, как посмотрит хоть на один навык, если профиля нет, — а вызывающий
+// рисовал пустой список одной фразой «Все навыки освоены». Два разных состояния
+// схлопывались в одно предложение, и одно из них было ложью: без ребёнка не
+// известно ничего, и «освоено» тут не про что сказать. Ответ на это состояние у
+// приложения уже есть — окно создания профиля, которое surfaces/skill-completion.js
+// открывает ровно тогда же и ровно по той же причине (ADR-015, честная
+// деградация: отказ называется, и рядом лежит то, что его снимает). Оно
+// ПЕРЕИСПОЛЬЗУЕТСЯ, а не повторяется: второе окно того же назначения — это второй
+// текст, второй набор дверей и второй порядок закрытия, расходящиеся молча.
 
 import { DATA, windowsBySkillId } from '../core/kb-boot.js';
 import { getCurrentProfile, getCompletedSkills } from '../core/state.js';
@@ -9,14 +21,38 @@ import { calculateCurrentLifeMonth, formatParentActivities } from '../core/forma
 import { isSkillReady } from '../core/zpd.js';
 import { skillUrgency } from '../core/urgency.js';
 import { openSkillModal } from './skill-modal.js';
+import { openCreateProfileModal } from './profile.js';
 
 // Модальное окно развивающих активностей месяца
 export function openActivitiesModal() {
+    // ПРЕДУСЛОВИЕ СТОИТ ЗДЕСЬ, В ОДНОМ МЕСТЕ, И ДО ТОГО, КАК ОКНО ВООБЩЕ
+    // ТРОНУТО. Раньше оно жило внутри getRelevantUncompletedSkills() и отвечало
+    // пустым списком; теперь оно отвечает тем, что снимает причину. Окно
+    // активностей при этом НЕ открывается: показывать поверх окна создания
+    // профиля пустую сетку не за чем, а у всех .modal один z-index (см.
+    // surfaces/diary.js), так что открытое #activitiesModal легло бы поверх
+    // диалога, который посетителя и просят заполнить.
+    //
+    // В поверхности, а не в слушателе #activitiesBtn: app.js реэкспортирует эту
+    // функцию как шов паритетного прогона, и условие на слушателе оставило бы
+    // шов ездить по пути, которого у родителя нет.
+    //
+    // Сигнала здесь нет, и это решение: сосед в skill-completion.js эмитит
+    // write.refused/no_subject, потому что там отказано ЗАПИСИ; здесь не отказано
+    // ничему, что пишет, а в объявленном словаре core/signals.js нет кода для
+    // чтения без субъекта. Заводить его ради одного эмиттера без потребителя —
+    // не то, что делает ADR-013.
+    const profile = getCurrentProfile();
+    if (!profile || !profile.birthdate) {
+        openCreateProfileModal();
+        return;
+    }
+
     const modal = document.getElementById('activitiesModal');
     const grid = document.getElementById('activitiesGrid');
 
     // Получаем неосвоенные навыки, соответствующие возрасту
-    const relevantSkills = getRelevantUncompletedSkills();
+    const relevantSkills = getRelevantUncompletedSkills(profile);
 
     // Сколько из них в биологическом окне. До UIP-P1 это объявление стояло под
     // комментарием «Google Analytics event: только счётчики, без имён навыков» и
@@ -35,6 +71,11 @@ export function openActivitiesModal() {
         topNote.hidden = true;
     }
 
+    // ЭТА ФРАЗА ОСТАЁТСЯ, ПОТОМУ ЧТО С РЕБЁНКОМ ОНА ИСТИННА. Пустой список
+    // достижим и у заведённого профиля — когда готовых к освоению навыков не
+    // осталось, — и тогда сказанное здесь описывает ровно то состояние, в
+    // котором семья находится. Ложным этот ответ делало только отсутствие
+    // профиля, и оно отсечено выше.
     if (relevantSkills.length === 0) {
         grid.innerHTML = '<div class="no-activities-message">Все навыки освоены — подходящих активностей сейчас нет</div>';
     } else {
@@ -60,12 +101,13 @@ function closeActivitiesModal() {
     document.getElementById('activitiesModal').classList.remove('show');
 }
 
-function getRelevantUncompletedSkills() {
-    const profile = getCurrentProfile();
-    if (!profile || !profile.birthdate) {
-        return [];
-    }
-
+// Профиль приходит АРГУМЕНТОМ, а не читается здесь снова (NAV-P4). Прежде
+// функция сама спрашивала getCurrentProfile() и сама же отвечала пустым списком
+// на его отсутствие — то есть держала предусловие, которое теперь принадлежит
+// вызывающему. Оставить его здесь вторым экземпляром значило бы оставить охрану,
+// до которой нельзя дойти, а недостижимая охрана — ровно та форма, о которой
+// AGENTS.md §11.
+function getRelevantUncompletedSkills(profile) {
     const completedSkills = getCompletedSkills();
     const relevantSkills = [];
 

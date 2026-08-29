@@ -299,7 +299,24 @@ module.exports = defineConfig({
       // on the argument diary-save.spec.js records: that project serves a
       // different web root, and a leg that also simulates the shell would vary
       // two things at once.
-      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress|update-check|surface-pager|back-button)\.spec\.js/,
+      // NAV-P4 adds profile-gate, and it is here for the reason its own header
+      // gives. Its subject is a pair of doors — the activities control and a
+      // skill mark, with no child — and the claim is that they open the SAME
+      // window and that nothing on the screen answers «Все навыки освоены» when
+      // there is no child to say it about. Which element became visible, and
+      // that exactly one of it exists, are facts about a rendered page and
+      // handlers that ran; a source scan can see the call and cannot see either.
+      // Its static half — that the surface REUSES the shipped opener rather than
+      // carrying a second copy of the reveal — lives in the same file rather
+      // than in `contract`, labelled as static where it stands, because the two
+      // halves are about one decision and splitting them across projects would
+      // hide that the runtime half deliberately does not carry it. It is NOT in
+      // `native` below, on the argument diary-save.spec.js records: that project
+      // serves a different web root, and a leg that also varied the channel
+      // would vary two things at once — and this path has no channel branch at
+      // all, which is what makes the web channel the right place to make the
+      // claim.
+      testMatch: /(behavior|upgrade-path|mount-derivation|channel-composition|diary-surface|diary-save|diary-search|store-lifecycle|privacy-surface|analytics-egress|update-check|surface-pager|back-button|profile-gate)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     // The Capacitor channel (L1-P1). Same specs, same committed baselines,

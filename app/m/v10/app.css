@@ -707,17 +707,56 @@ header h1 {
     color: var(--text-primary, #333);
 }
 
-.install-modal-content h3 {
-    margin: 20px 0 6px;
-    font-size: 15px;
-    color: var(--primary-purple);
-}
-
 .install-modal-content p {
     margin: 0;
     font-size: 14px;
     line-height: 1.6;
     color: var(--text-primary, #333);
+}
+
+/* NAV-P4 ЗАМЕНИЛ ЗДЕСЬ h3 НА СПИСОК, И ЭТО СМЕНА РОЛИ, А НЕ ОФОРМЛЕНИЯ. Окно
+   перестало быть таблицей параметров под четырьмя заголовками и стало
+   перечислением того, что даёт приложение; выгода — это предложение, а не имя
+   поля. Правило .install-modal-content h3 снято ВМЕСТЕ с элементами, которые оно
+   одевало: правило, пережившее свою разметку, — это то, как поверхность
+   возвращается (довод app/tests/install-channel.spec.js). Цвет заголовка
+   переехал на li strong, потому что вводное слово пункта несёт ровно ту роль,
+   которую нёс h3.
+
+   ОТСТУП МЕЖДУ АБЗАЦАМИ ОБЪЯВЛЕН ДОЧЕРНИМ КОМБИНАТОРОМ НАРОЧНО. Прежде
+   расстояние держали поля h3; без них соседние абзацы слиплись бы. Но под
+   .install-modal-content есть ещё один <p> — #installPlatformNote внутри
+   .modal-buttons, — у которого своя раскладка (margin: 0, flex, выравнивание
+   вправо). Правило на всех потомков добавило бы ему нижнее поле и сдвинуло ряд
+   кнопок; `>` оставляет его в точности таким, каким он был. Специфичность у двух
+   правил одинаковая, поэтому это стоит ПОСЛЕ правила выше — порядок здесь
+   несущий. Измерено на 412px. */
+.install-modal-content > p {
+    margin: 0 0 12px;
+}
+
+.install-modal-content > p:last-of-type {
+    margin-bottom: 0;
+}
+
+.install-modal-content ul.install-gains {
+    margin: 12px 0;
+    padding-left: 20px;
+}
+
+.install-modal-content ul.install-gains li {
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary, #333);
+}
+
+.install-modal-content ul.install-gains li:last-child {
+    margin-bottom: 0;
+}
+
+.install-modal-content ul.install-gains li strong {
+    color: var(--primary-purple);
 }
 
 /* ССЫЛКА НА ПОЛИТИКУ КОНФИДЕНЦИАЛЬНОСТИ (L3-P3). Спокойная, не кнопка: это

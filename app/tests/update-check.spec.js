@@ -207,11 +207,22 @@ test.describe('nothing leaves this app until the row is pressed (NAV-P2-INV-001)
         // assumed. Installing a `nativePromise` is what makes the build-info
         // plugin reachable, and it is also what store/bridge.js reads as "the
         // native store is available" — so this page takes the device-store path
-        // with no device behind it, and the activities window correctly reports
-        // that it has nothing to suggest. The skill window opens from an activity
+        // with no device behind it, and there is no current child on it however
+        // the storage was seeded. The skill window opens from an activity
         // card, so there is no card to open it from here. That surface is swept
         // on the web branch by the leg below instead of being faked into
         // existence here.
+        //
+        // WHAT THE ACTIVITIES PRESS DOES ON THIS BRANCH CHANGED AT NAV-P4, and
+        // this comment used to end "...and the activities window correctly
+        // reports that it has nothing to suggest". It did not report that
+        // correctly: with no child it answered «Все навыки освоены», which is a
+        // statement about a family this page does not have. The surface now
+        // routes that state into the create-profile window — the same one a
+        // refused skill mark opens (NAV-P4-INV-001) — so this leg presses the
+        // same control, drives the same handler and closes the window that
+        // actually opens. What it is about is unchanged: no request may leave
+        // from any of these handlers, whichever window they end in.
         const requests = watchRequests(page);
         await routeAway(page, null);
         await installNativeShell(page);
@@ -230,8 +241,9 @@ test.describe('nothing leaves this app until the row is pressed (NAV-P2-INV-001)
         await page.locator('#zpdFilterToggleBtn').click();
 
         await page.locator('#activitiesBtn').click();
-        await expect(page.locator('#activitiesModal')).toHaveClass(/show/);
-        await page.locator('#activitiesModalClose').click();
+        await expect(page.locator('#createProfileModal')).toHaveClass(/show/);
+        await expect(page.locator('#activitiesModal')).not.toHaveClass(/show/);
+        await page.locator('#cancelProfile').click();
 
         await openMenu(page);
         await page.locator('#exportBtn').click();
@@ -247,6 +259,7 @@ test.describe('nothing leaves this app until the row is pressed (NAV-P2-INV-001)
         // the absence would be about a page nobody touched.
         await expect(page.locator('#diaryModal')).toBeHidden();
         await expect(page.locator('#exportModal')).toBeHidden();
+        await expect(page.locator('#createProfileModal')).not.toHaveClass(/show/);
         expectObserverLive(requests, 'a full pass over every other surface on the app channel');
         expect(awayUrls(requests), 'a request left the app from some other surface').toEqual([]);
     });
