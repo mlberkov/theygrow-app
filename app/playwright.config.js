@@ -191,7 +191,14 @@ module.exports = defineConfig({
       // Its executing twin — when the request happens and what it is made of,
       // read off the network log of a real page — is update-check.spec.js in
       // `behavior`, and both files say so about each other on purpose.
-      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|download-offer|analytics-absence|update-contour|overlay-coverage)\.spec\.js/,
+      // POL-P1 adds one more, and it is an off-device unit run rather than a
+      // static scan: live-policy-check drives the promotion check
+      // (scripts/check-live-policy-edition.js) against throwaway loopback
+      // origins it starts itself, including one that serves the previous
+      // edition — the state the live address was actually in for about an hour
+      // after the NAV merge. It talks to 127.0.0.1 and to nothing else; the
+      // script's default public target is never used from a test.
+      testMatch: /(delivery-contract|storage-seam|native-shell|merge-semantics|store-supply-chain|store-unit|store-seam|export-contour|export-sink-unit|write-path|import-legacy|diary-write|signal-payload|show-rule-coverage|mount-reference|undeclared-reference|embedded-js-parse|install-channel|privacy-page|live-policy-check|download-offer|analytics-absence|update-contour|overlay-coverage)\.spec\.js/,
       use: { viewport: DESKTOP },
     },
     {

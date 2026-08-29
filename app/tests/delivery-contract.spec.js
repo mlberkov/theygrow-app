@@ -16,6 +16,12 @@ const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { HEADER_RULES } = require('./server');
 const { currentMount } = require('./support/ship-list');
+// POL-P1. The judgement of "a class that cannot outlive a release" lives in the
+// promotion check, and is imported here rather than restated, so CI and the
+// owner's post-promotion command cannot come to different conclusions about the
+// same header. Direction of the dependency follows the house precedent that
+// app/tests/release/ tests scripts/verify_release_signature.py.
+const { permitsAStoredCopy, declaredCacheControl } = require('../../scripts/check-live-policy-edition');
 
 const NGINX_CONF = path.resolve(__dirname, '..', 'nginx.conf');
 
@@ -363,6 +369,68 @@ test.describe('redirects stay inside the origin — config shape (PPR-P4)', () =
   });
 });
 
+// POL-P1 — the policy document's cache class, as the COMMITTED config declares
+// it.
+//
+// WHAT THIS BLOCK IS AND IS NOT. It parses app/nginx.conf and proves what the
+// config SAYS; it runs no nginx and observes no response (AGENTS.md §11). Its
+// executing twin is the live leg below, which measures a real response — from
+// the MIRROR, tests/server.js, which the drift guard above pairs to this same
+// file. Neither of them is production: nothing in this repository runs the real
+// image, and what observes the shipped container is the owner's curl against
+// the tagged revision plus the post-promotion check
+// (scripts/check-live-policy-edition.js), both in docs/RUNBOOK.md § Promotion +
+// rollback.
+//
+// The class leg and the token leg are separate on purpose. `permitsAStoredCopy`
+// asks the SEMANTIC question — may any cache keep a copy? — and is satisfied by
+// `no-store` alone, so `max-age=0` would be an unguarded token if nothing named
+// it. It is there for the cache that mishandles `no-store` and would otherwise
+// compute HEURISTIC freshness from Last-Modified, whose value here is the image
+// build date.
+test.describe('the policy document cannot be served from a copy that outlived its release — config shape (POL-P1)', () => {
+  test('the class app/nginx.conf declares for /privacy permits no stored copy', () => {
+    const declared = declaredCacheControl(conf);
+    expect(
+      permitsAStoredCopy(declared),
+      `app/nginx.conf declares "${declared}" for /privacy, and that class lets a cache keep a copy after the release`
+    ).toBe(false);
+  });
+
+  test('both tokens are named, and each is named for its own reason', () => {
+    const declared = declaredCacheControl(conf);
+    expect(declared, 'no-store is the token that forbids storing at all, in every cache including the edge').toContain(
+      'no-store'
+    );
+    expect(
+      declared,
+      'max-age=0 is the explicit expiration that stops a cache mishandling no-store from falling back to heuristic freshness'
+    ).toContain('max-age=0');
+  });
+
+  test('the cache-class detector is armed, and proves it on inputs it builds in-run', () => {
+    // Self-proving rather than argued: the same predicate the two legs above
+    // and the promotion check all call is shown reaching the right verdict on
+    // classes written here, so no shipped file is mutated and nobody is trusted
+    // to put one back. The first line is the class this packet REPLACED — the
+    // one that was live during the 2026-08-29 gap.
+    expect(permitsAStoredCopy('public, max-age=3600, must-revalidate')).toBe(true);
+    expect(permitsAStoredCopy('no-cache'), 'no-cache permits a STORED copy and only requires revalidating it').toBe(true);
+    expect(permitsAStoredCopy('public, immutable, max-age=31536000')).toBe(true);
+    expect(permitsAStoredCopy('max-age=60')).toBe(true);
+    expect(permitsAStoredCopy(undefined), 'a missing header must fail CLOSED — heuristic freshness applies').toBe(true);
+    expect(permitsAStoredCopy(''), 'an empty header must fail CLOSED').toBe(true);
+    expect(permitsAStoredCopy('no-store, max-age=0')).toBe(false);
+    expect(permitsAStoredCopy('NO-STORE'), 'the directive is case-insensitive').toBe(false);
+    expect(permitsAStoredCopy('private, no-store')).toBe(false);
+
+    // Anti-vacuity, and fail-closed: a parser that stopped matching would make
+    // both legs above pass on an empty string.
+    expect(declaredCacheControl(conf).length).toBeGreaterThan(0);
+    expect(() => declaredCacheControl('http { server { } }')).toThrow(/no `location = \/privacy \{` block/);
+  });
+});
+
 test.describe('delivery contract — live responses', () => {
   test('/sw.js is served no-cache with Service-Worker-Allowed', async ({ request }) => {
     const res = await request.get('/sw.js');
@@ -411,13 +479,29 @@ test.describe('delivery contract — live responses', () => {
     ).not.toContain('<table id="mainTable">');
   });
 
-  test('/privacy is cached as a document, never as immutable', async ({ request }) => {
+  test('/privacy is served in a class no cache may store (POL-P1)', async ({ request }) => {
+    // WHAT THIS LEG USED TO SAY, AND WHY THAT WAS TOO WEAK. It asserted the
+    // shell's class — `public, max-age=3600, must-revalidate` — under the title
+    // «cached as a document, never as immutable». Both halves were true and the
+    // pair passed for an hour on 2026-08-29 while the live address served the
+    // PREVIOUS edition: `public` plus an hour of max-age lets the edge and the
+    // browser hold this document for an hour AFTER a release, so a parent can
+    // read edition N while running the app of edition N+1. A document that is a
+    // public promise about a family's data cannot be delivered in a class that
+    // outlives the release it shipped with.
     const res = await request.get('/privacy');
-    // The shell's class. Never `immutable`: a new redaction of the policy ships
-    // at the SAME address — the document is versioned by its own text and its
-    // effective date, not by its URL, unlike /kb-v{N}.json or the module mount.
-    expect(res.headers()['cache-control']).toBe('public, max-age=3600, must-revalidate');
-    expect(res.headers()['cache-control']).not.toContain('immutable');
+    const cacheControl = res.headers()['cache-control'];
+
+    // Read from the config, not restated: a value written down twice agrees
+    // with itself after one of the two changes.
+    expect(cacheControl, 'the served class is not the one app/nginx.conf declares').toBe(
+      declaredCacheControl(conf)
+    );
+    expect(
+      permitsAStoredCopy(cacheControl),
+      `the served class ${cacheControl} permits a stored copy — it can outlive the release`
+    ).toBe(false);
+    expect(cacheControl).not.toContain('immutable');
   });
 
   test('/privacy/ redirects to the canonical address instead of serving the shell', async ({
